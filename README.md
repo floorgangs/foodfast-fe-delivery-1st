@@ -75,12 +75,18 @@ expo start
 | \[PRD\_FE\_FoodFast.md](docs/PRD\_FE\_FoodFast.md) | Tài liệu yêu cầu sản phẩm |
 | \[FE\_Design.md](docs/FE\_Design.md)             | Mô tả thiết kế giao diện  |
 | \[Test\_Scenarios.md](docs/Test\_Scenarios.md)   | Kịch bản kiểm thử         |
-
+| CongNghePhanMem.docx                             | Tài liệu báo cáo          |
 ## Tiến độ
 
 * 2025-10-05: Khởi tạo repo + tạo cấu trúc thư mục + viết README.
+* 2025-10-18: Tạo file báo cáo, nội dung gồm phân tích thiết kế, sơ đồ use case
+* 2025-10-20: push file báo cáo lên github
 
 ## Use case
+### Tiếp nhận và xử lý đơn hàng
+<img width="771" height="1183" alt="image" src="https://github.com/user-attachments/assets/df693b0a-91f2-4579-887e-6e0ad942e230" />
+
+### Quản lý thực đơn và thông tin nhà hàng
 
 ![usecase1](images/ucql-Trang-1.png)
 ![usecase2](images/ucql-Trang-2.png)
