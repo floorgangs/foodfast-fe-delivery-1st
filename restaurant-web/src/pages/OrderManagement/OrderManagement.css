@@ -1,0 +1,138 @@
+.order-management-page h1 {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+  color: #1a1a1a;
+  font-weight: 800;
+}
+
+.subtitle {
+  color: #666;
+  margin-bottom: 2.5rem;
+  font-size: 1.1rem;
+}
+
+.orders-list {
+  display: grid;
+  gap: 2rem;
+}
+
+.order-card {
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  border: 2px solid #f0f0f0;
+}
+
+.order-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  border-color: #667eea;
+}
+
+.order-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #eee;
+}
+
+.order-header h3 {
+  font-size: 1.25rem;
+  color: #333;
+  margin-bottom: 0.25rem;
+}
+
+.customer-name {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.status-badge {
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.status-badge.pending {
+  background: #fff7e6;
+  color: #fa8c16;
+}
+
+.status-badge.preparing {
+  background: #e6f7ff;
+  color: #1890ff;
+}
+
+.status-badge.delivering {
+  background: #f6ffed;
+  color: #52c41a;
+}
+
+.status-badge.completed {
+  background: #f0f0f0;
+  color: #595959;
+}
+
+.order-details {
+  margin-bottom: 1rem;
+}
+
+.order-details p {
+  margin: 0.5rem 0;
+  color: #666;
+}
+
+.order-items {
+  font-weight: 500;
+  color: #333 !important;
+}
+
+.order-total {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #ee4d2d !important;
+}
+
+.order-actions {
+  display: flex;
+  gap: 1rem;
+}
+
+.order-actions button {
+  flex: 1;
+  padding: 0.75rem;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.3s;
+}
+
+.order-actions button:hover {
+  opacity: 0.8;
+}
+
+.accept-btn {
+  background: #52c41a;
+  color: white;
+}
+
+.reject-btn {
+  background: #ff4d4f;
+  color: white;
+}
+
+.ready-btn {
+  background: #1890ff;
+  color: white;
+}
+
+.complete-btn {
+  background: #52c41a;
+  color: white;
+}
