@@ -31,6 +31,17 @@ const authSlice = createSlice({
       state.isAuthenticated = true;
       AsyncStorage.setItem('user', JSON.stringify(state.user));
     },
+    register: (state, action: PayloadAction<{ name: string; email: string; phone: string; password: string }>) => {
+      // Mock register - lưu thông tin thật từ form
+      state.user = {
+        id: Date.now().toString(),
+        name: action.payload.name,
+        email: action.payload.email,
+        phone: action.payload.phone,
+      };
+      state.isAuthenticated = true;
+      AsyncStorage.setItem('user', JSON.stringify(state.user));
+    },
     logout: (state) => {
       state.user = null;
       state.isAuthenticated = false;
@@ -44,5 +55,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { login, logout, setUser } = authSlice.actions;
+export const { login, register, logout, setUser } = authSlice.actions;
 export default authSlice.reducer;

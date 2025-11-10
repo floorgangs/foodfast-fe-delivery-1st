@@ -6,31 +6,70 @@ import {
   StyleSheet,
   TouchableOpacity,
   Animated,
+  Dimensions,
+  StatusBar,
+  Platform,
 } from 'react-native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 
+const { width, height } = Dimensions.get('window');
+
 const OrderTrackingScreen = ({ navigation }: any) => {
   const { currentOrder } = useSelector((state: RootState) => state.orders);
-  const [dronePosition] = useState(new Animated.Value(0));
+  const [dronePosition] = useState(new Animated.ValueXY({ x: 50, y: 50 }));
+  const [orderStatus, setOrderStatus] = useState<'preparing' | 'delivering' | 'delivered'>('preparing');
+  const [estimatedTime, setEstimatedTime] = useState(15);
 
   useEffect(() => {
-    // Animate drone
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(dronePosition, {
-          toValue: 20,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(dronePosition, {
-          toValue: 0,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
+    // Simulate order status changes
+    const statusTimer = setTimeout(() => {
+      setOrderStatus('delivering');
+      startDroneAnimation();
+    }, 3000);
+
+    const deliveryTimer = setTimeout(() => {
+      setOrderStatus('delivered');
+    }, 18000);
+
+    return () => {
+      clearTimeout(statusTimer);
+      clearTimeout(deliveryTimer);
+    };
   }, []);
+
+  useEffect(() => {
+    // Update estimated time every second
+    const timer = setInterval(() => {
+      setEstimatedTime(prev => {
+        if (prev > 0) return prev - 1;
+        return 0;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  const startDroneAnimation = () => {
+    // Animate drone from restaurant to customer (simulated path)
+    Animated.sequence([
+      Animated.timing(dronePosition, {
+        toValue: { x: 150, y: 100 },
+        duration: 5000,
+        useNativeDriver: false,
+      }),
+      Animated.timing(dronePosition, {
+        toValue: { x: 250, y: 150 },
+        duration: 5000,
+        useNativeDriver: false,
+      }),
+      Animated.timing(dronePosition, {
+        toValue: { x: 250, y: 300 },
+        duration: 5000,
+        useNativeDriver: false,
+      }),
+    ]).start();
+  };
 
   if (!currentOrder) {
     return (
@@ -72,81 +111,78 @@ const OrderTrackingScreen = ({ navigation }: any) => {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <View style={{ width: 40 }} />
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Text style={styles.backButton}>←</Text>
+        </TouchableOpacity>
         <Text style={styles.headerTitle}>Theo dõi đơn hàng</Text>
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* Order Info */}
-        <View style={styles.orderCard}>
-          <Text style={styles.orderId}>Mã đơn hàng: {currentOrder.id}</Text>
-          <Text style={styles.restaurantName}>{currentOrder.restaurantName}</Text>
-          <Text style={styles.orderTotal}>
-            Tổng tiền: {currentOrder.total.toLocaleString('vi-VN')}đ
-          </Text>
-        </View>
+      {/* Mock Map */}
+      <View style={styles.mapContainer}>
+        <View style={styles.mockMap}>
+          {/* Restaurant marker */}
+          <View style={[styles.marker, { top: 50, left: 50 }]}>
+            <Text style={styles.markerIcon}>🏪</Text>
+            <Text style={styles.markerLabel}>Nhà hàng</Text>
+          </View>
 
-        {/* Drone Animation */}
-        {currentOrder.status === 'delivering' && (
-          <View style={styles.droneContainer}>
-            <Animated.Text
+          {/* Customer marker */}
+          <View style={[styles.marker, { top: 250, left: 300 }]}>
+            <Text style={styles.markerIcon}>📍</Text>
+            <Text style={styles.markerLabel}>Bạn</Text>
+          </View>
+
+          {/* Drone animation */}
+          {orderStatus === 'delivering' && (
+            <Animated.View
               style={[
-                styles.droneIcon,
-                { transform: [{ translateY: dronePosition }] },
+                styles.droneMarker,
+                {
+                  transform: [
+                    { translateX: dronePosition.x },
+                    { translateY: dronePosition.y },
+                  ],
+                },
               ]}
             >
-              🚁
-            </Animated.Text>
-            <Text style={styles.droneText}>Drone đang bay đến</Text>
+              <Text style={styles.droneIcon}>🚁</Text>
+            </Animated.View>
+          )}
+
+          {/* Path line */}
+          <View style={styles.pathLine} />
+        </View>
+      </View>
+
+      <ScrollView style={styles.bottomSheet}>
+        {/* Order Info */}
+        <View style={styles.orderCard}>
+          <View style={styles.orderHeader}>
+            <View>
+              <Text style={styles.orderId}>#{currentOrder.id.slice(0, 8)}</Text>
+              <Text style={styles.restaurantName}>{currentOrder.restaurantName}</Text>
+            </View>
+            <View style={styles.statusBadge}>
+              <Text style={styles.statusText}>
+                {orderStatus === 'preparing' ? '👨‍🍳 Đang chuẩn bị' : orderStatus === 'delivering' ? '🚁 Đang giao' : '✓ Đã giao'}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Estimated Time */}
+        {orderStatus !== 'delivered' && (
+          <View style={styles.estimateCard}>
+            <Text style={styles.estimateLabel}>Thời gian dự kiến</Text>
+            <Text style={styles.estimateTime}>
+              {`${Math.floor(estimatedTime / 60)}:${(estimatedTime % 60).toString().padStart(2, '0')}`}
+            </Text>
+            <Text style={styles.estimateSubtext}>
+              Drone sẽ giao đến trong vài phút
+            </Text>
           </View>
         )}
-
-        {/* Status Timeline */}
-        <View style={styles.timeline}>
-          {statusSteps.map((step, index) => (
-            <View key={step.key} style={styles.timelineItem}>
-              <View style={styles.timelineIconContainer}>
-                <View
-                  style={[
-                    styles.timelineIcon,
-                    index <= currentStep && styles.timelineIconActive,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.timelineIconText,
-                      index <= currentStep && styles.timelineIconTextActive,
-                    ]}
-                  >
-                    {step.icon}
-                  </Text>
-                </View>
-                {index < statusSteps.length - 1 && (
-                  <View
-                    style={[
-                      styles.timelineLine,
-                      index < currentStep && styles.timelineLineActive,
-                    ]}
-                  />
-                )}
-              </View>
-              <View style={styles.timelineContent}>
-                <Text
-                  style={[
-                    styles.timelineLabel,
-                    index <= currentStep && styles.timelineLabelActive,
-                  ]}
-                >
-                  {step.label}
-                </Text>
-                {index === currentStep && (
-                  <Text style={styles.timelineStatus}>Đang thực hiện</Text>
-                )}
-              </View>
-            </View>
-          ))}
-        </View>
 
         {/* Order Items */}
         <View style={styles.itemsSection}>
@@ -154,14 +190,35 @@ const OrderTrackingScreen = ({ navigation }: any) => {
           {currentOrder.items.map((item: any, index: number) => (
             <View key={index} style={styles.orderItem}>
               <Text style={styles.itemName}>
-                {item.quantity}x {item.name}
+                {`${item.quantity}x ${item.name}`}
               </Text>
               <Text style={styles.itemPrice}>
-                {item.price.toLocaleString('vi-VN')}đ
+                {`${(item.price * item.quantity).toLocaleString('vi-VN')}đ`}
               </Text>
             </View>
           ))}
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>Tổng cộng</Text>
+            <Text style={styles.totalValue}>{`${currentOrder.total.toLocaleString('vi-VN')}đ`}</Text>
+          </View>
         </View>
+
+        {/* Delivery Success */}
+        {orderStatus === 'delivered' && (
+          <View style={styles.successCard}>
+            <Text style={styles.successIcon}>✓</Text>
+            <Text style={styles.successTitle}>Giao hàng thành công!</Text>
+            <Text style={styles.successText}>
+              Cảm ơn bạn đã sử dụng dịch vụ giao hàng drone của FoodFast
+            </Text>
+            <TouchableOpacity
+              style={styles.homeButton}
+              onPress={() => navigation.navigate('MainTabs')}
+            >
+              <Text style={styles.homeButtonText}>Về trang chủ</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -171,6 +228,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fafafa',
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   header: {
     flexDirection: 'row',
@@ -183,7 +241,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#eee',
   },
   backButton: {
-    fontSize: 16,
+    fontSize: 24,
     color: '#EA5034',
     fontWeight: '500',
   },
@@ -192,48 +250,108 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
-  content: {
-    padding: 16,
+  mapContainer: {
+    height: height * 0.4,
+    backgroundColor: '#E8F5E9',
+  },
+  mockMap: {
+    flex: 1,
+    position: 'relative',
+  },
+  marker: {
+    position: 'absolute',
+    alignItems: 'center',
+  },
+  markerIcon: {
+    fontSize: 32,
+  },
+  markerLabel: {
+    fontSize: 10,
+    backgroundColor: '#fff',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginTop: 4,
+  },
+  droneMarker: {
+    position: 'absolute',
+    alignItems: 'center',
+  },
+  droneIcon: {
+    fontSize: 40,
+  },
+  pathLine: {
+    position: 'absolute',
+    top: 65,
+    left: 65,
+    width: 250,
+    height: 200,
+    borderWidth: 2,
+    borderColor: '#EA5034',
+    borderStyle: 'dashed',
+    borderRadius: 20,
+  },
+  bottomSheet: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    marginTop: -20,
   },
   orderCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
     padding: 16,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  orderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   orderId: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 8,
+    fontWeight: 'bold',
   },
   restaurantName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 8,
+    marginTop: 4,
   },
-  orderTotal: {
-    fontSize: 16,
-    color: '#EA5034',
-    fontWeight: 'bold',
+  statusBadge: {
+    backgroundColor: '#FFF5F3',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
   },
-  droneContainer: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  droneIcon: {
-    fontSize: 60,
-    marginBottom: 12,
-  },
-  droneText: {
-    fontSize: 16,
+  statusText: {
+    fontSize: 12,
     color: '#EA5034',
     fontWeight: '600',
+  },
+  estimateCard: {
+    backgroundColor: '#EA5034',
+    margin: 16,
+    padding: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  estimateLabel: {
+    fontSize: 14,
+    color: '#fff',
+    marginBottom: 8,
+  },
+  estimateTime: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 8,
+  },
+  estimateSubtext: {
+    fontSize: 12,
+    color: '#fff',
+    opacity: 0.9,
   },
   timeline: {
     backgroundColor: '#fff',
@@ -322,6 +440,48 @@ const styles = StyleSheet.create({
     color: '#666',
     fontWeight: '500',
   },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop: 16,
+    marginTop: 8,
+    borderTopWidth: 2,
+    borderTopColor: '#e0e0e0',
+  },
+  totalLabel: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  totalValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#EA5034',
+  },
+  successCard: {
+    backgroundColor: '#E8F5E9',
+    margin: 16,
+    padding: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  successIcon: {
+    fontSize: 64,
+    color: '#27AE60',
+    marginBottom: 16,
+  },
+  successTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  successText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
@@ -344,8 +504,8 @@ const styles = StyleSheet.create({
   },
   homeButton: {
     backgroundColor: '#EA5034',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    paddingHorizontal: 32,
+    paddingVertical: 14,
     borderRadius: 8,
   },
   homeButtonText: {
