@@ -1,225 +1,585 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
+  Alert,
   Animated,
   Dimensions,
-  StatusBar,
   Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import MapView, { Circle, LatLng, Marker, Polyline, PROVIDER_GOOGLE, Region } from 'react-native-maps';
+import { Ionicons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 
-const { width, height } = Dimensions.get('window');
+const { height } = Dimensions.get('window');
+const MAP_HEIGHT = height * 0.42;
+const INITIAL_CAMERA_ZOOM = 15.8;
+const CAMERA_PITCH = 45;
+const CAMERA_ANIMATION_DURATION = 750;
+const ETA_SECONDS = 15 * 60;
+
+const statusSteps = [
+  { key: 'confirmed', label: 'Đã xác nhận', description: 'FoodFast đã nhận đơn của bạn', threshold: 0 },
+  { key: 'preparing', label: 'Đang chuẩn bị', description: 'Nhà hàng đang hoàn tất món ăn', threshold: 0.2 },
+  { key: 'inflight', label: 'Drone đang bay', description: 'Drone rời bãi đáp và bay đường thẳng', threshold: 0.45 },
+  { key: 'arriving', label: 'Sắp giao', description: 'Drone hạ độ cao để giao hàng', threshold: 0.75 },
+  { key: 'delivered', label: 'Đã giao', description: 'Phi công xác nhận bạn đã nhận hàng', threshold: 0.98 },
+] as const;
+
+const getFlightProgress = (progress: number): number => {
+  const inflightStep = statusSteps.find(step => step.key === 'inflight');
+  const inflightThreshold = inflightStep?.threshold ?? 0.45;
+
+  if (progress <= inflightThreshold) {
+    return 0;
+  }
+
+  const normalized = (progress - inflightThreshold) / (1 - inflightThreshold);
+  return Math.min(Math.max(normalized, 0), 1);
+};
+
+const FALLBACK_PICKUP: LatLng = { latitude: 10.776923, longitude: 106.700981 };
+const FALLBACK_DROPOFF: LatLng = { latitude: 10.782112, longitude: 106.70917 };
+
+const MAP_STYLE = [
+  {
+    elementType: 'geometry',
+    stylers: [{ color: '#f5f5f5' }],
+  },
+  {
+    elementType: 'labels.icon',
+    stylers: [{ visibility: 'off' }],
+  },
+  {
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#616161' }],
+  },
+  {
+    elementType: 'labels.text.stroke',
+    stylers: [{ color: '#f5f5f5' }],
+  },
+  {
+    featureType: 'poi.park',
+    elementType: 'geometry',
+    stylers: [{ color: '#e5f4d7' }],
+  },
+  {
+    featureType: 'poi.business',
+    stylers: [{ visibility: 'off' }],
+  },
+  {
+    featureType: 'road',
+    elementType: 'geometry',
+    stylers: [{ color: '#ffffff' }],
+  },
+  {
+    featureType: 'road.highway',
+    elementType: 'geometry',
+    stylers: [{ color: '#fbe9e7' }],
+  },
+  {
+    featureType: 'water',
+    elementType: 'geometry',
+    stylers: [{ color: '#d4e4fb' }],
+  },
+];
+
+const buildRouteCoordinates = (start: LatLng, end: LatLng): LatLng[] => {
+  if (!start || !end) {
+    return [FALLBACK_PICKUP, FALLBACK_DROPOFF];
+  }
+
+  const points: LatLng[] = [];
+  const steps = 30;
+
+  for (let i = 0; i <= steps; i += 1) {
+    const t = i / steps;
+    points.push({
+      latitude: start.latitude + (end.latitude - start.latitude) * t,
+      longitude: start.longitude + (end.longitude - start.longitude) * t,
+    });
+  }
+
+  return points;
+};
+
+const computeRegionFromRoute = (coordinates: LatLng[]): Region => {
+  if (!coordinates.length) {
+    return {
+      latitude: FALLBACK_PICKUP.latitude,
+      longitude: FALLBACK_PICKUP.longitude,
+      latitudeDelta: 0.03,
+      longitudeDelta: 0.03,
+    };
+  }
+
+  let minLat = coordinates[0].latitude;
+  let maxLat = coordinates[0].latitude;
+  let minLng = coordinates[0].longitude;
+  let maxLng = coordinates[0].longitude;
+
+  coordinates.forEach(point => {
+    minLat = Math.min(minLat, point.latitude);
+    maxLat = Math.max(maxLat, point.latitude);
+    minLng = Math.min(minLng, point.longitude);
+    maxLng = Math.max(maxLng, point.longitude);
+  });
+
+  const paddingLat = Math.max((maxLat - minLat) * 0.6, 0.01);
+  const paddingLng = Math.max((maxLng - minLng) * 0.6, 0.01);
+
+  return {
+    latitude: (minLat + maxLat) / 2,
+    longitude: (minLng + maxLng) / 2,
+    latitudeDelta: (maxLat - minLat) + paddingLat,
+    longitudeDelta: (maxLng - minLng) + paddingLng,
+  };
+};
+
+const getCoordinateAtProgress = (route: LatLng[], progress: number): LatLng => {
+  if (!route.length) {
+    return FALLBACK_PICKUP;
+  }
+
+  if (progress <= 0) {
+    return route[0];
+  }
+
+  if (progress >= 1) {
+    return route[route.length - 1];
+  }
+
+  const clampedProgress = Math.max(0, Math.min(progress, 1));
+  const segments = route.length - 1;
+  const exactIndex = clampedProgress * segments;
+  const segmentIndex = Math.min(Math.floor(exactIndex), segments - 1);
+  const segmentProgress = exactIndex - segmentIndex;
+  const start = route[segmentIndex];
+  const end = route[segmentIndex + 1];
+
+  return {
+    latitude: start.latitude + (end.latitude - start.latitude) * segmentProgress,
+    longitude: start.longitude + (end.longitude - start.longitude) * segmentProgress,
+  };
+};
+
+const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
+const toDegrees = (radians: number) => (radians * 180) / Math.PI;
+
+const calculateBearing = (from: LatLng, to: LatLng): number => {
+  if (from.latitude === to.latitude && from.longitude === to.longitude) {
+    return 0;
+  }
+
+  const lat1 = toRadians(from.latitude);
+  const lat2 = toRadians(to.latitude);
+  const deltaLng = toRadians(to.longitude - from.longitude);
+
+  const y = Math.sin(deltaLng) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(deltaLng);
+  const bearing = toDegrees(Math.atan2(y, x));
+
+  return (bearing + 360) % 360;
+};
+
+const buildProgressPolyline = (route: LatLng[], progress: number): LatLng[] => {
+  if (!route.length) {
+    return [];
+  }
+
+  const clamped = Math.max(0, Math.min(progress, 1));
+  if (clamped === 0) {
+    return [];
+  }
+
+  const segments = route.length - 1;
+  if (segments <= 0) {
+    return [...route];
+  }
+
+  const target = clamped * segments;
+  const polyline: LatLng[] = [route[0]];
+
+  for (let i = 0; i < segments; i += 1) {
+    const start = route[i];
+    const end = route[i + 1];
+
+    if (target >= i + 1) {
+      polyline.push(end);
+      continue;
+    }
+
+    if (target > i) {
+      const segmentProgress = target - i;
+      polyline.push({
+        latitude: start.latitude + (end.latitude - start.latitude) * segmentProgress,
+        longitude: start.longitude + (end.longitude - start.longitude) * segmentProgress,
+      });
+    }
+
+    break;
+  }
+
+  return polyline;
+};
 
 const OrderTrackingScreen = ({ navigation }: any) => {
   const { currentOrder } = useSelector((state: RootState) => state.orders);
-  const [dronePosition] = useState(new Animated.ValueXY({ x: 50, y: 50 }));
-  const [orderStatus, setOrderStatus] = useState<'preparing' | 'delivering' | 'delivered'>('preparing');
-  const [estimatedTime, setEstimatedTime] = useState(15);
+  const progressRef = useRef(new Animated.Value(0));
+  const mapRef = useRef<MapView | null>(null);
+  const cameraReadyRef = useRef(false);
+  const lastHeadingRef = useRef(0);
+  const [progressValue, setProgressValue] = useState(0);
+  const [acknowledged, setAcknowledged] = useState(false);
+  const fallbackOrder = useMemo(
+    () => ({
+      id: 'FFDEMO1',
+      restaurantName: 'FoodFast Demo Kitchen',
+      items: [
+        { id: 'demo-1', name: 'Foodie Rice Bowl', quantity: 1, price: 78000 },
+        { id: 'demo-2', name: 'Coconut Smoothie', quantity: 2, price: 45000 },
+        { id: 'demo-3', name: 'Veggie Spring Rolls', quantity: 1, price: 32000 },
+      ],
+      total: 200000,
+      status: 'delivering' as const,
+      createdAt: new Date().toISOString(),
+      deliveryAddress: '21 Nguyễn Trung Trực, Quận 1, TP.HCM',
+      pickupCoordinate: FALLBACK_PICKUP,
+      dropoffCoordinate: FALLBACK_DROPOFF,
+      unlockPin: '4821',
+    }),
+    [],
+  );
+  const activeOrder = currentOrder ?? fallbackOrder;
+  const isMockOrder = !currentOrder;
 
   useEffect(() => {
-    // Simulate order status changes
-    const statusTimer = setTimeout(() => {
-      setOrderStatus('delivering');
-      startDroneAnimation();
-    }, 3000);
+    const listener = progressRef.current.addListener(({ value }) => setProgressValue(value));
+    return () => progressRef.current.removeListener(listener);
+  }, []);
 
-    const deliveryTimer = setTimeout(() => {
-      setOrderStatus('delivered');
-    }, 18000);
+  useEffect(() => {
+    const progress = progressRef.current;
+
+    progress.stopAnimation();
+    progress.setValue(0);
+    setProgressValue(0);
+    setAcknowledged(false);
+
+    const animation = Animated.timing(progress, {
+      toValue: 1,
+      duration: 22000,
+      useNativeDriver: false,
+    });
+
+    animation.start(({ finished }) => {
+      if (finished) {
+        progress.setValue(1);
+        setProgressValue(1);
+      }
+    });
 
     return () => {
-      clearTimeout(statusTimer);
-      clearTimeout(deliveryTimer);
+      animation.stop();
     };
-  }, []);
+  }, [currentOrder?.id]);
+
+  const activeStepIndex = useMemo(
+    () => statusSteps.reduce((acc, step, index) => (progressValue >= step.threshold ? index : acc), 0),
+    [progressValue],
+  );
+
+  const etaSeconds = Math.max(0, Math.round((1 - progressValue) * ETA_SECONDS));
+  const etaMinutes = Math.floor(etaSeconds / 60);
+  const etaRemainingSeconds = etaSeconds % 60;
+  const droneCode = `FF-${activeOrder.id.slice(0, 4).toUpperCase()}`;
+  const canConfirm = progressValue >= statusSteps[statusSteps.length - 1].threshold;
+  const pickupCoordinate = activeOrder.pickupCoordinate ?? FALLBACK_PICKUP;
+  const dropoffCoordinate = activeOrder.dropoffCoordinate ?? FALLBACK_DROPOFF;
+  const routeCoordinates = useMemo(
+    () => buildRouteCoordinates(pickupCoordinate, dropoffCoordinate),
+    [pickupCoordinate, dropoffCoordinate],
+  );
+  const mapRegion = useMemo(() => computeRegionFromRoute(routeCoordinates), [routeCoordinates]);
+  const flightProgress = useMemo(() => getFlightProgress(progressValue), [progressValue]);
+  const droneCoordinate = useMemo(
+    () => getCoordinateAtProgress(routeCoordinates, flightProgress),
+    [routeCoordinates, flightProgress],
+  );
+  const routeHeading = useMemo(() => {
+    const nextPoint = getCoordinateAtProgress(routeCoordinates, Math.min(flightProgress + 0.02, 1));
+    return calculateBearing(droneCoordinate, nextPoint);
+  }, [routeCoordinates, flightProgress, droneCoordinate]);
+  const progressPolyline = useMemo(
+    () => buildProgressPolyline(routeCoordinates, flightProgress),
+    [routeCoordinates, flightProgress],
+  );
 
   useEffect(() => {
-    // Update estimated time every second
-    const timer = setInterval(() => {
-      setEstimatedTime(prev => {
-        if (prev > 0) return prev - 1;
-        return 0;
-      });
-    }, 1000);
+    cameraReadyRef.current = false;
+  }, [activeOrder.id]);
 
-    return () => clearInterval(timer);
-  }, []);
+  useEffect(() => {
+    if (!cameraReadyRef.current || !mapRef.current) {
+      return;
+    }
 
-  const startDroneAnimation = () => {
-    // Animate drone from restaurant to customer (simulated path)
-    Animated.sequence([
-      Animated.timing(dronePosition, {
-        toValue: { x: 150, y: 100 },
-        duration: 5000,
-        useNativeDriver: false,
-      }),
-      Animated.timing(dronePosition, {
-        toValue: { x: 250, y: 150 },
-        duration: 5000,
-        useNativeDriver: false,
-      }),
-      Animated.timing(dronePosition, {
-        toValue: { x: 250, y: 300 },
-        duration: 5000,
-        useNativeDriver: false,
-      }),
-    ]).start();
-  };
+    mapRef.current.fitToCoordinates(routeCoordinates, {
+      edgePadding: { top: 80, right: 60, bottom: 80, left: 60 },
+      animated: true,
+    });
+  }, [routeCoordinates]);
 
-  if (!currentOrder) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <View style={{ width: 40 }} />
-          <Text style={styles.headerTitle}>Theo dõi đơn hàng</Text>
-          <View style={{ width: 40 }} />
-        </View>
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>📦</Text>
-          <Text style={styles.emptyText}>Chưa có đơn hàng nào</Text>
-          <Text style={styles.emptySubText}>Hãy đặt món ngay để trải nghiệm!</Text>
-        </View>
-      </View>
+  useEffect(() => {
+    if (!cameraReadyRef.current || !mapRef.current) {
+      return;
+    }
+
+    if (flightProgress <= 0) {
+      return;
+    }
+
+    mapRef.current.animateToRegion(
+      {
+        ...droneCoordinate,
+        latitudeDelta: 0.015,
+        longitudeDelta: 0.015,
+      },
+      500,
     );
-  }
-
-  const getStatusStep = (status: string) => {
-    const steps = {
-      confirmed: 0,
-      preparing: 1,
-      delivering: 2,
-      delivered: 3,
-    };
-    return steps[status as keyof typeof steps] || 0;
-  };
-
-  const currentStep = getStatusStep(currentOrder.status);
-
-  const statusSteps = [
-    { key: 'confirmed', label: 'Đã xác nhận', icon: '✓' },
-    { key: 'preparing', label: 'Đang chuẩn bị', icon: '👨‍🍳' },
-    { key: 'delivering', label: 'Đang giao', icon: '🚁' },
-    { key: 'delivered', label: 'Đã giao', icon: '🎉' },
-  ];
+  }, [droneCoordinate, flightProgress]);
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>←</Text>
+          <Ionicons name="chevron-back" size={22} color="#EA5034" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Theo dõi đơn hàng</Text>
-        <View style={{ width: 40 }} />
+        <Text style={styles.headerTitle}>Theo dõi drone</Text>
+        <View style={{ width: 22 }} />
       </View>
 
-      {/* Mock Map */}
-      <View style={styles.mapContainer}>
-        <View style={styles.mockMap}>
-          {/* Restaurant marker */}
-          <View style={[styles.marker, { top: 50, left: 50 }]}>
-            <Text style={styles.markerIcon}>🏪</Text>
-            <Text style={styles.markerLabel}>Nhà hàng</Text>
-          </View>
+      <View style={styles.banner}>
+        <View style={styles.bannerLeft}>
+          <Text style={styles.bannerLabel}>Drone tự động</Text>
+          <Text style={styles.bannerText}>Drone {droneCode} đang bay thẳng từ nhà hàng đến vị trí giao hàng.</Text>
+        </View>
+        <Ionicons name="radio-outline" size={20} color="#EA5034" />
+      </View>
 
-          {/* Customer marker */}
-          <View style={[styles.marker, { top: 250, left: 300 }]}>
-            <Text style={styles.markerIcon}>📍</Text>
-            <Text style={styles.markerLabel}>Bạn</Text>
-          </View>
-
-          {/* Drone animation */}
-          {orderStatus === 'delivering' && (
-            <Animated.View
-              style={[
-                styles.droneMarker,
-                {
-                  transform: [
-                    { translateX: dronePosition.x },
-                    { translateY: dronePosition.y },
-                  ],
-                },
-              ]}
-            >
-              <Text style={styles.droneIcon}>🚁</Text>
-            </Animated.View>
+      <View style={styles.mapWrapper}>
+        <MapView
+          key={activeOrder.id}
+          ref={mapInstance => {
+            mapRef.current = mapInstance;
+          }}
+          style={styles.map}
+          initialRegion={mapRegion}
+          showsCompass={false}
+          showsPointsOfInterest={false}
+          scrollEnabled={false}
+          zoomEnabled={false}
+          pitchEnabled={false}
+          rotateEnabled={false}
+          onMapReady={() => {
+            cameraReadyRef.current = true;
+            if (mapRef.current) {
+              mapRef.current.fitToCoordinates(routeCoordinates, {
+                edgePadding: { top: 80, right: 60, bottom: 80, left: 60 },
+                animated: true,
+              });
+            }
+          }}
+        >
+          <Polyline
+            coordinates={routeCoordinates}
+            strokeColor="rgba(43, 76, 126, 0.18)"
+            strokeWidth={8}
+            lineCap="round"
+            lineJoin="round"
+          />
+          <Polyline
+            coordinates={routeCoordinates}
+            strokeColor="#1B2945"
+            strokeWidth={4}
+            lineCap="round"
+            lineJoin="round"
+          />
+          {progressPolyline.length > 1 && (
+            <Polyline
+              coordinates={progressPolyline}
+              strokeColor="#EA5034"
+              strokeWidth={6}
+              lineCap="round"
+              lineJoin="round"
+            />
           )}
 
-          {/* Path line */}
-          <View style={styles.pathLine} />
+          <Marker 
+            coordinate={pickupCoordinate} 
+            title="Nhà hàng" 
+            description={activeOrder.restaurantName}
+            tracksViewChanges={false}
+            zIndex={100}
+          >
+            <View style={styles.markerWrapper}>
+              <View style={[styles.markerHalo, styles.originHalo]} />
+              <View style={[styles.markerIcon, styles.originMarker]}>
+                <Ionicons name="restaurant" size={20} color="#fff" />
+              </View>
+            </View>
+          </Marker>
+
+          <Marker 
+            coordinate={dropoffCoordinate} 
+            title="Điểm giao hàng" 
+            description={activeOrder.deliveryAddress}
+            tracksViewChanges={false}
+            zIndex={100}
+          >
+            <View style={styles.markerWrapper}>
+              <View style={[styles.markerHalo, styles.destinationHalo]} />
+              <View style={[styles.markerIcon, styles.destinationMarker]}>
+                <Ionicons name="home" size={20} color="#27AE60" />
+              </View>
+            </View>
+          </Marker>
+
+          <Marker
+            coordinate={droneCoordinate}
+            title={`Drone ${droneCode}`}
+            description={`Đang bay: ${Math.round(progressValue * 100)}%`}
+            anchor={{ x: 0.5, y: 0.5 }}
+            tracksViewChanges={false}
+            rotation={routeHeading}
+            flat
+            zIndex={200}
+          >
+            <View style={styles.droneWrapper}>
+              <View style={styles.droneGlow} />
+              <View style={styles.droneMarker}>
+                <Ionicons name="airplane" size={22} color="#fff" />
+              </View>
+            </View>
+          </Marker>
+        </MapView>
+
+        <View style={[styles.mapBadge, styles.shadow]}>
+          <Ionicons name="navigate" size={16} color="#EA5034" />
+          <View style={{ marginLeft: 10 }}>
+            <Text style={styles.mapBadgeLabel}>Điểm giao</Text>
+            <Text style={styles.mapBadgeText}>Cửa nhà • Khu vực an toàn</Text>
+          </View>
         </View>
+        {isMockOrder && (
+          <View style={styles.demoChip}>
+            <Ionicons name="sparkles-outline" size={14} color="#EA5034" />
+            <Text style={styles.demoChipText}>Dữ liệu demo</Text>
+          </View>
+        )}
       </View>
 
-      <ScrollView style={styles.bottomSheet}>
-        {/* Order Info */}
-        <View style={styles.orderCard}>
-          <View style={styles.orderHeader}>
+      <View style={styles.bottomSheet}>
+        <ScrollView
+          contentContainerStyle={styles.bottomContent}
+          showsVerticalScrollIndicator={false}
+          bounces
+        >
+          <View style={styles.summaryHeader}>
             <View>
-              <Text style={styles.orderId}>#{currentOrder.id.slice(0, 8)}</Text>
-              <Text style={styles.restaurantName}>{currentOrder.restaurantName}</Text>
+              <Text style={styles.orderCode}>#{activeOrder.id.slice(0, 6)}</Text>
+              <Text style={styles.restaurantName}>{activeOrder.restaurantName}</Text>
+              <Text style={styles.deliveryAddress}>{activeOrder.deliveryAddress}</Text>
             </View>
-            <View style={styles.statusBadge}>
-              <Text style={styles.statusText}>
-                {orderStatus === 'preparing' ? '👨‍🍳 Đang chuẩn bị' : orderStatus === 'delivering' ? '🚁 Đang giao' : '✓ Đã giao'}
+            <View style={styles.etaPill}>
+              <Ionicons name="time-outline" size={16} color="#EA5034" />
+              <Text style={styles.etaText}>
+                {etaMinutes.toString().padStart(2, '0')}:{etaRemainingSeconds.toString().padStart(2, '0')}
               </Text>
             </View>
           </View>
-        </View>
 
-        {/* Estimated Time */}
-        {orderStatus !== 'delivered' && (
-          <View style={styles.estimateCard}>
-            <Text style={styles.estimateLabel}>Thời gian dự kiến</Text>
-            <Text style={styles.estimateTime}>
-              {`${Math.floor(estimatedTime / 60)}:${(estimatedTime % 60).toString().padStart(2, '0')}`}
-            </Text>
-            <Text style={styles.estimateSubtext}>
-              Drone sẽ giao đến trong vài phút
-            </Text>
+          <View style={styles.timeline}>
+            {statusSteps.map((step, index) => {
+              const reached = index <= activeStepIndex;
+              const nextReached = index < activeStepIndex;
+              return (
+                <View key={step.key} style={styles.timelineRow}>
+                  <View style={styles.timelineRail}>
+                    <View style={[styles.timelineDot, reached && styles.timelineDotActive]}>
+                      {reached ? (
+                        <Ionicons name="checkmark" size={12} color="#fff" />
+                      ) : (
+                        <Ionicons name="ellipse" size={8} color="#CBD3E3" />
+                      )}
+                    </View>
+                    {index < statusSteps.length - 1 && (
+                      <View style={[styles.timelineConnector, nextReached && styles.timelineConnectorActive]} />
+                    )}
+                  </View>
+                  <View style={styles.timelineContent}>
+                    <Text style={[styles.timelineTitle, reached && styles.timelineTitleActive]}>{step.label}</Text>
+                    <Text style={styles.timelineDescription}>{step.description}</Text>
+                  </View>
+                </View>
+              );
+            })}
           </View>
-        )}
 
-        {/* Order Items */}
-        <View style={styles.itemsSection}>
-          <Text style={styles.sectionTitle}>Chi tiết đơn hàng</Text>
-          {currentOrder.items.map((item: any, index: number) => (
-            <View key={index} style={styles.orderItem}>
-              <Text style={styles.itemName}>
-                {`${item.quantity}x ${item.name}`}
-              </Text>
-              <Text style={styles.itemPrice}>
-                {`${(item.price * item.quantity).toLocaleString('vi-VN')}đ`}
-              </Text>
+          <View style={styles.orderCard}>
+            <Text style={styles.sectionHeading}>Chi tiết đơn hàng</Text>
+            {activeOrder.items.slice(0, 3).map((item: any, index: number) => (
+              <View key={`${item.id}-${index}`} style={styles.orderRow}>
+                <Text style={styles.orderRowText}>
+                  {item.quantity}x {item.name}
+                </Text>
+                <Text style={styles.orderRowPrice}>
+                  {(item.price * item.quantity).toLocaleString('vi-VN')}đ
+                </Text>
+              </View>
+            ))}
+            {activeOrder.items.length > 3 && (
+              <Text style={styles.moreItemsText}>và {activeOrder.items.length - 3} món khác</Text>
+            )}
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>Tổng cộng</Text>
+              <Text style={styles.totalValue}>{activeOrder.total.toLocaleString('vi-VN')}đ</Text>
             </View>
-          ))}
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Tổng cộng</Text>
-            <Text style={styles.totalValue}>{`${currentOrder.total.toLocaleString('vi-VN')}đ`}</Text>
           </View>
-        </View>
 
-        {/* Delivery Success */}
-        {orderStatus === 'delivered' && (
-          <View style={styles.successCard}>
-            <Text style={styles.successIcon}>✓</Text>
-            <Text style={styles.successTitle}>Giao hàng thành công!</Text>
-            <Text style={styles.successText}>
-              Cảm ơn bạn đã sử dụng dịch vụ giao hàng drone của FoodFast
+          <View style={styles.handoverCard}>
+            <View style={styles.handoverHeader}>
+              <Ionicons name="shield-checkmark" size={20} color="#27AE60" />
+              <Text style={styles.sectionHeading}>Xác nhận nhận hàng</Text>
+            </View>
+            <Text style={styles.handoverText}>
+              Khi drone hạ cánh, hãy kiểm tra mã PIN trên khoang chứa. Nhấn "Tôi đã nhận hàng" để mở khoang và hoàn tất đơn.
             </Text>
             <TouchableOpacity
-              style={styles.homeButton}
-              onPress={() => navigation.navigate('MainTabs')}
+              style={[styles.confirmButton, (!canConfirm || acknowledged) && styles.confirmButtonDisabled]}
+              disabled={!canConfirm || acknowledged}
+              onPress={() => {
+                setAcknowledged(true);
+                if (Platform.OS === 'web') {
+                  alert('Cảm ơn bạn! Đơn hàng đã được xác nhận.');
+                } else {
+                  Alert.alert('Hoàn tất', 'Cảm ơn bạn! Đơn hàng đã được xác nhận.');
+                }
+              }}
             >
-              <Text style={styles.homeButtonText}>Về trang chủ</Text>
+              <Text style={styles.confirmButtonText}>
+                {acknowledged ? 'Đã xác nhận' : 'Tôi đã nhận hàng'}
+              </Text>
             </TouchableOpacity>
+            <Text style={styles.pinNote}>Mã PIN: {activeOrder.unlockPin ?? '****'}</Text>
           </View>
-        )}
-      </ScrollView>
+        </ScrollView>
+      </View>
     </View>
   );
 };
@@ -227,291 +587,369 @@ const OrderTrackingScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fafafa',
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+    backgroundColor: '#F6F8FD',
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 0,
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: '#fff',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  backButton: {
-    fontSize: 24,
-    color: '#EA5034',
-    fontWeight: '500',
+    borderBottomColor: '#EBEDF5',
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: '700',
+    color: '#172B4D',
   },
-  mapContainer: {
-    height: height * 0.4,
-    backgroundColor: '#E8F5E9',
-  },
-  mockMap: {
-    flex: 1,
+  mapWrapper: {
+    height: MAP_HEIGHT,
+    backgroundColor: '#172B4D',
+    marginHorizontal: 20,
+    marginBottom: 12,
+    borderRadius: 24,
+    overflow: 'hidden',
     position: 'relative',
   },
-  marker: {
-    position: 'absolute',
+  map: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  banner: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFF5F1',
+    marginHorizontal: 20,
+    marginBottom: 12,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  bannerLeft: {
+    flex: 1,
+    marginRight: 12,
+  },
+  bannerLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#EA5034',
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  bannerText: {
+    fontSize: 14,
+    color: '#5D6379',
+  },
+  mapBadge: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+  },
+  mapBadgeLabel: {
+    fontSize: 12,
+    color: '#7A819C',
+    fontWeight: '600',
+  },
+  mapBadgeText: {
+    fontSize: 13,
+    color: '#1B2945',
+    marginTop: 2,
+  },
+  demoChip: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#FFF5F1',
+  },
+  demoChipText: {
+    marginLeft: 6,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#EA5034',
+  },
+  markerWrapper: {
+    width: 56,
+    height: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  markerHalo: {
+    position: 'absolute',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FFEAE6',
+  },
+  originHalo: {
+    backgroundColor: '#FFEAE6',
+  },
+  destinationHalo: {
+    backgroundColor: '#E8F8EF',
   },
   markerIcon: {
-    fontSize: 32,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    elevation: 8,
   },
-  markerLabel: {
-    fontSize: 10,
-    backgroundColor: '#fff',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    marginTop: 4,
+  originMarker: {
+    backgroundColor: '#EA5034',
+  },
+  destinationMarker: {
+    backgroundColor: '#27AE60',
+  },
+  droneWrapper: {
+    width: 70,
+    height: 70,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  droneGlow: {
+    position: 'absolute',
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: '#FFF5F1',
   },
   droneMarker: {
-    position: 'absolute',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#EA5034',
     alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#EA5034',
+    shadowOpacity: 0.5,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 12,
+    elevation: 10,
   },
-  droneIcon: {
-    fontSize: 40,
-  },
-  pathLine: {
-    position: 'absolute',
-    top: 65,
-    left: 65,
-    width: 250,
-    height: 200,
-    borderWidth: 2,
-    borderColor: '#EA5034',
-    borderStyle: 'dashed',
-    borderRadius: 20,
+  shadow: {
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
   },
   bottomSheet: {
     flex: 1,
     backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    marginTop: -20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    marginTop: -24,
+    paddingHorizontal: 20,
+    paddingTop: 20,
   },
-  orderCard: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+  bottomContent: {
+    paddingBottom: 36,
   },
-  orderHeader: {
+  summaryHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 16,
   },
-  orderId: {
+  orderCode: {
     fontSize: 14,
-    color: '#666',
-    fontWeight: 'bold',
+    color: '#7B85A1',
+    fontWeight: '600',
+    letterSpacing: 0.6,
   },
   restaurantName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1B2945',
     marginTop: 4,
   },
-  statusBadge: {
-    backgroundColor: '#FFF5F3',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+  deliveryAddress: {
+    fontSize: 13,
+    color: '#7B85A1',
+    marginTop: 4,
   },
-  statusText: {
-    fontSize: 12,
+  etaPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#FFF1EC',
+  },
+  etaText: {
     color: '#EA5034',
     fontWeight: '600',
-  },
-  estimateCard: {
-    backgroundColor: '#EA5034',
-    margin: 16,
-    padding: 20,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  estimateLabel: {
     fontSize: 14,
-    color: '#fff',
-    marginBottom: 8,
-  },
-  estimateTime: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 8,
-  },
-  estimateSubtext: {
-    fontSize: 12,
-    color: '#fff',
-    opacity: 0.9,
   },
   timeline: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: '#F9FAFE',
+    borderRadius: 16,
     padding: 16,
-    marginBottom: 24,
+    marginBottom: 16,
   },
-  timelineItem: {
+  timelineRow: {
     flexDirection: 'row',
-    marginBottom: 24,
+    alignItems: 'flex-start',
   },
-  timelineIconContainer: {
+  timelineRail: {
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: 12,
   },
-  timelineIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#f5f5f5',
+  timelineDot: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#ddd',
+    borderColor: '#CBD3E3',
+    backgroundColor: '#fff',
   },
-  timelineIconActive: {
+  timelineDotActive: {
     backgroundColor: '#EA5034',
     borderColor: '#EA5034',
   },
-  timelineIconText: {
-    fontSize: 20,
-  },
-  timelineIconTextActive: {
-    fontSize: 20,
-  },
-  timelineLine: {
+  timelineConnector: {
     width: 2,
     flex: 1,
-    backgroundColor: '#ddd',
-    marginTop: 4,
+    backgroundColor: '#E4E9F3',
+    marginVertical: 6,
   },
-  timelineLineActive: {
+  timelineConnectorActive: {
     backgroundColor: '#EA5034',
   },
   timelineContent: {
     flex: 1,
-    justifyContent: 'center',
-  },
-  timelineLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#666',
-  },
-  timelineLabelActive: {
-    color: '#333',
-  },
-  timelineStatus: {
-    fontSize: 14,
-    color: '#EA5034',
-    marginTop: 4,
-  },
-  itemsSection: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EAEFF7',
     marginBottom: 16,
   },
-  orderItem: {
+  timelineTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#51607A',
+  },
+  timelineTitleActive: {
+    color: '#EA5034',
+  },
+  timelineDescription: {
+    fontSize: 13,
+    color: '#7B85A1',
+    marginTop: 4,
+  },
+  orderCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 18,
+    shadowColor: '#0B1F3A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 3,
+    marginBottom: 24,
+  },
+  sectionHeading: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1B2945',
+    marginBottom: 12,
+  },
+  orderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f5f5f5',
+    alignItems: 'center',
+    marginBottom: 8,
   },
-  itemName: {
-    fontSize: 16,
-    color: '#333',
+  orderRowText: {
+    fontSize: 14,
+    color: '#51607A',
   },
-  itemPrice: {
-    fontSize: 16,
-    color: '#666',
-    fontWeight: '500',
+  orderRowPrice: {
+    fontSize: 14,
+    color: '#1B2945',
+    fontWeight: '600',
+  },
+  moreItemsText: {
+    fontSize: 13,
+    color: '#7B85A1',
+    marginBottom: 12,
   },
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingTop: 16,
-    marginTop: 8,
-    borderTopWidth: 2,
-    borderTopColor: '#e0e0e0',
+    alignItems: 'center',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#EAEFF7',
   },
   totalLabel: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 15,
+    color: '#51607A',
+    fontWeight: '600',
   },
   totalValue: {
     fontSize: 18,
-    fontWeight: 'bold',
     color: '#EA5034',
+    fontWeight: '700',
   },
-  successCard: {
-    backgroundColor: '#E8F5E9',
-    margin: 16,
-    padding: 24,
+  handoverCard: {
+    backgroundColor: '#F7FFF9',
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: '#C8F3D5',
+  },
+  handoverHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  handoverText: {
+    fontSize: 14,
+    color: '#4C5A54',
+    marginBottom: 16,
+  },
+  confirmButton: {
+    backgroundColor: '#27AE60',
+    paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
   },
-  successIcon: {
-    fontSize: 64,
-    color: '#27AE60',
-    marginBottom: 16,
+  confirmButtonDisabled: {
+    backgroundColor: '#A5D6B1',
   },
-  successTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
-  },
-  successText: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
-  },
-  emptyIcon: {
-    fontSize: 80,
-    marginBottom: 16,
-  },
-  emptyText: {
-    fontSize: 18,
-    color: '#333',
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  emptySubText: {
-    fontSize: 16,
-    color: '#666',
-  },
-  homeButton: {
-    backgroundColor: '#EA5034',
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderRadius: 8,
-  },
-  homeButtonText: {
+  confirmButtonText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  pinNote: {
+    fontSize: 13,
+    color: '#4C5A54',
+    marginTop: 12,
+    textAlign: 'center',
+    letterSpacing: 1,
   },
 });
 

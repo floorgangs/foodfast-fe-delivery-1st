@@ -83,54 +83,22 @@ const PersonalInfoScreen = ({ navigation }: any) => {
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Giới tính</Text>
-            {gender ? (
-              <View style={styles.genderContainer}>
-                <TouchableOpacity
-                  style={[styles.genderButton, gender === 'Nam' && styles.genderButtonActive]}
-                  onPress={() => setGender('Nam')}
-                >
-                  <Text style={[styles.genderButtonText, gender === 'Nam' && styles.genderButtonTextActive]}>
-                    👨 Nam
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.genderButton, gender === 'Nữ' && styles.genderButtonActive]}
-                  onPress={() => setGender('Nữ')}
-                >
-                  <Text style={[styles.genderButtonText, gender === 'Nữ' && styles.genderButtonTextActive]}>
-                    👩 Nữ
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.genderButton, gender === 'Khác' && styles.genderButtonActive]}
-                  onPress={() => setGender('Khác')}
-                >
-                  <Text style={[styles.genderButtonText, gender === 'Khác' && styles.genderButtonTextActive]}>
-                    🧑 Khác
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity style={styles.setupButton} onPress={() => setGender('Nam')}>
-                <Text style={styles.setupButtonText}>⚙️ Thiết lập ngay</Text>
-              </TouchableOpacity>
-            )}
+            <TextInput
+              style={styles.input}
+              placeholder="Nhập giới tính"
+              value={gender}
+              onChangeText={setGender}
+            />
           </View>
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Ngày sinh</Text>
-            {dateOfBirth ? (
-              <TextInput
-                style={styles.input}
-                placeholder="DD/MM/YYYY"
-                value={dateOfBirth}
-                onChangeText={setDateOfBirth}
-              />
-            ) : (
-              <TouchableOpacity style={styles.setupButton} onPress={() => setDateOfBirth('01/01/2000')}>
-                <Text style={styles.setupButtonText}>⚙️ Thiết lập ngay</Text>
-              </TouchableOpacity>
-            )}
+            <TextInput
+              style={styles.input}
+              placeholder="DD/MM/YYYY"
+              value={dateOfBirth}
+              onChangeText={setDateOfBirth}
+            />
           </View>
 
           <View style={styles.inputGroup}>
@@ -237,46 +205,6 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     backgroundColor: '#fff',
-  },
-  genderContainer: {
-    flexDirection: 'row',
-    marginHorizontal: -4,
-  },
-  genderButton: {
-    flex: 1,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    marginHorizontal: 4,
-  },
-  genderButtonActive: {
-    borderColor: '#EA5034',
-    backgroundColor: '#FFF5F3',
-  },
-  genderButtonText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  genderButtonTextActive: {
-    color: '#EA5034',
-    fontWeight: '600',
-  },
-  setupButton: {
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#EA5034',
-    borderRadius: 8,
-    alignItems: 'center',
-    backgroundColor: '#FFF5F3',
-    borderStyle: 'dashed',
-  },
-  setupButtonText: {
-    fontSize: 14,
-    color: '#EA5034',
-    fontWeight: '600',
   },
   saveButton: {
     backgroundColor: '#EA5034',

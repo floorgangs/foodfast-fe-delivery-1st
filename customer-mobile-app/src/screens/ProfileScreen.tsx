@@ -11,6 +11,7 @@ import {
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
 import { logout } from '../store/slices/authSlice';
+import { Ionicons } from '@expo/vector-icons';
 
 const ProfileScreen = ({ navigation }: any) => {
   const { user, isAuthenticated } = useSelector((state: RootState) => state.auth);
@@ -56,7 +57,7 @@ const ProfileScreen = ({ navigation }: any) => {
         {/* User Info Card */}
         <View style={styles.userCard}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>👤</Text>
+            <Ionicons name="person-outline" size={40} color="#EA5034" />
           </View>
           {!isAuthenticated ? (
             <>
@@ -84,45 +85,53 @@ const ProfileScreen = ({ navigation }: any) => {
             style={styles.menuItem}
             onPress={() => navigation.navigate('PersonalInfo')}
           >
-            <Text style={styles.menuIcon}>👤</Text>
+            <View style={styles.menuIconContainer}>
+              <Ionicons name="person-outline" size={22} color="#EA5034" />
+            </View>
             <Text style={styles.menuText}>Thông tin cá nhân</Text>
-            <Text style={styles.menuArrow}>›</Text>
+            <Ionicons name="chevron-forward" size={18} color="#999" />
           </TouchableOpacity>
 
           <TouchableOpacity 
             style={styles.menuItem}
             onPress={() => navigation.navigate('Address')}
           >
-            <Text style={styles.menuIcon}>📍</Text>
+            <View style={styles.menuIconContainer}>
+              <Ionicons name="location-outline" size={22} color="#EA5034" />
+            </View>
             <Text style={styles.menuText}>Địa chỉ giao hàng</Text>
-            <Text style={styles.menuArrow}>›</Text>
+            <Ionicons name="chevron-forward" size={18} color="#999" />
           </TouchableOpacity>
 
           <TouchableOpacity 
             style={styles.menuItem}
             onPress={() => navigation.navigate('PaymentMethod')}
           >
-            <Text style={styles.menuIcon}>💳</Text>
+            <View style={styles.menuIconContainer}>
+              <Ionicons name="card-outline" size={22} color="#EA5034" />
+            </View>
             <Text style={styles.menuText}>Phương thức thanh toán</Text>
-            <Text style={styles.menuArrow}>›</Text>
+            <Ionicons name="chevron-forward" size={18} color="#999" />
           </TouchableOpacity>
 
           <TouchableOpacity 
             style={styles.menuItem}
             onPress={() => navigation.navigate('Vouchers')}
           >
-            <Text style={styles.menuIcon}>🎁</Text>
+            <View style={styles.menuIconContainer}>
+              <Ionicons name="gift-outline" size={22} color="#EA5034" />
+            </View>
             <Text style={styles.menuText}>Ưu đãi của tôi</Text>
-            <Text style={styles.menuArrow}>›</Text>
+            <Ionicons name="chevron-forward" size={18} color="#999" />
           </TouchableOpacity>
         </View>
 
         {/* Order History */}
         <View style={styles.orderSection}>
-          <Text style={styles.sectionTitle}>Lịch sử đơn hàng</Text>
+          <Text style={styles.sectionTitle}>Đơn hàng của tôi</Text>
           {orders.length === 0 ? (
             <View style={styles.emptyOrders}>
-              <Text style={styles.emptyIcon}>📦</Text>
+              <Ionicons name="cube-outline" size={56} color="#d1d5db" style={styles.emptyIcon} />
               <Text style={styles.emptyText}>Chưa có đơn hàng nào</Text>
             </View>
           ) : (
@@ -215,9 +224,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
-  avatarText: {
-    fontSize: 40,
-  },
   userName: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -260,18 +266,19 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f5f5f5',
   },
-  menuIcon: {
-    fontSize: 24,
+  menuIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FFF1EB',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 16,
   },
   menuText: {
     flex: 1,
     fontSize: 16,
     color: '#333',
-  },
-  menuArrow: {
-    fontSize: 24,
-    color: '#999',
   },
   orderSection: {
     backgroundColor: '#fff',
@@ -320,7 +327,6 @@ const styles = StyleSheet.create({
     padding: 32,
   },
   emptyIcon: {
-    fontSize: 60,
     marginBottom: 12,
   },
   emptyText: {

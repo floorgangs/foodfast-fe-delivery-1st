@@ -238,6 +238,64 @@ export const mockProducts: Record<string, any[]> = {
     { id: '8-2', name: 'Chicken Burger', price: 55000, description: 'Burger gà giòn', image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=300' },
     { id: '8-3', name: 'Double Whopper', price: 95000, description: 'Burger bò 2 tầng', image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=300' },
   ],
+  '9': [
+    { id: '9-1', name: 'Bánh Mì Thịt Nướng', price: 25000, description: 'Bánh mì thịt nướng đặc biệt', image: 'https://images.unsplash.com/photo-1608198093002-ad4e005484ec?w=300' },
+    { id: '9-2', name: 'Bánh Mì Pate', price: 20000, description: 'Bánh mì pate trứng', image: 'https://images.unsplash.com/photo-1608198093002-ad4e005484ec?w=300' },
+    { id: '9-3', name: 'Bánh Mì Xíu Mại', price: 30000, description: 'Bánh mì xíu mại sốt cà', image: 'https://images.unsplash.com/photo-1608198093002-ad4e005484ec?w=300' },
+    { id: '9-4', name: 'Bánh Mì Chả Cá', price: 35000, description: 'Bánh mì chả cá Nha Trang', image: 'https://images.unsplash.com/photo-1608198093002-ad4e005484ec?w=300' },
+  ],
+  '10': [
+    { id: '10-1', name: 'Trà Sữa Truyền Thống', price: 35000, description: 'Trà sữa Đài Loan nguyên bản', image: 'https://images.unsplash.com/photo-1525385133512-2f3bdd039054?w=300' },
+    { id: '10-2', name: 'Trà Sữa Ô Long', price: 40000, description: 'Trà sữa ô long thơm mát', image: 'https://images.unsplash.com/photo-1525385133512-2f3bdd039054?w=300' },
+    { id: '10-3', name: 'Trà Sữa Matcha', price: 45000, description: 'Trà sữa matcha Nhật Bản', image: 'https://images.unsplash.com/photo-1525385133512-2f3bdd039054?w=300' },
+    { id: '10-4', name: 'Trà Sữa Đường Đen', price: 42000, description: 'Trà sữa đường đen trân châu', image: 'https://images.unsplash.com/photo-1525385133512-2f3bdd039054?w=300' },
+  ],
+  '11': [
+    { id: '11-1', name: 'Hủ Tiếu Khô', price: 40000, description: 'Hủ tiếu khô Nam Vang', image: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=300' },
+    { id: '11-2', name: 'Hủ Tiếu Nước', price: 42000, description: 'Hủ tiếu nước đầy đủ', image: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=300' },
+    { id: '11-3', name: 'Hủ Tiếu Mỹ Tho', price: 45000, description: 'Hủ tiếu Mỹ Tho hải sản', image: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=300' },
+  ],
+  '12': [
+    { id: '12-1', name: 'Set Nướng Hàn Quốc', price: 280000, description: 'Set nướng Hàn Quốc cho 2 người', image: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300' },
+    { id: '12-2', name: 'Thịt Bò Nướng', price: 150000, description: 'Thịt bò nướng Hàn Quốc', image: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300' },
+    { id: '12-3', name: 'Thịt Heo Nướng', price: 120000, description: 'Thịt heo nướng BBQ', image: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300' },
+    { id: '12-4', name: 'Combo BBQ Đặc Biệt', price: 350000, description: 'Combo BBQ đủ loại thịt', image: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300' },
+  ],
+  '13': [
+    { id: '13-1', name: 'Lẩu Nấm Chay', price: 180000, description: 'Lẩu nấm chay dinh dưỡng', image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=300' },
+    { id: '13-2', name: 'Lẩu Nấm Hải Sản', price: 250000, description: 'Lẩu nấm với hải sản tươi', image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=300' },
+    { id: '13-3', name: 'Lẩu Nấm Bò', price: 220000, description: 'Lẩu nấm với thịt bò Úc', image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=300' },
+  ],
+  '14': [
+    { id: '14-1', name: 'Cà Phê Đen Đá', price: 25000, description: 'Cà phê đen đá truyền thống', image: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=300' },
+    { id: '14-2', name: 'Cà Phê Sữa Đá', price: 28000, description: 'Cà phê sữa đá Việt Nam', image: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=300' },
+    { id: '14-3', name: 'Bạc Xỉu', price: 30000, description: 'Bạc xỉu Sài Gòn', image: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=300' },
+    { id: '14-4', name: 'Cà Phê Cappuccino', price: 45000, description: 'Cappuccino Ý cao cấp', image: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=300' },
+  ],
+  '15': [
+    { id: '15-1', name: 'Dimsum Tôm Hấp', price: 55000, description: 'Dimsum tôm hấp cao cấp', image: 'https://images.unsplash.com/photo-1496116218417-1a781b1c416c?w=300' },
+    { id: '15-2', name: 'Há Cảo', price: 50000, description: 'Há cảo tôm thịt', image: 'https://images.unsplash.com/photo-1496116218417-1a781b1c416c?w=300' },
+    { id: '15-3', name: 'Sủi Cảo', price: 48000, description: 'Sủi cảo chiên giòn', image: 'https://images.unsplash.com/photo-1496116218417-1a781b1c416c?w=300' },
+    { id: '15-4', name: 'Combo Dimsum', price: 120000, description: 'Combo dimsum đầy đủ', image: 'https://images.unsplash.com/photo-1496116218417-1a781b1c416c?w=300' },
+  ],
+  '16': [
+    { id: '16-1', name: 'Xôi Xéo', price: 20000, description: 'Xôi xéo đậu xanh', image: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=300' },
+    { id: '16-2', name: 'Xôi Gấc', price: 25000, description: 'Xôi gấc truyền thống', image: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=300' },
+    { id: '16-3', name: 'Chè Ba Màu', price: 18000, description: 'Chè ba màu mát lạnh', image: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=300' },
+    { id: '16-4', name: 'Chè Thập Cẩm', price: 22000, description: 'Chè thập cẩm đầy đủ', image: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=300' },
+  ],
+  '17': [
+    { id: '17-1', name: 'Mì Cay Level 1', price: 55000, description: 'Mì cay Hàn Quốc nhẹ', image: 'https://images.unsplash.com/photo-1585032226651-759b368d7246?w=300' },
+    { id: '17-2', name: 'Mì Cay Level 3', price: 60000, description: 'Mì cay Hàn Quốc trung bình', image: 'https://images.unsplash.com/photo-1585032226651-759b368d7246?w=300' },
+    { id: '17-3', name: 'Mì Cay Level 5', price: 65000, description: 'Mì cay Hàn Quốc cực cay', image: 'https://images.unsplash.com/photo-1585032226651-759b368d7246?w=300' },
+    { id: '17-4', name: 'Topokki Cay', price: 70000, description: 'Topokki cay truyền thống', image: 'https://images.unsplash.com/photo-1585032226651-759b368d7246?w=300' },
+  ],
+  '18': [
+    { id: '18-1', name: 'Kem Vani', price: 25000, description: 'Kem vani truyền thống', image: 'https://images.unsplash.com/photo-1563805042-7684c019e1cb?w=300' },
+    { id: '18-2', name: 'Kem Socola', price: 28000, description: 'Kem socola đậm đà', image: 'https://images.unsplash.com/photo-1563805042-7684c019e1cb?w=300' },
+    { id: '18-3', name: 'Kem Dâu', price: 30000, description: 'Kem dâu tươi ngon', image: 'https://images.unsplash.com/photo-1563805042-7684c019e1cb?w=300' },
+    { id: '18-4', name: 'Kem Mix 3 Vị', price: 35000, description: 'Kem mix 3 vị đặc biệt', image: 'https://images.unsplash.com/photo-1563805042-7684c019e1cb?w=300' },
+  ],
 };
 
 export const categories = [

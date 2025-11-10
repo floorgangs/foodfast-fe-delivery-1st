@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,41 @@ interface Address {
   isDefault: boolean;
 }
 
+const ADDRESS_SUGGESTIONS = [
+  {
+    id: 'vincom-dongkhoi',
+    label: 'Vincom Đồng Khởi',
+    address: '72 Lê Thánh Tôn, Bến Nghé, Quận 1, TP.HCM',
+  },
+  {
+    id: 'landmark81',
+    label: 'Landmark 81',
+    address: '720A Điện Biên Phủ, Phường 22, Bình Thạnh, TP.HCM',
+  },
+  {
+    id: 'saigoncentre',
+    label: 'Saigon Centre',
+    address: '65 Lê Lợi, Bến Nghé, Quận 1, TP.HCM',
+  },
+  {
+    id: 'cresentmall',
+    label: 'Crescent Mall',
+    address: '101 Tôn Dật Tiên, Tân Phú, Quận 7, TP.HCM',
+  },
+  {
+    id: 'citiho',
+    label: 'Chung cư CitiHome',
+    address: 'Cát Lái, Thành phố Thủ Đức, TP.HCM',
+  },
+  {
+    id: 'vinhomegrandpark',
+    label: 'Vinhomes Grand Park',
+    address: 'Nguyễn Xiển, Long Thạnh Mỹ, TP.Thủ Đức, TP.HCM',
+  },
+];
+
+const QUICK_ADDRESS_TAGS = ['Nhà riêng', 'Văn phòng', 'Chung cư', 'Sảnh bảo vệ'];
+
 const AddressScreen = ({ navigation }: any) => {
   const [addresses, setAddresses] = useState<Address[]>([]);
 
@@ -29,10 +64,24 @@ const AddressScreen = ({ navigation }: any) => {
     phone: '',
     address: '',
   });
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  const filteredSuggestions = useMemo(() => {
+    const keyword = formData.address.trim().toLowerCase();
+
+    if (!keyword) {
+      return ADDRESS_SUGGESTIONS.slice(0, 5);
+    }
+
+    return ADDRESS_SUGGESTIONS.filter(item =>
+      `${item.label} ${item.address}`.toLowerCase().includes(keyword),
+    ).slice(0, 6);
+  }, [formData.address]);
 
   const handleAdd = () => {
     setEditingAddress(null);
     setFormData({ name: '', phone: '', address: '' });
+    setShowSuggestions(false);
     setModalVisible(true);
   };
 
@@ -43,6 +92,7 @@ const AddressScreen = ({ navigation }: any) => {
       phone: address.phone,
       address: address.address,
     });
+    setShowSuggestions(false);
     setModalVisible(true);
   };
 
@@ -58,6 +108,15 @@ const AddressScreen = ({ navigation }: any) => {
         Alert.alert('Thành công', 'Đã xóa địa chỉ');
       }
     }
+  };
+
+  const handleSelectSuggestion = (suggestion: typeof ADDRESS_SUGGESTIONS[number]) => {
+    setFormData(prev => ({
+      ...prev,
+      address: `${suggestion.label}, ${suggestion.address}`,
+      name: prev.name || suggestion.label,
+    }));
+    setShowSuggestions(false);
   };
 
   const handleSave = () => {
@@ -78,6 +137,7 @@ const AddressScreen = ({ navigation }: any) => {
       setAddresses([...addresses, newAddress]);
     }
     setModalVisible(false);
+    setShowSuggestions(false);
   };
 
   const handleSetDefault = (id: string) => {
@@ -143,7 +203,10 @@ const AddressScreen = ({ navigation }: any) => {
         visible={modalVisible}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => setModalVisible(false)}
+        onRequestClose={() => {
+          setModalVisible(false);
+          setShowSuggestions(false);
+        }}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -156,7 +219,7 @@ const AddressScreen = ({ navigation }: any) => {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalForm}>
+            <ScrollView style={styles.modalForm} keyboardShouldPersistTaps="handled">
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Tên địa chỉ</Text>
                 <TextInput
@@ -184,10 +247,59 @@ const AddressScreen = ({ navigation }: any) => {
                   style={[styles.input, styles.textArea]}
                   placeholder="Số nhà, tên đường, phường, quận, thành phố"
                   value={formData.address}
-                  onChangeText={(text) => setFormData({ ...formData, address: text })}
+                  onChangeText={text => {
+                    setFormData({ ...formData, address: text });
+                    setShowSuggestions(true);
+                  }}
+                  onFocus={() => setShowSuggestions(true)}
                   multiline
                   numberOfLines={4}
                 />
+                <View style={styles.quickTagRow}>
+                  {QUICK_ADDRESS_TAGS.map(tag => (
+                    <TouchableOpacity
+                      key={tag}
+                      style={styles.quickTag}
+                      onPress={() => {
+                        setFormData(prev => ({
+                          ...prev,
+                          address: prev.address ? `${tag} • ${prev.address}` : tag,
+                        }));
+                        setShowSuggestions(true);
+                      }}
+                    >
+                      <Text style={styles.quickTagText}>{tag}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {showSuggestions && (
+                  <View style={styles.suggestionList}>
+                    {filteredSuggestions.length > 0 ? (
+                      filteredSuggestions.map((item, index) => (
+                        <TouchableOpacity
+                          key={item.id}
+                          style={[
+                            styles.suggestionItem,
+                            index === filteredSuggestions.length - 1 && styles.suggestionItemLast,
+                          ]}
+                          onPress={() => handleSelectSuggestion(item)}
+                        >
+                          <Text style={styles.suggestionTitle}>{item.label}</Text>
+                          <Text style={styles.suggestionSubtitle}>{item.address}</Text>
+                        </TouchableOpacity>
+                      ))
+                    ) : (
+                      <Text style={styles.noSuggestionText}>Không tìm thấy địa chỉ phù hợp, hãy nhập chi tiết hơn.</Text>
+                    )}
+                    <TouchableOpacity
+                      style={styles.hideSuggestionButton}
+                      onPress={() => setShowSuggestions(false)}
+                    >
+                      <Text style={styles.hideSuggestionText}>Ẩn gợi ý</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
 
               <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
@@ -366,6 +478,70 @@ const styles = StyleSheet.create({
   textArea: {
     height: 100,
     textAlignVertical: 'top',
+  },
+  quickTagRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 8,
+  },
+  quickTag: {
+    backgroundColor: '#FFF2EC',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  quickTagText: {
+    color: '#EA5034',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  suggestionList: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  suggestionItem: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5F5F5',
+  },
+  suggestionItemLast: {
+    borderBottomWidth: 0,
+  },
+  suggestionTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  suggestionSubtitle: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  noSuggestionText: {
+    paddingHorizontal: 14,
+    paddingVertical: 16,
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  hideSuggestionButton: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  hideSuggestionText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#EA5034',
   },
   saveButton: {
     backgroundColor: '#EA5034',
