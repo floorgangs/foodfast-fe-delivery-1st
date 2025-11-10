@@ -1,6 +1,7 @@
-import React, { useEffect } from 'react';
-import { Platform, StatusBar } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Platform, View, TouchableOpacity, StyleSheet, Text, useWindowDimensions, PanResponder } from 'react-native';
+import type { PanResponderGestureState } from 'react-native';
+import { NavigationContainer, useNavigation, useNavigationState } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Provider, useSelector } from 'react-redux';
@@ -19,6 +20,7 @@ import CartScreen from './src/screens/CartScreen';
 import CheckoutScreen from './src/screens/CheckoutScreen';
 import NotificationsScreen from './src/screens/NotificationsScreen';
 import OrderTrackingScreen from './src/screens/OrderTrackingScreen';
+import OrdersScreen from './src/screens/OrdersScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import PersonalInfoScreen from './src/screens/PersonalInfoScreen';
 import AddressScreen from './src/screens/AddressScreen';
@@ -66,16 +68,6 @@ function HomeTabs() {
         }}
       />
       <Tab.Screen
-        name="Cart"
-        component={CartScreen}
-        options={{
-          tabBarLabel: 'Giỏ hàng',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="cart" size={24} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
         name="Notifications"
         component={NotificationsScreen}
         options={{
@@ -87,12 +79,12 @@ function HomeTabs() {
       />
       <Tab.Screen
         name="Orders"
-        component={OrderTrackingScreen}
+        component={OrdersScreen}
         options={{
           tabBarLabel: 'Đơn hàng',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="receipt" size={24} color={color} />
-          ),
+          )
         }}
       />
       <Tab.Screen
@@ -106,6 +98,137 @@ function HomeTabs() {
         }}
       />
     </Tab.Navigator>
+  );
+}
+
+const hiddenCartRoutes = new Set(['Cart', 'Checkout']);
+
+const BUTTON_SIZE = 56;
+const HORIZONTAL_MARGIN = 16;
+const TOP_SAFE_MARGIN = 80;
+const BOTTOM_SAFE_MARGIN = Platform.OS === 'ios' ? 180 : 140;
+
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+const deriveInitialPosition = (width: number, height: number) => {
+  const maxX = Math.max(HORIZONTAL_MARGIN, width - BUTTON_SIZE - HORIZONTAL_MARGIN);
+  const maxY = Math.max(TOP_SAFE_MARGIN, height - BUTTON_SIZE - BOTTOM_SAFE_MARGIN);
+  return { x: maxX, y: maxY };
+};
+
+function CartFloatingButton() {
+  const navigation = useNavigation<any>();
+  const items = useSelector((state: RootState) => state.cart.items);
+  const routeName = useNavigationState((state: any) => {
+    const currentRoute = state?.routes?.[state?.index];
+    const nestedRoute = currentRoute?.state?.routes?.[currentRoute?.state?.index];
+    return nestedRoute?.name ?? currentRoute?.name ?? '';
+  });
+  const { width, height } = useWindowDimensions();
+
+  const [position, setPosition] = useState<{ x: number; y: number }>(() => deriveInitialPosition(width, height));
+  const startOffset = useRef(position);
+  const isDragging = useRef(false);
+
+  const clampPosition = useCallback((x: number, y: number) => {
+    const maxX = Math.max(HORIZONTAL_MARGIN, width - BUTTON_SIZE - HORIZONTAL_MARGIN);
+    const maxY = Math.max(TOP_SAFE_MARGIN, height - BUTTON_SIZE - BOTTOM_SAFE_MARGIN);
+    return {
+      x: clamp(x, HORIZONTAL_MARGIN, maxX),
+      y: clamp(y, TOP_SAFE_MARGIN, maxY),
+    };
+  }, [height, width]);
+
+  useEffect(() => {
+    setPosition(prev => {
+      const next = clampPosition(prev.x, prev.y);
+      if (next.x === prev.x && next.y === prev.y) {
+        return prev;
+      }
+      return next;
+    });
+  }, [clampPosition]);
+
+  const finishDrag = useCallback((gesture: PanResponderGestureState) => {
+    if (!gesture) {
+      return;
+    }
+    const next = clampPosition(
+      startOffset.current.x + gesture.dx,
+      startOffset.current.y + gesture.dy,
+    );
+    setPosition(prev => {
+      if (prev.x === next.x && prev.y === next.y) {
+        return prev;
+      }
+      return next;
+    });
+    startOffset.current = next;
+
+    const movedDistance = Math.sqrt(gesture.dx * gesture.dx + gesture.dy * gesture.dy);
+    if (!isDragging.current && movedDistance < 6) {
+      navigation.navigate('Cart');
+    }
+    isDragging.current = false;
+  }, [clampPosition, navigation]);
+
+  const panResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponder: (_, gesture) => (
+      Math.abs(gesture.dx) > 4 || Math.abs(gesture.dy) > 4
+    ),
+    onPanResponderGrant: () => {
+      startOffset.current = { x: position.x, y: position.y };
+  isDragging.current = true;
+    },
+    onPanResponderMove: (_, gesture) => {
+      const next = clampPosition(
+        startOffset.current.x + gesture.dx,
+        startOffset.current.y + gesture.dy,
+      );
+
+      if (!isDragging.current && (Math.abs(gesture.dx) > 4 || Math.abs(gesture.dy) > 4)) {
+        isDragging.current = true;
+      }
+
+      setPosition(prev => {
+        if (prev.x === next.x && prev.y === next.y) {
+          return prev;
+        }
+        return next;
+      });
+    },
+    onPanResponderRelease: (_, gesture) => finishDrag(gesture),
+    onPanResponderTerminate: (_, gesture) => finishDrag(gesture),
+  }), [clampPosition, finishDrag, position.x, position.y]);
+
+  const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
+
+  if (totalItems === 0 || hiddenCartRoutes.has(routeName)) {
+    return null;
+  }
+
+  return (
+    <TouchableOpacity
+      {...panResponder.panHandlers}
+      style={[floatingStyles.cartButton, { left: position.x, top: position.y }]}
+      activeOpacity={0.85}
+      hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+      onPress={() => {
+        if (!isDragging.current) {
+          navigation.navigate('Cart');
+        }
+      }}
+      accessibilityRole="button"
+      accessibilityLabel="Mở giỏ hàng"
+    >
+      <Ionicons name="bag-handle-outline" size={24} color="#EA5034" />
+      <View style={floatingStyles.cartBadge}>
+        <Text style={floatingStyles.cartBadgeText}>
+          {totalItems > 99 ? '99+' : totalItems}
+        </Text>
+      </View>
+    </TouchableOpacity>
   );
 }
 
@@ -145,21 +268,62 @@ function AppNavigator() {
 
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="MainTabs" component={HomeTabs} />
-        <Stack.Screen name="RestaurantDetail" component={RestaurantDetailScreen} />
-        <Stack.Screen name="Checkout" component={CheckoutScreen} />
-        <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} />
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="Register" component={RegisterScreen} />
-        <Stack.Screen name="PersonalInfo" component={PersonalInfoScreen} />
-        <Stack.Screen name="Address" component={AddressScreen} />
-        <Stack.Screen name="PaymentMethod" component={PaymentMethodScreen} />
-        <Stack.Screen name="Vouchers" component={VouchersScreen} />
-      </Stack.Navigator>
+      <View style={{ flex: 1 }}>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="MainTabs" component={HomeTabs} />
+          <Stack.Screen name="RestaurantDetail" component={RestaurantDetailScreen} />
+          <Stack.Screen name="Cart" component={CartScreen} />
+          <Stack.Screen name="Checkout" component={CheckoutScreen} />
+          <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} />
+          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="Register" component={RegisterScreen} />
+          <Stack.Screen name="PersonalInfo" component={PersonalInfoScreen} />
+          <Stack.Screen name="Address" component={AddressScreen} />
+          <Stack.Screen name="PaymentMethod" component={PaymentMethodScreen} />
+          <Stack.Screen name="Vouchers" component={VouchersScreen} />
+        </Stack.Navigator>
+        <CartFloatingButton />
+      </View>
     </NavigationContainer>
   );
 }
+
+const floatingStyles = StyleSheet.create({
+  cartButton: {
+    position: 'absolute',
+    backgroundColor: '#fff',
+    borderColor: '#F5C2B6',
+    borderWidth: 1,
+    borderRadius: 28,
+    width: 56,
+    height: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#EA5034',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 5,
+    zIndex: 100,
+  },
+  cartBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: '#EA5034',
+    borderRadius: 9,
+    minWidth: 20,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cartBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+});
 
 export default function App() {
   return (

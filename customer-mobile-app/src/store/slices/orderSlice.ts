@@ -7,7 +7,12 @@ interface OrderItem {
   price: number;
 }
 
-interface Order {
+interface Coordinate {
+  latitude: number;
+  longitude: number;
+}
+
+export interface Order {
   id: string;
   restaurantName: string;
   items: OrderItem[];
@@ -15,6 +20,12 @@ interface Order {
   status: 'confirmed' | 'preparing' | 'delivering' | 'delivered';
   createdAt: string;
   deliveryAddress: string;
+  pickupCoordinate?: Coordinate;
+  dropoffCoordinate?: Coordinate;
+  unlockPin?: string;
+  isReviewed?: boolean;
+  rating?: number | null;
+  reviewComment?: string;
 }
 
 interface OrderState {
@@ -31,12 +42,18 @@ const orderSlice = createSlice({
   name: 'orders',
   initialState,
   reducers: {
-    createOrder: (state, action: PayloadAction<Omit<Order, 'id' | 'status' | 'createdAt'>>) => {
+    createOrder: (
+      state,
+      action: PayloadAction<Omit<Order, 'id' | 'status' | 'createdAt' | 'isReviewed' | 'rating' | 'reviewComment'>>
+    ) => {
       const newOrder: Order = {
         ...action.payload,
         id: `ORD${Date.now()}`,
         status: 'confirmed',
         createdAt: new Date().toISOString(),
+        isReviewed: false,
+        rating: null,
+        reviewComment: '',
       };
       state.orders.unshift(newOrder);
       state.currentOrder = newOrder;
@@ -53,8 +70,24 @@ const orderSlice = createSlice({
     setCurrentOrder: (state, action: PayloadAction<Order | null>) => {
       state.currentOrder = action.payload;
     },
+    submitOrderReview: (
+      state,
+      action: PayloadAction<{ id: string; rating: number; comment?: string }>
+    ) => {
+      const order = state.orders.find(o => o.id === action.payload.id);
+      if (order) {
+        order.isReviewed = true;
+        order.rating = action.payload.rating;
+        order.reviewComment = action.payload.comment ?? '';
+      }
+      if (state.currentOrder?.id === action.payload.id) {
+        state.currentOrder.isReviewed = true;
+        state.currentOrder.rating = action.payload.rating;
+        state.currentOrder.reviewComment = action.payload.comment ?? '';
+      }
+    },
   },
 });
 
-export const { createOrder, updateOrderStatus, setCurrentOrder } = orderSlice.actions;
+export const { createOrder, updateOrderStatus, setCurrentOrder, submitOrderReview } = orderSlice.actions;
 export default orderSlice.reducer;

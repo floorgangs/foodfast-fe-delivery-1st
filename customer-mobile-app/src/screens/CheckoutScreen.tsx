@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,16 +9,24 @@ import {
   Alert,
   Platform,
   StatusBar,
+  Modal,
+  Animated,
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
 import { createOrder } from '../store/slices/orderSlice';
 import { clearCart } from '../store/slices/cartSlice';
+import { Ionicons } from '@expo/vector-icons';
 
 const CheckoutScreen = ({ navigation }: any) => {
   const { items, total } = useSelector((state: RootState) => state.cart);
   const user = useSelector((state: RootState) => state.auth.user);
   const dispatch = useDispatch();
+
+  // Success Modal State
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const scaleAnim = useState(new Animated.Value(0))[0];
+  const fadeAnim = useState(new Animated.Value(0))[0];
 
   // Mock addresses - In real app, get from Redux/API
   const [addresses] = useState([
@@ -50,6 +58,38 @@ const CheckoutScreen = ({ navigation }: any) => {
 
   const deliveryFee = 15000; // Fixed drone delivery fee
   const finalTotal = total + deliveryFee - discount;
+
+  // Animation for success modal
+  useEffect(() => {
+    if (showSuccessModal) {
+      // Reset animations
+      scaleAnim.setValue(0);
+      fadeAnim.setValue(0);
+
+      // Start animations
+      Animated.parallel([
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          tension: 50,
+          friction: 7,
+          useNativeDriver: false,
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: false,
+        }),
+      ]).start();
+
+      // Auto hide after 2 seconds and navigate
+      const timer = setTimeout(() => {
+        setShowSuccessModal(false);
+        navigation.navigate('Orders');
+      }, 2000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [showSuccessModal]);
 
   const handleApplyVoucher = () => {
     // Mock voucher validation
@@ -113,7 +153,9 @@ const CheckoutScreen = ({ navigation }: any) => {
 
     dispatch(createOrder(order as any));
     dispatch(clearCart());
-    navigation.navigate('OrderTracking');
+    
+    // Show success modal
+    setShowSuccessModal(true);
   };
 
   if (items.length === 0) {
@@ -138,7 +180,7 @@ const CheckoutScreen = ({ navigation }: any) => {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButtonContainer}>
           <Text style={styles.backButton}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Thanh toán</Text>
@@ -153,7 +195,10 @@ const CheckoutScreen = ({ navigation }: any) => {
         {/* Delivery Address */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>📍 Địa chỉ giao hàng</Text>
+            <View style={styles.sectionTitleContainer}>
+              <Text style={styles.sectionIcon}>📍</Text>
+              <Text style={styles.sectionTitle}>Địa chỉ giao hàng</Text>
+            </View>
             <TouchableOpacity onPress={() => navigation.navigate('Address')}>
               <Text style={styles.changeButton}>Thay đổi</Text>
             </TouchableOpacity>
@@ -190,7 +235,10 @@ const CheckoutScreen = ({ navigation }: any) => {
 
         {/* Order Summary */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🍽️ Đơn hàng</Text>
+          <View style={styles.sectionTitleContainer}>
+            <Text style={styles.sectionIcon}>🍽️</Text>
+            <Text style={styles.sectionTitle}>Đơn hàng</Text>
+          </View>
           <View style={styles.restaurantInfo}>
             <Text style={styles.restaurantName}>{items[0]?.restaurantName}</Text>
           </View>
@@ -207,7 +255,10 @@ const CheckoutScreen = ({ navigation }: any) => {
 
         {/* Voucher */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🎫 Mã giảm giá</Text>
+          <View style={styles.sectionTitleContainer}>
+            <Text style={styles.sectionIcon}>🎫</Text>
+            <Text style={styles.sectionTitle}>Mã giảm giá</Text>
+          </View>
           <View style={styles.voucherInput}>
             <TextInput
               style={styles.voucherTextInput}
@@ -229,7 +280,10 @@ const CheckoutScreen = ({ navigation }: any) => {
 
         {/* Payment Method */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>💳 Phương thức thanh toán</Text>
+          <View style={styles.sectionTitleContainer}>
+            <Text style={styles.sectionIcon}>💳</Text>
+            <Text style={styles.sectionTitle}>Phương thức thanh toán</Text>
+          </View>
           <Text style={styles.paymentNote}>
             * Chỉ hỗ trợ thanh toán online để đảm bảo giao hàng nhanh bằng drone
           </Text>
@@ -253,7 +307,10 @@ const CheckoutScreen = ({ navigation }: any) => {
 
         {/* Note */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📝 Ghi chú</Text>
+          <View style={styles.sectionTitleContainer}>
+            <Text style={styles.sectionIcon}>📝</Text>
+            <Text style={styles.sectionTitle}>Ghi chú</Text>
+          </View>
           <TextInput
             style={styles.noteInput}
             placeholder="Ghi chú cho người bán..."
@@ -298,6 +355,31 @@ const CheckoutScreen = ({ navigation }: any) => {
           <Text style={styles.checkoutButtonText}>Đặt hàng</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Success Modal */}
+      <Modal
+        visible={showSuccessModal}
+        transparent={true}
+        animationType="none"
+      >
+        <View style={styles.modalOverlay}>
+          <Animated.View
+            style={[
+              styles.successModal,
+              {
+                opacity: fadeAnim,
+                transform: [{ scale: scaleAnim }],
+              },
+            ]}
+          >
+            <View style={styles.successIconContainer}>
+              <Ionicons name="checkmark-circle" size={80} color="#4CAF50" />
+            </View>
+            <Text style={styles.successTitle}>Đặt hàng thành công!</Text>
+            <Text style={styles.successMessage}>Đơn hàng của bạn đang được xử lý</Text>
+          </Animated.View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -314,16 +396,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#fff',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#f0f0f0',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+  },
+  backButtonContainer: {
+    padding: 4,
   },
   backButton: {
     fontSize: 24,
-    color: '#EA5034',
+    color: '#333',
+    fontWeight: '600',
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
   },
@@ -333,16 +424,32 @@ const styles = StyleSheet.create({
   section: {
     backgroundColor: '#fff',
     padding: 16,
-    marginBottom: 8,
+    marginBottom: 12,
+    marginHorizontal: 12,
+    marginTop: 12,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
+  },
+  sectionTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sectionIcon: {
+    fontSize: 20,
+    marginRight: 8,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 12,
@@ -582,6 +689,39 @@ const styles = StyleSheet.create({
   emptyCartText: {
     fontSize: 18,
     color: '#999',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  successModal: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 32,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    minWidth: 280,
+  },
+  successIconContainer: {
+    marginBottom: 16,
+  },
+  successTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  successMessage: {
+    fontSize: 15,
+    color: '#666',
+    textAlign: 'center',
   },
 });
 
