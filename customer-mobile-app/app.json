@@ -20,7 +20,11 @@
       "adaptiveIcon": {
         "backgroundColor": "#EA5034"
       },
-      "package": "com.foodfast.customer"
+      "package": "com.foodfast.customer",
+      "permissions": [],
+      "blockedPermissions": [
+        "android.permission.DETECT_SCREEN_CAPTURE"
+      ]
     },
     "web": {
       "bundler": "metro"

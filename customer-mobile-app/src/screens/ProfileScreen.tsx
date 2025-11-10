@@ -5,7 +5,8 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  Alert,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
@@ -17,18 +18,29 @@ const ProfileScreen = ({ navigation }: any) => {
   const dispatch = useDispatch();
 
   const handleLogout = () => {
-    Alert.alert(
-      'Đăng xuất',
-      'Bạn có chắc chắn muốn đăng xuất?',
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Đăng xuất',
-          style: 'destructive',
-          onPress: () => dispatch(logout()),
-        },
-      ]
-    );
+    if (Platform.OS === 'web') {
+      // Trên web dùng confirm
+      if (window.confirm('Bạn có chắc chắn muốn đăng xuất?')) {
+        dispatch(logout());
+      }
+    } else {
+      // Trên mobile dùng Alert
+      const Alert = require('react-native').Alert;
+      Alert.alert(
+        'Đăng xuất',
+        'Bạn có chắc chắn muốn đăng xuất?',
+        [
+          { text: 'Hủy', style: 'cancel' },
+          {
+            text: 'Đăng xuất',
+            style: 'destructive',
+            onPress: () => {
+              dispatch(logout());
+            },
+          },
+        ]
+      );
+    }
   };
 
   return (
@@ -68,25 +80,37 @@ const ProfileScreen = ({ navigation }: any) => {
 
         {/* Menu Options */}
         <View style={styles.menuSection}>
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => navigation.navigate('PersonalInfo')}
+          >
             <Text style={styles.menuIcon}>👤</Text>
             <Text style={styles.menuText}>Thông tin cá nhân</Text>
             <Text style={styles.menuArrow}>›</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => navigation.navigate('Address')}
+          >
             <Text style={styles.menuIcon}>📍</Text>
             <Text style={styles.menuText}>Địa chỉ giao hàng</Text>
             <Text style={styles.menuArrow}>›</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => navigation.navigate('PaymentMethod')}
+          >
             <Text style={styles.menuIcon}>💳</Text>
             <Text style={styles.menuText}>Phương thức thanh toán</Text>
             <Text style={styles.menuArrow}>›</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => navigation.navigate('Vouchers')}
+          >
             <Text style={styles.menuIcon}>🎁</Text>
             <Text style={styles.menuText}>Ưu đãi của tôi</Text>
             <Text style={styles.menuArrow}>›</Text>
@@ -154,6 +178,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fafafa',
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   header: {
     flexDirection: 'row',

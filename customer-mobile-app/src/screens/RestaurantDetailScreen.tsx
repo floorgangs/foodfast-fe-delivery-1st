@@ -7,6 +7,8 @@ import {
   Image,
   TouchableOpacity,
   FlatList,
+  StatusBar,
+  Platform,
 } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { addToCart } from '../store/slices/cartSlice';
@@ -18,11 +20,13 @@ const RestaurantDetailScreen = ({ route, navigation }: any) => {
   const products = mockProducts[restaurant.id] || [];
 
   const handleAddToCart = (product: any) => {
+    console.log('Adding to cart:', product);
     dispatch(addToCart({
       ...product,
       restaurantId: restaurant.id,
       restaurantName: restaurant.name,
     }));
+    alert('Đã thêm vào giỏ hàng!');
   };
 
   const renderProductCard = ({ item }: any) => (
@@ -57,7 +61,11 @@ const RestaurantDetailScreen = ({ route, navigation }: any) => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView>
+      <ScrollView 
+        style={[styles.scrollView, { overflow: 'scroll' } as any]}
+        showsVerticalScrollIndicator={true}
+        contentContainerStyle={{ paddingBottom: 20 }}
+      >
         {/* Restaurant Header */}
         <Image source={{ uri: restaurant.image }} style={styles.restaurantImage} />
         <View style={styles.restaurantHeader}>
@@ -72,12 +80,24 @@ const RestaurantDetailScreen = ({ route, navigation }: any) => {
         {/* Menu */}
         <View style={styles.menuSection}>
           <Text style={styles.sectionTitle}>Thực đơn</Text>
-          <FlatList
-            data={products}
-            renderItem={renderProductCard}
-            keyExtractor={(item) => item.id}
-            scrollEnabled={false}
-          />
+          {products.map((item: any) => (
+            <View key={item.id} style={styles.productCard}>
+              <Image source={{ uri: item.image }} style={styles.productImage} />
+              <View style={styles.productInfo}>
+                <Text style={styles.productName}>{item.name}</Text>
+                <Text style={styles.productDescription}>{item.description}</Text>
+                <View style={styles.productFooter}>
+                  <Text style={styles.productPrice}>{item.price.toLocaleString('vi-VN')}đ</Text>
+                  <TouchableOpacity
+                    style={styles.addButton}
+                    onPress={() => handleAddToCart(item)}
+                  >
+                    <Text style={styles.addButtonText}>Thêm</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          ))}
         </View>
       </ScrollView>
     </View>
@@ -88,6 +108,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fafafa',
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+  },
+  scrollView: {
+    flex: 1,
+    height: '100%',
   },
   header: {
     flexDirection: 'row',
@@ -135,11 +160,11 @@ const styles = StyleSheet.create({
   },
   restaurantMeta: {
     flexDirection: 'row',
-    gap: 16,
   },
   rating: {
     fontSize: 14,
     color: '#333',
+    marginRight: 16,
   },
   deliveryTime: {
     fontSize: 14,

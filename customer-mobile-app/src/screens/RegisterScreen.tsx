@@ -8,19 +8,23 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Image,
 } from 'react-native';
 import { useDispatch } from 'react-redux';
-import { login } from '../store/slices/authSlice';
+import { register } from '../store/slices/authSlice';
 
-const LoginScreen = ({ navigation }: any) => {
+const RegisterScreen = ({ navigation }: any) => {
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const dispatch = useDispatch();
 
-  const handleLogin = () => {
-    if (email && password) {
-      dispatch(login({ email, password }));
+  const handleRegister = () => {
+    if (name && email && phone && password && password === confirmPassword) {
+      // Đăng ký với thông tin thật từ form
+      dispatch(register({ name, email, phone, password }));
+      navigation.navigate('MainTabs');
     }
   };
 
@@ -28,8 +32,8 @@ const LoginScreen = ({ navigation }: any) => {
     navigation.goBack();
   };
 
-  const handleRegister = () => {
-    navigation.navigate('Register');
+  const handleLogin = () => {
+    navigation.navigate('Login');
   };
 
   return (
@@ -49,8 +53,18 @@ const LoginScreen = ({ navigation }: any) => {
         </View>
 
         <View style={styles.form}>
-          <Text style={styles.title}>Đăng nhập</Text>
+          <Text style={styles.title}>Đăng ký</Text>
           
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Họ và tên</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Nhập họ và tên"
+              value={name}
+              onChangeText={setName}
+            />
+          </View>
+
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Email</Text>
             <TextInput
@@ -60,6 +74,17 @@ const LoginScreen = ({ navigation }: any) => {
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Số điện thoại</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Nhập số điện thoại"
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
             />
           </View>
 
@@ -74,13 +99,24 @@ const LoginScreen = ({ navigation }: any) => {
             />
           </View>
 
-          <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-            <Text style={styles.loginButtonText}>Đăng nhập</Text>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Xác nhận mật khẩu</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Nhập lại mật khẩu"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry
+            />
+          </View>
+
+          <TouchableOpacity style={styles.registerButton} onPress={handleRegister}>
+            <Text style={styles.registerButtonText}>Đăng ký</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.registerLink} onPress={handleRegister}>
-            <Text style={styles.registerText}>
-              Chưa có tài khoản? <Text style={styles.registerTextBold}>Đăng ký ngay</Text>
+          <TouchableOpacity style={styles.loginLink} onPress={handleLogin}>
+            <Text style={styles.loginText}>
+              Đã có tài khoản? <Text style={styles.loginTextBold}>Đăng nhập ngay</Text>
             </Text>
           </TouchableOpacity>
         </View>
@@ -131,7 +167,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   label: {
     fontSize: 14,
@@ -147,27 +183,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     backgroundColor: '#fff',
   },
-  loginButton: {
+  registerButton: {
     backgroundColor: '#EA5034',
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',
     marginTop: 8,
   },
-  loginButtonText: {
+  registerButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
   },
-  registerLink: {
+  loginLink: {
     marginTop: 20,
     alignItems: 'center',
   },
-  registerText: {
+  loginText: {
     fontSize: 14,
     color: '#666',
   },
-  registerTextBold: {
+  loginTextBold: {
     color: '#EA5034',
     fontWeight: 'bold',
   },
@@ -195,4 +231,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default LoginScreen;
+export default RegisterScreen;

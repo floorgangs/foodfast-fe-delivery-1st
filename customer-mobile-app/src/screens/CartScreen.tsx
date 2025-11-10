@@ -8,6 +8,8 @@ import {
   TouchableOpacity,
   FlatList,
   Alert,
+  StatusBar,
+  Platform,
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
@@ -19,7 +21,7 @@ const CartScreen = ({ navigation }: any) => {
   const dispatch = useDispatch();
 
   const handleUpdateQuantity = (productId: string, quantity: number) => {
-    dispatch(updateQuantity({ productId, quantity }));
+    dispatch(updateQuantity({ id: productId, quantity }));
   };
 
   const handleRemoveItem = (productId: string) => {
@@ -32,21 +34,7 @@ const CartScreen = ({ navigation }: any) => {
       return;
     }
 
-    const order = {
-      items: items.map(item => ({
-        productId: item.id,
-        name: item.name,
-        quantity: item.quantity,
-        price: item.price,
-      })),
-      restaurantId: items[0].restaurantId,
-      restaurantName: items[0].restaurantName,
-      total,
-    };
-
-    dispatch(createOrder(order));
-    dispatch(clearCart());
-    navigation.navigate('OrderTracking');
+    navigation.navigate('Checkout');
   };
 
   const renderCartItem = ({ item }: any) => (
@@ -130,6 +118,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fafafa',
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   header: {
     flexDirection: 'row',
