@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "FoodFast Customer",
+    "slug": "foodfast-customer",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#EA5034"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.foodfast.customer"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#EA5034"
+      },
+      "package": "com.foodfast.customer"
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
