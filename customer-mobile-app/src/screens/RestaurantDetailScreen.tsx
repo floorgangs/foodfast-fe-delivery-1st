@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -55,7 +55,13 @@ const RestaurantDetailScreen = ({ route, navigation }: any) => {
   }, [products, restaurant]);
   const restaurantReviewCount = restaurant.orders ?? 0;
 
+  const { isAuthenticated } = useSelector((state: RootState) => state.auth);
+
   const handleAddToCart = (product: any) => {
+    if (!isAuthenticated) {
+      navigation.navigate('Login', { pendingAdd: { product, restaurant } });
+      return;
+    }
     // Kiểm tra nếu giỏ hàng có món từ nhà hàng khác
     if (items.length > 0 && currentRestaurantId !== restaurant.id) {
       Alert.alert(
@@ -69,29 +75,60 @@ const RestaurantDetailScreen = ({ route, navigation }: any) => {
           {
             text: 'Tiếp tục',
             onPress: () => {
-              dispatch(addToCart({
-                ...product,
-                restaurantId: restaurant.id,
-                restaurantName: restaurant.name,
-              }));
+                      dispatch(addToCart({
+                        ...product,
+                        restaurantId: restaurant.id,
+                        restaurantName: restaurant.name,
+                      }));
               Alert.alert('Thành công', 'Đã thêm món ăn vào giỏ hàng!');
             },
           },
         ]
       );
     } else {
-      dispatch(addToCart({
-        ...product,
-        restaurantId: restaurant.id,
-        restaurantName: restaurant.name,
-      }));
-      Alert.alert('Thành công', 'Đã thêm vào giỏ hàng!');
+              dispatch(addToCart({
+                ...product,
+                restaurantId: restaurant.id,
+                restaurantName: restaurant.name,
+              }));
+              Alert.alert('Thành công', 'Đã thêm vào giỏ hàng!');
     }
   };
 
+  const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
+  const PLACEHOLDER_IMAGE = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAQCAYAAAB49l8GAAAAHUlEQVR4nGNgGAWjYBSMglEwCkbGhoYGBgYGBgAAMaQF4nKp8OAAAAAElFTkSuQmCC';
+
   const renderProductCard = (product: any) => (
-    <View key={product.id} style={styles.productCard}>
-      <Image source={{ uri: product.image }} style={styles.productImage} />
+    <TouchableOpacity
+      key={product.id}
+      style={styles.productCard}
+      onPress={() => navigation.navigate('ProductDetail', { product, restaurant })}
+      activeOpacity={0.9}
+    >
+      {failedImages[product.id] ? (
+        // If product image failed, try to use restaurant image as fallback
+        restaurant.image && restaurant.image !== product.image ? (
+          <Image
+            source={{ uri: restaurant.image }}
+            style={styles.productImage}
+            resizeMode="cover"
+            onError={() => setFailedImages(prev => ({ ...prev, [product.id]: true }))}
+          />
+        ) : (
+          <Image
+            source={{ uri: PLACEHOLDER_IMAGE }}
+            style={styles.productImage}
+            resizeMode="cover"
+          />
+        )
+      ) : (
+        <Image
+          source={{ uri: product.image }}
+          style={styles.productImage}
+          resizeMode="cover"
+          onError={() => setFailedImages(prev => ({ ...prev, [product.id]: true }))}
+        />
+      )}
       <View style={styles.productInfo}>
         <Text style={styles.productName}>{product.name}</Text>
         <View style={styles.productRatingRow}>
@@ -112,8 +149,10 @@ const RestaurantDetailScreen = ({ route, navigation }: any) => {
           </TouchableOpacity>
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
+
+  const [failedRestaurantImage, setFailedRestaurantImage] = useState(false);
 
   return (
     <View style={styles.container}>
@@ -142,7 +181,20 @@ const RestaurantDetailScreen = ({ route, navigation }: any) => {
         contentContainerStyle={{ paddingBottom: 20 }}
       >
         {/* Restaurant Header */}
-        <Image source={{ uri: restaurant.image }} style={styles.restaurantImage} />
+        {failedRestaurantImage || !restaurant.image ? (
+          <Image
+            source={{ uri: PLACEHOLDER_IMAGE }}
+            style={styles.restaurantImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <Image
+            source={{ uri: restaurant.image }}
+            style={styles.restaurantImage}
+            resizeMode="cover"
+            onError={() => setFailedRestaurantImage(true)}
+          />
+        )}
         <View style={styles.restaurantHeader}>
           <Text style={styles.restaurantName}>{restaurant.name}</Text>
           <Text style={styles.restaurantDescription}>{restaurant.description}</Text>

@@ -16,6 +16,7 @@ import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import RestaurantDetailScreen from './src/screens/RestaurantDetailScreen';
+import ProductDetailScreen from './src/screens/ProductDetailScreen';
 import CartScreen from './src/screens/CartScreen';
 import CheckoutScreen from './src/screens/CheckoutScreen';
 import NotificationsScreen from './src/screens/NotificationsScreen';
@@ -202,7 +203,7 @@ function CartFloatingButton() {
     onPanResponderTerminate: (_, gesture) => finishDrag(gesture),
   }), [clampPosition, finishDrag, position.x, position.y]);
 
-  const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
+  const totalItems = items.reduce((sum, item) => sum + (item?.quantity ?? 0), 0);
 
   if (totalItems === 0 || hiddenCartRoutes.has(routeName)) {
     return null;
@@ -272,6 +273,7 @@ function AppNavigator() {
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="MainTabs" component={HomeTabs} />
           <Stack.Screen name="RestaurantDetail" component={RestaurantDetailScreen} />
+          <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
           <Stack.Screen name="Cart" component={CartScreen} />
           <Stack.Screen name="Checkout" component={CheckoutScreen} />
           <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} />

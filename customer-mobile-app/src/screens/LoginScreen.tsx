@@ -11,6 +11,9 @@ import {
   Image,
 } from 'react-native';
 import { useDispatch } from 'react-redux';
+import { useRoute } from '@react-navigation/native';
+import { addToCart } from '../store/slices/cartSlice';
+import { Alert } from 'react-native';
 import { login } from '../store/slices/authSlice';
 
 const LoginScreen = ({ navigation }: any) => {
@@ -18,9 +21,30 @@ const LoginScreen = ({ navigation }: any) => {
   const [password, setPassword] = useState('');
   const dispatch = useDispatch();
 
+  const route = useRoute<any>();
+
   const handleLogin = () => {
     if (email && password) {
       dispatch(login({ email, password }));
+
+      // Nếu có pendingAdd từ màn hình trước, thêm món vào giỏ ngay sau khi đăng nhập
+      const pending = route?.params?.pendingAdd;
+      if (pending && pending.product && pending.restaurant) {
+        dispatch(addToCart({
+          id: pending.product.id,
+          name: pending.product.name,
+          price: pending.product.price ?? 0,
+          restaurantId: pending.restaurant.id,
+          restaurantName: pending.restaurant.name,
+          image: (pending.product.images && pending.product.images[0]) || pending.product.image,
+        }));
+        Alert.alert('Thành công', 'Đã thêm vào giỏ hàng');
+        navigation.navigate('Cart');
+        return;
+      }
+
+      // Nếu không có pendingAdd, quay về màn hình trước
+      navigation.goBack();
     }
   };
 
