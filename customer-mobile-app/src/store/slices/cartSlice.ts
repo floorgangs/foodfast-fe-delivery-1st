@@ -131,8 +131,11 @@ const cartSlice = createSlice({
       AsyncStorage.setItem('cart', JSON.stringify(state));
     },
     setCart: (state, action: PayloadAction<CartState>) => {
-      state.items = action.payload.items;
-      state.total = action.payload.total;
+      // Normalize incoming cart: ensure each item has a quantity
+      state.items = (action.payload.items || []).map(item => ({ ...item, quantity: (item as any).quantity ?? 1 }));
+      state.total = action.payload.total ?? state.items.reduce((sum, i) => sum + (i.price * (i.quantity ?? 1)), 0);
+      state.currentRestaurantId = action.payload.currentRestaurantId ?? state.currentRestaurantId;
+      state.currentRestaurantName = action.payload.currentRestaurantName ?? state.currentRestaurantName;
     },
   },
 });
