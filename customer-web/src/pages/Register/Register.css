@@ -1,0 +1,194 @@
+.register-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffe8d6;
+  padding: 2rem 1rem;
+}
+
+body {
+  background: #ffe8d6;
+}
+
+.register-card {
+  width: 380px;
+  max-width: 100%;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(2, 6, 23, 0.45);
+  padding: 2rem 1.5rem 2rem 1.5rem;
+  margin: 24px auto;
+}
+
+.register-top {
+  text-align: center;
+  margin-bottom: 0.75rem;
+}
+.register-logo {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  margin: 0 auto 0.5rem;
+  display: block;
+}
+.register-top h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  color: #111827;
+}
+.register-top p {
+  margin: 6px 0 0;
+  color: #6b7280;
+  font-size: 0.95rem;
+}
+
+.register-form {
+  margin-top: 1.2rem;
+}
+.form-group {
+  margin-bottom: 1.1rem;
+}
+.form-group label {
+  display: block;
+  font-size: 0.9rem;
+  color: #374151;
+  margin-bottom: 6px;
+}
+.form-group input {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  height: 44px;
+  line-height: 1.25;
+  border: 1px solid #eef0f2;
+  border-radius: 10px;
+  font-size: 0.98rem;
+  background: #fbfbfc;
+  box-sizing: border-box;
+}
+.form-group input:focus {
+  outline: none;
+  border-color: #d6cfff;
+  box-shadow: 0 6px 18px rgba(99, 72, 255, 0.04);
+  background: #fff;
+}
+
+.form-group input.invalid {
+  border-color: #ef4444;
+  box-shadow: 0 6px 18px rgba(239, 68, 68, 0.06);
+}
+
+/* inputs with icons */
+.input-with-icon {
+  position: relative;
+}
+.input-with-icon .icon {
+  position: absolute;
+  left: 14px;
+  top: calc(50% + 12px);
+  transform: translateY(-50%);
+  pointer-events: none;
+  font-size: 16px;
+  color: #9aa0a6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.input-with-icon .icon.phone-icon {
+  top: 50%;
+}
+.input-with-icon input {
+  padding-left: 44px;
+}
+
+.input-note {
+  color: #9ca3af;
+  font-size: 0.85rem;
+  margin-top: 6px;
+}
+
+.input-error {
+  color: #ef4444;
+  font-size: 0.85rem;
+  margin-top: 6px;
+}
+
+.agree {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0.6rem 0 0.9rem;
+}
+.agree input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+}
+.agree label {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+.agree a {
+  color: #4f46e5;
+  text-decoration: underline;
+}
+
+.register-btn {
+  width: 100%;
+  padding: 0.95rem;
+  background: #ff7a2f;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+}
+.register-btn:hover {
+  background: #e86920;
+}
+
+.divider {
+  text-align: center;
+  margin: 1rem 0;
+  color: #9ca3af;
+  font-size: 0.9rem;
+}
+.socials {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.btn-google,
+.btn-fb {
+  width: 100%;
+  padding: 0.75rem;
+  border-radius: 10px;
+  background: transparent;
+  border: 1px solid #e6e6e9;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-google {
+  color: #b91c1c;
+}
+.btn-fb {
+  color: #1e40af;
+}
+
+.have-account {
+  text-align: center;
+  margin-top: 0.9rem;
+  color: #6b7280;
+}
+.have-account a {
+  color: #4f46e5;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+@media (max-width: 480px) {
+  .register-card {
+    padding: 1rem;
+    border-radius: 12px;
+  }
+}

@@ -1,52 +1,112 @@
-import { Outlet, Link, useNavigate } from 'react-router-dom'
-import { useSelector, useDispatch } from 'react-redux'
-import { logout } from '../../store/slices/authSlice'
-import './Layout.css'
+import { Outlet, NavLink, Link, useNavigate } from "react-router-dom";
+import { useSelector, useDispatch } from "react-redux";
+import { logout } from "../../store/slices/authSlice";
+import "./Layout.css";
+import { useState } from "react";
 
 function Layout() {
-  const { user } = useSelector(state => state.auth)
-  const dispatch = useDispatch()
-  const navigate = useNavigate()
+  const { user } = useSelector((state) => state.auth);
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const [collapsed, setCollapsed] = useState(false);
 
   const handleLogout = () => {
-    dispatch(logout())
-    navigate('/login')
-  }
+    dispatch(logout());
+    navigate("/login");
+  };
 
   return (
-    <div className="layout">
-      <aside className="sidebar">
-        <div className="sidebar-header">
-          <h2>⚙️ FoodFast Admin</h2>
-          <p className="admin-name">{user?.name}</p>
+    <div className="ff-layout">
+      {/* Sidebar (left) */}
+      <aside className={"ff-sidebar" + (collapsed ? " ff-collapsed" : "")}>
+        <div className="ff-sidebar-header">
+          <Link to="/" className="ff-brand">
+            🍽️ FoodFast Admin
+          </Link>
+          <p className="ff-admin-name">{user?.name}</p>
         </div>
-        <nav className="sidebar-nav">
-          <Link to="/" className="nav-item">
+        <nav className="ff-sidebar-nav">
+          <NavLink
+            to="/"
+            end
+            className={({ isActive }) =>
+              "ff-nav-item" + (isActive ? " active" : "")
+            }
+          >
             📊 Dashboard
-          </Link>
-          <Link to="/users" className="nav-item">
+          </NavLink>
+          <NavLink
+            to="/users"
+            className={({ isActive }) =>
+              "ff-nav-item" + (isActive ? " active" : "")
+            }
+          >
             👥 Quản lý người dùng
-          </Link>
-          <Link to="/restaurants" className="nav-item">
+          </NavLink>
+          <NavLink
+            to="/restaurants"
+            className={({ isActive }) =>
+              "ff-nav-item" + (isActive ? " active" : "")
+            }
+          >
             🏪 Quản lý nhà hàng
-          </Link>
-          <Link to="/orders" className="nav-item">
+          </NavLink>
+          <NavLink
+            to="/orders"
+            className={({ isActive }) =>
+              "ff-nav-item" + (isActive ? " active" : "")
+            }
+          >
             📦 Giám sát đơn hàng
-          </Link>
-          <Link to="/drones" className="nav-item">
+          </NavLink>
+          <NavLink
+            to="/drones"
+            className={({ isActive }) =>
+              "ff-nav-item" + (isActive ? " active" : "")
+            }
+          >
             🚁 Quản lý Drone
-          </Link>
+          </NavLink>
         </nav>
-        <button onClick={handleLogout} className="logout-btn">
-          Đăng xuất
-        </button>
+        <div className="ff-sidebar-footer">
+          <button onClick={handleLogout} className="ff-logout-btn">
+            Đăng xuất
+          </button>
+        </div>
       </aside>
-      
-      <main className="main-content">
-        <Outlet />
-      </main>
+
+      {/* Main content area with top navbar (to align with Admin Dashboard look) */}
+      <div className="ff-main">
+        <header className="ff-topbar">
+          <div className="ff-topbar-inner">
+            <div className="ff-topbar-left">
+              <button
+                className="ff-toggle-btn"
+                aria-label="Toggle sidebar"
+                onClick={() => setCollapsed((s) => !s)}
+              >
+                ☰
+              </button>
+              <h4 className="ff-page-title">Admin</h4>
+            </div>
+            <div className="ff-topbar-right">
+              <span className="ff-user">👋 {user?.name || "Quản trị"}</span>
+            </div>
+          </div>
+        </header>
+
+        <main className="ff-content">
+          <Outlet />
+        </main>
+
+        <footer className="ff-footer">
+          <div className="ff-footer-inner">
+            © {new Date().getFullYear()} FoodFast
+          </div>
+        </footer>
+      </div>
     </div>
-  )
+  );
 }
 
-export default Layout
+export default Layout;

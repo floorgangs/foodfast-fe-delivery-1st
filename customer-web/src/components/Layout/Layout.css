@@ -27,7 +27,7 @@
 .logo {
   font-size: 1.25rem;
   font-weight: 700;
-  color: #EA5034;
+  color: #ea5034;
   text-decoration: none;
   display: flex;
   align-items: center;
@@ -60,17 +60,17 @@
 }
 
 .nav a:hover {
-  color: #EA5034;
+  color: #ea5034;
 }
 
 .nav a::after {
-  content: '';
+  content: "";
   position: absolute;
   bottom: 0;
   left: 0;
   width: 0;
   height: 2px;
-  background: #EA5034;
+  background: #ea5034;
   transition: width 0.2s ease;
 }
 
@@ -93,7 +93,7 @@
 .cart-link:hover {
   background: #f8f9fa;
   border-radius: 8px;
-  color: #EA5034;
+  color: #ea5034;
 }
 
 .logout-btn {
@@ -110,8 +110,24 @@
 
 .logout-btn:hover {
   background: #f8f9fa;
-  border-color: #EA5034;
-  color: #EA5034;
+  border-color: #ea5034;
+  color: #ea5034;
+}
+
+.auth-link {
+  padding: 0.35rem 0.875rem !important;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 0.75rem !important;
+}
+
+.auth-link:hover {
+  background: #f8f9fa;
+  border-color: #ea5034;
+}
+
+.auth-link::after {
+  display: none !important;
 }
 
 .main {
@@ -143,25 +159,25 @@
   .header .container {
     padding: 0.35rem 16px;
   }
-  
+
   .nav {
     gap: 0.5rem;
   }
-  
+
   .nav a {
     padding: 0.25rem 0.5rem;
     font-size: 0.75rem;
   }
-  
+
   .logo {
     font-size: 1.1rem;
   }
-  
+
   .cart-link {
     font-size: 1rem;
     padding: 0.25rem 0.5rem;
   }
-  
+
   .logout-btn {
     padding: 0.3rem 0.75rem;
     font-size: 0.7rem;
