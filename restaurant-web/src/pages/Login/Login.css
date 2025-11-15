@@ -1,86 +1,354 @@
-.login-page {
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Raleway:wght@400;600&display=swap');
+
+.box-login {
+  background: #f7edd5;
+  font-family: 'Montserrat', sans-serif;
   min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
 .login-container {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-  padding: 3rem;
-  max-width: 450px;
-  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
 }
 
-.login-header {
-  text-align: center;
-  margin-bottom: 2rem;
+a {
+  display: inline-block;
+  text-decoration: none;
 }
 
-.login-header h1 {
-  font-size: 2rem;
-  color: #667eea;
-  margin-bottom: 0.5rem;
+input {
+  outline: none !important;
 }
 
-.login-header p {
-  color: #666;
+section#formHolder {
+  padding: 50px 0;
 }
 
-.login-form h2 {
-  color: #333;
-  margin-bottom: 1.5rem;
-  text-align: center;
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  align-items: stretch;
 }
 
-.form-group {
-  margin-bottom: 1.5rem;
+.row > .brand {
+  flex: 0 0 360px;
+  max-width: 360px;
 }
 
-.form-group label {
+.row > .form {
+  flex: 1 1 420px;
+  max-width: calc(100% - 360px);
+}
+
+.brand {
+  padding: 24px;
+  background: url('https://images.unsplash.com/photo-1478145046317-39f10e56b5e9?auto=format&fit=crop&w=900&q=80');
+  background-size: cover;
+  background-position: center center;
+  color: #fff;
+  min-height: 540px;
+  position: relative;
+  box-shadow: 3px 3px 18px rgba(0, 0, 0, 0.25);
+  transition: transform 0.6s cubic-bezier(1, -0.375, 0.285, 0.995);
+  border-radius: 28px 0 0 28px;
+  overflow: hidden;
+}
+
+.brand::before {
+  content: '';
   display: block;
-  margin-bottom: 0.5rem;
-  color: #333;
-  font-weight: 500;
-}
-
-.form-group input {
   width: 100%;
-  padding: 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 1rem;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: -1;
 }
 
-.form-group input:focus {
-  outline: none;
-  border-color: #667eea;
+.brand a.logo {
+  color: #ffb347;
+  font-size: 16px;
+  font-weight: 700;
+  text-decoration: none;
+  line-height: 1em;
 }
 
-.login-btn {
-  width: 100%;
-  padding: 1rem;
-  background: #667eea;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.3s;
+.brand a.logo span {
+  font-size: 22px;
+  color: #fff;
+  transform: translateX(-5px);
+  display: inline-block;
 }
 
-.login-btn:hover {
-  background: #5568d3;
-}
-
-.demo-note {
+.brand .heading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   text-align: center;
-  color: #999;
-  font-size: 0.8rem;
-  font-style: italic;
-  margin-top: 1rem;
+  transition: transform 0.6s ease, opacity 0.6s ease;
+}
+
+.brand .heading h2 {
+  font-size: clamp(34px, 4.2vw, 48px);
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 0;
+  color: #fff;
+  letter-spacing: 0.14em;
+}
+
+.brand .heading p {
+  font-size: 13px;
+  font-weight: 300;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  font-family: 'Raleway', sans-serif;
+}
+
+.brand-list {
+  list-style: none;
+  padding: 0;
+  margin: 24px 0 0;
+  display: grid;
+  gap: 12px;
+  text-align: left;
+}
+
+.brand-list li {
+  font-size: 13px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 10px 16px;
+  border-radius: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.form {
+  position: relative;
+  flex: 1 1 420px;
+  width: 100%;
+  min-height: 540px;
+  overflow: hidden;
+  border-radius: 0 28px 28px 0;
+}
+
+.form .form-piece {
+  background: #fff;
+  position: absolute;
+  inset: 0;
+  padding: 56px 64px;
+  box-shadow: 12px 24px 40px rgba(0, 0, 0, 0.12);
+  border-radius: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.6s cubic-bezier(1, -0.375, 0.285, 0.995), opacity 0.4s ease;
+  color: #2e2e2e;
+  background-clip: padding-box;
+  overflow-y: auto;
+}
+
+.form .login.form-piece {
+  transform: translateX(0);
+  z-index: 2;
+}
+
+.form .login.form-piece.switched {
+  transform: translateX(-105%);
+  z-index: 1;
+}
+
+.form .signup.form-piece {
+  transform: translateX(105%);
+  z-index: 1;
+}
+
+.form .signup.form-piece.active {
+  transform: translateX(0);
+  z-index: 3;
+}
+
+.form form {
+  width: 100%;
+  max-width: 340px;
+  padding: 0;
+  margin: 0;
+  position: static;
+  transform: none;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.form form .form-group {
+  margin-bottom: 0;
+  position: relative;
+}
+
+.form form .form-group input:not([type='submit']) {
+  background: none;
+  outline: none;
+  border: none;
+  display: block;
+  padding: 14px 0 6px;
+  width: 100%;
+  border-bottom: 1px solid #dedede;
+  color: #222;
+  font-size: 15px;
+  font-family: 'Montserrat', sans-serif;
+  transition: border-color 0.2s ease;
+}
+
+.form form .form-group input:not([type='submit']):focus {
+  border-color: #ff7034;
+}
+
+.form form .form-group input::placeholder {
+  color: transparent;
+}
+
+.form form .form-group label {
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  font-family: 'Montserrat', sans-serif;
+  letter-spacing: 0.08em;
+  position: absolute;
+  top: 16px;
+  left: 0;
+  transform-origin: left top;
+  transition: transform 0.2s ease, color 0.2s ease, font-size 0.2s ease;
+  color: #888;
+  pointer-events: none;
+}
+
+.form form .form-group input:focus + label,
+.form form .form-group input:not(:placeholder-shown) + label {
+  transform: translateY(-12px);
+  font-size: 10px;
+  color: #ff7034;
+}
+
+.form form .CTA {
+  margin-top: 24px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+}
+
+.form form .CTA input {
+  font-size: 12px;
+  text-transform: uppercase;
+  padding: 8px 36px;
+  background: #ff7034;
+  color: #fff;
+  border-radius: 30px;
+  border: none;
+  font-family: 'Montserrat', sans-serif;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.form form .CTA input:hover {
+  background: #ff4d00;
+}
+
+.link-button {
+  font-size: 13px;
+  font-weight: 500;
+  font-family: 'Montserrat', sans-serif;
+  color: #777;
+  text-decoration: underline;
+  transition: color 0.3s ease;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.link-button:hover {
+  color: #ff7034;
+}
+
+.form form .form-links {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -8px;
+}
+
+.login-options {
+  margin: 12px 0;
+  text-align: center;
+}
+
+.sms-login-btn {
+  font-size: 0.9rem;
+  color: #1890ff;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.sms-login-btn:hover {
+  color: #40a9ff;
+}
+
+.form-error {
+  margin: -4px 0 12px;
+  color: #ff7034;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.form form .form-group.hasError input {
+  border-color: #ff7034 !important;
+}
+
+.form form .form-group.hasError label {
+  color: #ff7034 !important;
+}
+
+@media (max-width: 992px) {
+  .row {
+    flex-direction: column;
+    gap: 32px;
+  }
+
+  .row > .brand,
+  .row > .form {
+    max-width: 100%;
+  }
+
+  .brand {
+    min-height: 360px;
+    border-radius: 28px;
+  }
+  .form {
+    min-height: 520px;
+    border-radius: 28px;
+  }
+}
+
+@media (max-width: 768px) {
+  section#formHolder {
+    padding: 16px 0 32px;
+  }
+
+  .form .form-piece {
+    padding: 40px 32px;
+  }
+
+}
+
+@media (max-width: 480px) {
+  .brand .heading h2 {
+    font-size: 44px;
+  }
+
+  .form .form-piece {
+    padding: 32px 24px;
+  }
 }
