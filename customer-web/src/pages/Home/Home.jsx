@@ -202,9 +202,6 @@ function Home() {
             >
               <div className="restaurant-image">
                 <img src={restaurant.image} alt={restaurant.name} />
-                {restaurant.freeShipping && (
-                  <span className="free-ship-badge">🚀 Free ship</span>
-                )}
                 {restaurant.isOpen ? (
                   <span className="status-badge open">Đang mở</span>
                 ) : (

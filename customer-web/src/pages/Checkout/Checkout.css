@@ -172,6 +172,76 @@
   margin: 0;
 }
 
+/* Address Row Layout */
+.address-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.location-select {
+  position: relative;
+  margin-bottom: 0 !important;
+}
+
+.location-select input {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.location-select input:disabled {
+  background: #f3f4f6;
+  cursor: not-allowed;
+}
+
+.location-select input:focus {
+  outline: none;
+  border-color: #ea5034;
+  box-shadow: 0 0 0 3px rgba(234, 80, 52, 0.1);
+}
+
+.location-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  max-height: 250px;
+  overflow-y: auto;
+  z-index: 1000;
+  margin-top: 4px;
+}
+
+.dropdown-item {
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.dropdown-item:hover {
+  background: #f8f9fa;
+}
+
+.dropdown-item.selected {
+  background: #ea5034;
+  color: white;
+  font-weight: 500;
+}
+
 .payment-methods {
   display: flex;
   flex-direction: column;
@@ -180,13 +250,14 @@
 
 .payment-option {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 1rem;
-  padding: 1rem;
+  padding: 1.25rem;
   border: 2px solid #e5e7eb;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
+  background: white;
 }
 
 .payment-option:hover {
@@ -195,14 +266,11 @@
 }
 
 .payment-option input[type="radio"] {
-  margin-top: 0.25rem;
   width: 20px;
   height: 20px;
   cursor: pointer;
-}
-
-.payment-option input[type="radio"]:checked ~ .payment-content {
-  color: #ea5034;
+  flex-shrink: 0;
+  accent-color: #ea5034;
 }
 
 .payment-option:has(input:checked) {
@@ -217,29 +285,56 @@
 }
 
 .payment-icon {
-  width: 50px;
-  height: 50px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f9fafb;
-  border-radius: 8px;
-  color: #6b7280;
+  flex-shrink: 0;
 }
 
 .payment-icon svg {
-  width: 32px;
-  height: 32px;
+  width: 40px;
+  height: 40px;
 }
 
-.payment-content strong {
+.pay-logo {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+.payment-details {
+  flex: 1;
+  text-align: left;
+}
+
+.payment-title {
   display: block;
   color: #111827;
-  margin-bottom: 0.25rem;
   font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
 }
 
-.payment-content p {
+.payment-desc {
+  color: #9ca3af;
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.payment-info {
+  flex: 1;
+}
+
+.payment-info strong {
+  display: block;
+  color: #111827;
+  font-size: 1rem;
+  margin-bottom: 0.25rem;
+}
+
+.payment-info p {
   color: #6b7280;
   font-size: 0.875rem;
   margin: 0;

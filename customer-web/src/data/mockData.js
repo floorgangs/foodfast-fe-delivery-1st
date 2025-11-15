@@ -184,6 +184,36 @@ export const products = {
       image: "https://images.unsplash.com/photo-1559314809-0d155014e29e?w=300",
       description: "Bún với thịt nướng",
     },
+    {
+      id: "204",
+      name: "Bún Bò Huế Thường",
+      price: 35000,
+      image:
+        "https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=300",
+      description: "Bún bò Huế size thường",
+    },
+    {
+      id: "205",
+      name: "Chả Giò (3 cuốn)",
+      price: 25000,
+      image:
+        "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=300",
+      description: "Chả giò chiên giòn",
+    },
+    {
+      id: "206",
+      name: "Nước Ngọt Coca (Lon)",
+      price: 15000,
+      image: "https://images.unsplash.com/photo-1554866585-cd94860890b7?w=300",
+      description: "Coca Cola lon 330ml",
+    },
+    {
+      id: "207",
+      name: "Trà Đá",
+      price: 5000,
+      image: "https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=300",
+      description: "Trà đá tươi mát",
+    },
   ],
   3: [
     // KFC
@@ -346,3 +376,88 @@ export const products = {
 
 // Mock orders
 export const mockOrders = [];
+
+// Mock reviews for restaurants
+export const mockReviews = {
+  1: [
+    // Cơm Tấm Sài Gòn
+    {
+      id: "r1",
+      customerName: "Nguyễn Văn A",
+      rating: 5,
+      comment: "Cơm tấm rất ngon, sườn nướng thơm phức. Giao hàng nhanh!",
+      createdAt: "2024-11-10T10:30:00.000Z",
+      orderId: "ORD001",
+    },
+    {
+      id: "r2",
+      customerName: "Trần Thị B",
+      rating: 4,
+      comment: "Món ăn ngon, giá cả hợp lý. Lần sau sẽ order tiếp.",
+      createdAt: "2024-11-12T15:20:00.000Z",
+      orderId: "ORD002",
+    },
+    {
+      id: "r3",
+      customerName: "Lê Hoàng C",
+      rating: 5,
+      comment: "Tuyệt vời! Phần ăn nhiều, chất lượng tốt.",
+      createdAt: "2024-11-14T12:00:00.000Z",
+      orderId: "ORD003",
+    },
+  ],
+  2: [
+    // Bún Bò Huế 24H
+    {
+      id: "r4",
+      customerName: "Phạm Minh D",
+      rating: 5,
+      comment: "Bún bò Huế đậm đà, chuẩn vị. Rất hài lòng!",
+      createdAt: "2024-11-09T08:45:00.000Z",
+      orderId: "ORD004",
+    },
+    {
+      id: "r5",
+      customerName: "Võ Thị E",
+      rating: 5,
+      comment: "Giao hàng cực nhanh, món ăn còn nóng. Sẽ order lại.",
+      createdAt: "2024-11-11T19:30:00.000Z",
+      orderId: "ORD005",
+    },
+    {
+      id: "r6",
+      customerName: "Đỗ Văn F",
+      rating: 4,
+      comment: "Ngon, nhưng hơi cay một chút. Nhìn chung rất ok!",
+      createdAt: "2024-11-13T14:15:00.000Z",
+      orderId: "ORD006",
+    },
+    {
+      id: "r7",
+      customerName: "Huỳnh Thị G",
+      rating: 5,
+      comment: "Bún riêu cũng rất ngon, topping đầy đủ. Recommend!",
+      createdAt: "2024-11-15T11:20:00.000Z",
+      orderId: "ORD007",
+    },
+  ],
+  3: [
+    // KFC
+    {
+      id: "r8",
+      customerName: "Ngô Minh H",
+      rating: 4,
+      comment: "Gà giòn ngon, burger cũng ổn. Giao hàng đúng giờ.",
+      createdAt: "2024-11-10T16:00:00.000Z",
+      orderId: "ORD008",
+    },
+    {
+      id: "r9",
+      customerName: "Bùi Thị I",
+      rating: 5,
+      comment: "Con cái thích lắm! Sẽ order combo family lần sau.",
+      createdAt: "2024-11-12T18:45:00.000Z",
+      orderId: "ORD009",
+    },
+  ],
+};

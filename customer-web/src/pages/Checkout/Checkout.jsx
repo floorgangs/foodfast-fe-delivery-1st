@@ -1,23 +1,47 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { clearCart } from "../../store/slices/cartSlice";
 import { checkAuth } from "../../store/slices/authSlice";
+import { vietnamLocations } from "../../data/vietnamLocations";
+import { restaurants } from "../../data/mockData";
+import { createOrder } from "../../services/orderService";
 import "./Checkout.css";
 
 function Checkout() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { user, isAuthenticated } = useSelector((state) => state.auth);
-  const { items } = useSelector((state) => state.cart);
+  const { items, restaurantId: cartRestaurantId } = useSelector(
+    (state) => state.cart
+  );
 
   // Form state
   const [name, setName] = useState(user?.name || "");
   const [phone, setPhone] = useState(user?.phone || "");
-  const [address, setAddress] = useState("");
+  const [streetAddress, setStreetAddress] = useState("");
   const [note, setNote] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cod");
   const [useOldAddress, setUseOldAddress] = useState(false);
+
+  // Location selection state
+  const [selectedCity, setSelectedCity] = useState("");
+  const [selectedDistrict, setSelectedDistrict] = useState("");
+  const [selectedWard, setSelectedWard] = useState("");
+
+  // Dropdown visibility
+  const [showCityDropdown, setShowCityDropdown] = useState(false);
+  const [showDistrictDropdown, setShowDistrictDropdown] = useState(false);
+  const [showWardDropdown, setShowWardDropdown] = useState(false);
+
+  // Search filters
+  const [citySearch, setCitySearch] = useState("");
+  const [districtSearch, setDistrictSearch] = useState("");
+  const [wardSearch, setWardSearch] = useState("");
+
+  const cityRef = useRef(null);
+  const districtRef = useRef(null);
+  const wardRef = useRef(null);
 
   // Voucher state
   const [showVoucherModal, setShowVoucherModal] = useState(false);
@@ -64,6 +88,73 @@ function Checkout() {
     ].filter(Boolean)
   );
 
+  // Get districts and wards based on selections
+  const getDistricts = () => {
+    const city = vietnamLocations.cities.find((c) => c.id === selectedCity);
+    return city ? city.districts : [];
+  };
+
+  const getWards = () => {
+    const city = vietnamLocations.cities.find((c) => c.id === selectedCity);
+    const district = city?.districts.find((d) => d.id === selectedDistrict);
+    return district ? district.wards : [];
+  };
+
+  // Filter locations based on search
+  const filteredCities = vietnamLocations.cities.filter((city) =>
+    city.name.toLowerCase().includes(citySearch.toLowerCase())
+  );
+
+  const filteredDistricts = getDistricts().filter((district) =>
+    district.name.toLowerCase().includes(districtSearch.toLowerCase())
+  );
+
+  const filteredWards = getWards().filter((ward) =>
+    ward.name.toLowerCase().includes(wardSearch.toLowerCase())
+  );
+
+  // Handle selections
+  const handleCitySelect = (city) => {
+    setSelectedCity(city.id);
+    setCitySearch(city.name);
+    setShowCityDropdown(false);
+    setSelectedDistrict("");
+    setSelectedWard("");
+    setDistrictSearch("");
+    setWardSearch("");
+  };
+
+  const handleDistrictSelect = (district) => {
+    setSelectedDistrict(district.id);
+    setDistrictSearch(district.name);
+    setShowDistrictDropdown(false);
+    setSelectedWard("");
+    setWardSearch("");
+  };
+
+  const handleWardSelect = (ward) => {
+    setSelectedWard(ward.id);
+    setWardSearch(ward.name);
+    setShowWardDropdown(false);
+  };
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (cityRef.current && !cityRef.current.contains(event.target)) {
+        setShowCityDropdown(false);
+      }
+      if (districtRef.current && !districtRef.current.contains(event.target)) {
+        setShowDistrictDropdown(false);
+      }
+      if (wardRef.current && !wardRef.current.contains(event.target)) {
+        setShowWardDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   useEffect(() => {
     // Check localStorage first on mount
     const token = localStorage.getItem("token");
@@ -83,7 +174,9 @@ function Checkout() {
 
   useEffect(() => {
     if (useOldAddress && savedAddresses.length > 0) {
-      setAddress(savedAddresses[0].address);
+      setStreetAddress(savedAddresses[0].address);
+    } else {
+      setStreetAddress("");
     }
   }, [useOldAddress, savedAddresses]);
 
@@ -117,31 +210,77 @@ function Checkout() {
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    if (!name || !phone || !address) {
+    // Validate
+    if (
+      !name ||
+      !phone ||
+      !streetAddress ||
+      !selectedCity ||
+      !selectedDistrict ||
+      !selectedWard
+    ) {
       alert("Vui lòng điền đầy đủ thông tin giao hàng!");
       return;
     }
 
-    // Mock order creation
-    const order = {
-      id: "ORD-" + Date.now(),
-      items: items,
-      customer: { name, phone, address },
+    // Build full address
+    const cityName = vietnamLocations.cities.find(
+      (c) => c.id === selectedCity
+    )?.name;
+    const districtName = getDistricts().find(
+      (d) => d.id === selectedDistrict
+    )?.name;
+    const wardName = getWards().find((w) => w.id === selectedWard)?.name;
+    const fullAddress = `${streetAddress}, ${wardName}, ${districtName}, ${cityName}`;
+
+    // Get restaurant info - ALWAYS use cartRestaurantId first
+    const restaurantId = cartRestaurantId || items[0]?.restaurantId || "2";
+
+    // Get restaurant details from mockData
+    const restaurant = restaurants.find((r) => r.id === restaurantId);
+    const restaurantName = restaurant?.name || "Bún Bò Huế 24H";
+    const restaurantAddress = restaurant?.address || "456 Lê Lợi, Q.1, TP.HCM";
+
+    console.log("=== Creating order with restaurantId:", restaurantId);
+
+    // Prepare order data
+    const orderData = {
+      restaurantId,
+      restaurantName,
+      restaurantAddress,
+      items: items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        note: "",
+      })),
+      customerName: name,
+      customerPhone: phone,
+      deliveryAddress: fullAddress,
       note,
-      paymentMethod,
       subtotal,
       shippingFee,
+      discount: selectedVoucher?.discount || 0,
       total,
-      status: "pending",
-      createdAt: new Date().toISOString(),
     };
 
-    console.log("Order created:", order);
+    // If online payment selected, redirect to mock payment gateway
+    if (paymentMethod === "vnpay" || paymentMethod === "momo") {
+      navigate("/payment", { state: { orderData, paymentMethod } });
+      return;
+    }
 
-    // Clear cart and redirect
+    // COD: create order immediately
+    const newOrder = createOrder({
+      ...orderData,
+      customerId: user?.id || "guest",
+      customerEmail: user?.email || "",
+      paymentMethod: "Tiền mặt",
+    });
+
     dispatch(clearCart());
-    alert("Đặt hàng thành công! Mã đơn hàng: " + order.id);
-    navigate("/order-tracking");
+    navigate(`/order-tracking/${newOrder.id}`);
   };
 
   return (
@@ -164,7 +303,7 @@ function Checkout() {
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder={user?.name || "Nhập họ và tên"}
+                    placeholder="Họ và tên"
                     required
                   />
                 </div>
@@ -177,7 +316,7 @@ function Checkout() {
                     type="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    placeholder={user?.phone || "Nhập số điện thoại"}
+                    placeholder="Số điện thoại"
                     required
                   />
                 </div>
@@ -207,16 +346,112 @@ function Checkout() {
 
                 <div className="form-group">
                   <label>
-                    Địa chỉ giao hàng<span className="required">*</span>
+                    Địa chỉ (trước sáp nhập)<span className="required">*</span>
                   </label>
-                  <textarea
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    placeholder="Nhập địa chỉ giao hàng"
-                    rows="3"
+                  <input
+                    type="text"
+                    value={streetAddress}
+                    onChange={(e) => setStreetAddress(e.target.value)}
+                    placeholder="Nhập địa chỉ"
                     required
                     disabled={useOldAddress}
                   />
+                </div>
+
+                <div className="address-row">
+                  <div className="form-group location-select" ref={cityRef}>
+                    <input
+                      type="text"
+                      value={citySearch}
+                      onFocus={() => {
+                        setCitySearch("");
+                        setShowCityDropdown(true);
+                      }}
+                      onChange={(e) => setCitySearch(e.target.value)}
+                      placeholder="Thành phố"
+                      disabled={useOldAddress}
+                      autoComplete="off"
+                    />
+                    {showCityDropdown && (
+                      <div className="location-dropdown">
+                        {filteredCities.map((city) => (
+                          <div
+                            key={city.id}
+                            className={`dropdown-item ${
+                              selectedCity === city.id ? "selected" : ""
+                            }`}
+                            onClick={() => handleCitySelect(city)}
+                          >
+                            {city.name}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="form-group location-select" ref={districtRef}>
+                    <input
+                      type="text"
+                      value={districtSearch}
+                      onFocus={() => {
+                        if (selectedCity) {
+                          setDistrictSearch("");
+                          setShowDistrictDropdown(true);
+                        }
+                      }}
+                      onChange={(e) => setDistrictSearch(e.target.value)}
+                      placeholder="Quận/Huyện"
+                      disabled={!selectedCity || useOldAddress}
+                      autoComplete="off"
+                    />
+                    {showDistrictDropdown && selectedCity && (
+                      <div className="location-dropdown">
+                        {filteredDistricts.map((district) => (
+                          <div
+                            key={district.id}
+                            className={`dropdown-item ${
+                              selectedDistrict === district.id ? "selected" : ""
+                            }`}
+                            onClick={() => handleDistrictSelect(district)}
+                          >
+                            {district.name}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="form-group location-select" ref={wardRef}>
+                    <input
+                      type="text"
+                      value={wardSearch}
+                      onFocus={() => {
+                        if (selectedDistrict) {
+                          setWardSearch("");
+                          setShowWardDropdown(true);
+                        }
+                      }}
+                      onChange={(e) => setWardSearch(e.target.value)}
+                      placeholder="Phường/Xã"
+                      disabled={!selectedDistrict || useOldAddress}
+                      autoComplete="off"
+                    />
+                    {showWardDropdown && selectedDistrict && (
+                      <div className="location-dropdown">
+                        {filteredWards.map((ward) => (
+                          <div
+                            key={ward.id}
+                            className={`dropdown-item ${
+                              selectedWard === ward.id ? "selected" : ""
+                            }`}
+                            onClick={() => handleWardSelect(ward)}
+                          >
+                            {ward.name}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="form-group">
@@ -280,24 +515,26 @@ function Checkout() {
                       checked={paymentMethod === "cod"}
                       onChange={(e) => setPaymentMethod(e.target.value)}
                     />
-                    <div className="payment-content">
-                      <div className="payment-icon">
-                        <svg
-                          width="32"
-                          height="32"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                        >
-                          <rect x="2" y="5" width="20" height="14" rx="2" />
-                          <line x1="2" y1="10" x2="22" y2="10" />
-                        </svg>
-                      </div>
-                      <div>
-                        <strong>Thanh toán khi nhận hàng (COD)</strong>
-                        <p>Thanh toán bằng tiền mặt khi nhận hàng</p>
-                      </div>
+                    <div className="payment-icon">
+                      <svg
+                        width="40"
+                        height="40"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#10B981"
+                        strokeWidth="2"
+                      >
+                        <rect x="2" y="5" width="20" height="14" rx="2" />
+                        <line x1="2" y1="10" x2="22" y2="10" />
+                      </svg>
+                    </div>
+                    <div className="payment-details">
+                      <strong className="payment-title">
+                        Thanh toán khi nhận hàng (COD)
+                      </strong>
+                      <p className="payment-desc">
+                        Thanh toán bằng tiền mặt khi nhận hàng
+                      </p>
                     </div>
                   </label>
 
@@ -309,24 +546,16 @@ function Checkout() {
                       checked={paymentMethod === "vnpay"}
                       onChange={(e) => setPaymentMethod(e.target.value)}
                     />
-                    <div className="payment-content">
-                      <div className="payment-icon">
-                        <svg
-                          width="32"
-                          height="32"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                        >
-                          <rect x="1" y="4" width="22" height="16" rx="2" />
-                          <line x1="1" y1="10" x2="23" y2="10" />
-                        </svg>
-                      </div>
-                      <div>
-                        <strong>VNPay</strong>
-                        <p>Thanh toán qua VNPay</p>
-                      </div>
+                    <div className="payment-icon">
+                      <img
+                        src="https://upload.wikimedia.org/wikipedia/commons/5/5f/VNPAY_logo.png"
+                        alt="VNPay"
+                        className="pay-logo"
+                      />
+                    </div>
+                    <div className="payment-details">
+                      <strong className="payment-title">VNPay</strong>
+                      <p className="payment-desc">Thanh toán qua VNPay</p>
                     </div>
                   </label>
 
@@ -338,24 +567,16 @@ function Checkout() {
                       checked={paymentMethod === "momo"}
                       onChange={(e) => setPaymentMethod(e.target.value)}
                     />
-                    <div className="payment-content">
-                      <div className="payment-icon">
-                        <svg
-                          width="32"
-                          height="32"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                        >
-                          <circle cx="12" cy="12" r="10" />
-                          <path d="M12 6v6l4 2" />
-                        </svg>
-                      </div>
-                      <div>
-                        <strong>Momo</strong>
-                        <p>Thanh toán qua ví Momo</p>
-                      </div>
+                    <div className="payment-icon">
+                      <img
+                        src="https://upload.wikimedia.org/wikipedia/commons/6/62/MoMo_Logo.png"
+                        alt="MoMo"
+                        className="pay-logo"
+                      />
+                    </div>
+                    <div className="payment-details">
+                      <strong className="payment-title">Momo</strong>
+                      <p className="payment-desc">Thanh toán qua ví Momo</p>
                     </div>
                   </label>
                 </div>

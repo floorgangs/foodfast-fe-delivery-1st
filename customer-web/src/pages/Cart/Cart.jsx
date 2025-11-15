@@ -14,9 +14,7 @@ function Cart() {
   const navigate = useNavigate();
 
   const handleUpdateQuantity = (productId, newQuantity) => {
-    if (newQuantity < 1) {
-      dispatch(removeFromCart(productId));
-    } else {
+    if (newQuantity >= 1) {
       dispatch(updateQuantity({ productId, quantity: newQuantity }));
     }
   };
@@ -49,81 +47,92 @@ function Cart() {
         <h1>Giỏ hàng của bạn</h1>
 
         <div className="cart-content">
-          <div className="cart-items">
-            {items.map((item) => (
-              <div key={item.id} className="cart-item">
-                <img src={item.image} alt={item.name} />
-                <div className="item-info">
-                  <h3>{item.name}</h3>
-                  <p className="item-price">
-                    {item.price.toLocaleString("vi-VN")}đ
-                  </p>
+          <div className="cart-left">
+            <div className="cart-header">
+              <h3>Sản phẩm ({items.length})</h3>
+              <button
+                onClick={() => dispatch(clearCart())}
+                className="clear-all-btn"
+              >
+                🗑️ Xóa tất cả
+              </button>
+            </div>
+
+            <div className="cart-items">
+              {items.map((item) => (
+                <div key={item.id} className="cart-item">
+                  <img src={item.image} alt={item.name} />
+                  <div className="item-details">
+                    <h3>{item.name}</h3>
+                    <p className="item-restaurant">
+                      {item.restaurant || "Cơm Tấm Sài Gòn"}
+                    </p>
+                    <p className="item-price">
+                      {item.price.toLocaleString("vi-VN")} đ
+                    </p>
+                  </div>
+                  <div className="item-actions">
+                    <div className="quantity-controls">
+                      <button
+                        onClick={() =>
+                          handleUpdateQuantity(item.id, item.quantity - 1)
+                        }
+                        className="qty-btn"
+                        disabled={item.quantity <= 1}
+                      >
+                        -
+                      </button>
+                      <span className="quantity">{item.quantity}</span>
+                      <button
+                        onClick={() =>
+                          handleUpdateQuantity(item.id, item.quantity + 1)
+                        }
+                        className="qty-btn"
+                      >
+                        +
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => dispatch(removeFromCart(item.id))}
+                      className="remove-btn"
+                      title="Xóa sản phẩm"
+                    >
+                      🗑️
+                    </button>
+                  </div>
                 </div>
-                <div className="quantity-controls">
-                  <button
-                    onClick={() =>
-                      handleUpdateQuantity(item.id, item.quantity - 1)
-                    }
-                    className="qty-btn"
-                  >
-                    -
-                  </button>
-                  <span className="quantity">{item.quantity}</span>
-                  <button
-                    onClick={() =>
-                      handleUpdateQuantity(item.id, item.quantity + 1)
-                    }
-                    className="qty-btn"
-                  >
-                    +
-                  </button>
-                </div>
-                <div className="item-total">
-                  {(item.price * item.quantity).toLocaleString("vi-VN")}đ
-                </div>
-                <button
-                  onClick={() => dispatch(removeFromCart(item.id))}
-                  className="remove-btn"
-                >
-                  ×
-                </button>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
 
           <div className="cart-summary">
             <h2>Tóm tắt đơn hàng</h2>
 
             <div className="summary-row">
-              <span>Tạm tính</span>
-              <span>{total.toLocaleString("vi-VN")}đ</span>
+              <span>Tạm tính ({items.length} món):</span>
+              <span>{total.toLocaleString("vi-VN")} đ</span>
             </div>
 
             <div className="summary-row">
-              <span>Phí giao hàng Drone 🚁</span>
-              <span>{shippingFee.toLocaleString("vi-VN")}đ</span>
+              <span>Phí giao hàng:</span>
+              <span>{shippingFee.toLocaleString("vi-VN")} đ</span>
             </div>
 
             <div className="summary-divider"></div>
 
             <div className="summary-row total">
-              <span>Tổng cộng</span>
+              <span>Tổng cộng:</span>
               <span className="total-price">
-                {(total + shippingFee).toLocaleString("vi-VN")}đ
+                {(total + shippingFee).toLocaleString("vi-VN")} đ
               </span>
             </div>
 
-            <div className="delivery-info">
-              <p>🚁 Giao bằng Drone</p>
-              <p>Thời gian dự kiến: 10-15 phút</p>
-            </div>
-
             <button onClick={handleCheckout} className="checkout-btn">
-              Đặt hàng ngay
+              🛒 Tiến hành đặt hàng
             </button>
 
             <button onClick={() => navigate("/")} className="continue-btn">
-              Tiếp tục mua sắm
+              Tiếp tục mua hàng
             </button>
           </div>
         </div>

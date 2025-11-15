@@ -78,29 +78,6 @@ body {
   box-shadow: 0 6px 18px rgba(239, 68, 68, 0.06);
 }
 
-/* inputs with icons */
-.input-with-icon {
-  position: relative;
-}
-.input-with-icon .icon {
-  position: absolute;
-  left: 14px;
-  top: calc(50% + 12px);
-  transform: translateY(-50%);
-  pointer-events: none;
-  font-size: 16px;
-  color: #9aa0a6;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.input-with-icon .icon.phone-icon {
-  top: 50%;
-}
-.input-with-icon input {
-  padding-left: 44px;
-}
-
 .input-note {
   color: #9ca3af;
   font-size: 0.85rem;

@@ -1,0 +1,140 @@
+.payment-gateway {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  transition: background 0.3s ease;
+}
+
+.payment-gateway.vnpay-theme {
+  background: linear-gradient(135deg, #0d47a1 0%, #1565c0 50%, #d32f2f 100%);
+}
+
+.payment-gateway.momo-theme {
+  background: linear-gradient(135deg, #d81b60 0%, #f06292 50%, #ec407a 100%);
+}
+
+.payment-container {
+  background: white;
+  border-radius: 12px;
+  padding: 2.25rem;
+  max-width: 520px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
+  text-align: center;
+}
+
+.processing-state,
+.success-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.payment-logo {
+  margin-bottom: 0.5rem;
+  display: flex;
+  justify-content: center;
+}
+
+.gateway-logo {
+  width: 120px;
+  height: 50px;
+  object-fit: contain;
+}
+
+.payment-logo.vnpay,
+.payment-logo.momo {
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+
+.spinner {
+  width: 56px;
+  height: 56px;
+  border: 4px solid #f3f4f6;
+  border-top: 4px solid #ea5034;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.success-icon {
+  width: 72px;
+  height: 72px;
+  background: #10b981;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.25rem;
+  color: white;
+  animation: scaleIn 0.45s ease-out;
+}
+
+@keyframes scaleIn {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.order-info {
+  background: #f8f9fa;
+  padding: 1rem;
+  border-radius: 8px;
+  width: 100%;
+}
+.order-info p {
+  margin: 0.45rem 0;
+  color: #374151;
+  font-size: 0.98rem;
+}
+.order-amount strong {
+  color: #ea5034;
+  font-size: 1.1rem;
+}
+.redirect-text {
+  color: #6b7280;
+  margin: 0.5rem 0 1rem;
+}
+.continue-btn {
+  background: #ea5034;
+  color: white;
+  border: none;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  width: 100%;
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .payment-container {
+    padding: 1.25rem;
+  }
+  .success-icon {
+    width: 56px;
+    height: 56px;
+    font-size: 1.75rem;
+  }
+}

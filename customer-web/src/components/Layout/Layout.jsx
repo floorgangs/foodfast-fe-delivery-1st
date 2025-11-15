@@ -1,6 +1,9 @@
 import { Outlet, Link, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
+import { useState, useEffect } from "react";
 import { logout } from "../../store/slices/authSlice";
+import { getAllOrders } from "../../services/orderService";
+import ActiveOrderBanner from "../ActiveOrderBanner/ActiveOrderBanner";
 import "./Layout.css";
 
 function Layout() {
@@ -8,6 +11,23 @@ function Layout() {
   const { items } = useSelector((state) => state.cart);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [hasActiveOrder, setHasActiveOrder] = useState(false);
+
+  useEffect(() => {
+    const checkActiveOrders = () => {
+      const orders = getAllOrders();
+      const hasActive = orders.some(
+        (order) => order.status !== "completed" && order.status !== "cancelled"
+      );
+      setHasActiveOrder(hasActive);
+    };
+
+    checkActiveOrders();
+
+    // Check periodically
+    const interval = setInterval(checkActiveOrders, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleLogout = () => {
     dispatch(logout());
@@ -15,7 +35,7 @@ function Layout() {
   };
 
   return (
-    <div className="layout">
+    <div className={`layout ${hasActiveOrder ? "has-active-banner" : ""}`}>
       <header className="header">
         <div className="container">
           <Link to="/" className="logo">
@@ -46,6 +66,7 @@ function Layout() {
           </nav>
         </div>
       </header>
+      <ActiveOrderBanner />
       <main className="main">
         <Outlet />
       </main>
