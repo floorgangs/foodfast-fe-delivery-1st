@@ -6,15 +6,12 @@ import "./Register.css";
 
 function Register() {
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
-  const [emailError, setEmailError] = useState("");
   const [phoneError, setPhoneError] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [confirmError, setConfirmError] = useState("");
-  const [checkingEmail, setCheckingEmail] = useState(false);
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { isAuthenticated } = useSelector((state) => state.auth);
@@ -28,10 +25,8 @@ function Register() {
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    // validate email and phone before submit
-    const emailValid = validateEmail(email);
+    // validate phone before submit
     const phoneValid = validatePhone(phone);
-    setEmailError(emailValid ? "" : "Email không hợp lệ");
     setPhoneError(phoneValid ? "" : "Số điện thoại không hợp lệ");
     // password length
     const pwdOk = password && password.length >= 8;
@@ -39,13 +34,12 @@ function Register() {
     const confirmOk = password === confirm;
     setConfirmError(confirmOk ? "" : "Mật khẩu xác nhận không khớp");
 
-    if (!emailValid || !phoneValid || !pwdOk || !confirmOk) return;
-    if (emailError) return; // if email already marked as existing
+    if (!phoneValid || !pwdOk || !confirmOk) return;
 
     const mockUser = {
       id: Date.now().toString(),
       name,
-      email,
+      email: "user@foodfast.vn",
       phone,
       address: "",
     };
@@ -54,43 +48,10 @@ function Register() {
     navigate("/");
   };
 
-  function validateEmail(value) {
-    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return re.test(String(value).toLowerCase());
-  }
-
   function validatePhone(value) {
     const v = String(value).trim();
     const re = /^(?:0|\+84)\d{9}$/;
     return re.test(v);
-  }
-
-  // mock API: treat emails ending with @taken.com as already used
-  function mockCheckEmailExists(value) {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const lowered = (value || "").toLowerCase();
-        if (!lowered) return resolve(false);
-        // sample rule: if email endsWith "@taken.com" or is "used@example.com" -> exists
-        if (lowered.endsWith("@taken.com") || lowered === "used@example.com")
-          return resolve(true);
-        return resolve(false);
-      }, 650);
-    });
-  }
-
-  async function handleEmailBlur() {
-    // quick client-side format check first
-    if (!email) return;
-    if (!validateEmail(email)) {
-      setEmailError("Email không hợp lệ");
-      return;
-    }
-    setCheckingEmail(true);
-    const exists = await mockCheckEmailExists(email);
-    setCheckingEmail(false);
-    if (exists) setEmailError("Email này đã được sử dụng");
-    else setEmailError("");
   }
 
   return (
@@ -111,26 +72,6 @@ function Register() {
               placeholder="Tên của bạn"
               required
             />
-          </div>
-
-          <div className="form-group">
-            <label>Email</label>
-            <input
-              type="email"
-              value={email}
-              className={emailError ? "invalid" : ""}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                if (emailError) setEmailError("");
-              }}
-              onBlur={handleEmailBlur}
-              placeholder="example@email.com"
-              required
-            />
-            {checkingEmail && (
-              <div className="input-note">Đang kiểm tra email...</div>
-            )}
-            {emailError && <div className="input-error">{emailError}</div>}
           </div>
 
           <div className="form-group">

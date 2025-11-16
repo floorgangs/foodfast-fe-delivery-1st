@@ -126,3 +126,102 @@ export const categories = [
   'Ý',
   'Fastfood',
 ];
+
+export const productCategories: Record<string, Record<string, string>> = {
+  '1': {
+    '1-1': 'Phở truyền thống',
+    '1-2': 'Phở truyền thống',
+    '1-3': 'Phở đặc biệt',
+  },
+  '2': {
+    '2-1': 'Món chính',
+    '2-2': 'Món kèm',
+  },
+  '3': {
+    '3-1': 'Món chính',
+    '3-2': 'Món chính',
+    '3-3': 'Combo đặc biệt',
+  },
+  '4': {
+    '4-1': 'Combo hải sản',
+    '4-2': 'Combo gia đình',
+  },
+  '5': {
+    '5-1': 'Sushi',
+    '5-2': 'Sashimi',
+    '5-3': 'Combo đặc biệt',
+  },
+  '6': {
+    '6-1': 'Pizza cổ điển',
+    '6-2': 'Pizza hải sản',
+    '6-3': 'Pizza đặc biệt',
+  },
+  '7': {
+    '7-1': 'Món lẻ',
+    '7-2': 'Combo gia đình',
+    '7-3': 'Combo tiện lợi',
+  },
+  '8': {
+    '8-1': 'Burger bò',
+    '8-2': 'Burger gà',
+    '8-3': 'Burger đặc biệt',
+  },
+  '9': {
+    '9-1': 'Nhân nướng',
+    '9-2': 'Nhân pate',
+    '9-3': 'Nhân xíu mại',
+    '9-4': 'Nhân đặc biệt',
+  },
+  '10': {
+    '10-1': 'Trà sữa cổ điển',
+    '10-2': 'Trà sữa đặc biệt',
+    '10-3': 'Matcha',
+    '10-4': 'Đường đen',
+  },
+  '11': {
+    '11-1': 'Hủ tiếu khô',
+    '11-2': 'Hủ tiếu nước',
+    '11-3': 'Đặc biệt',
+  },
+  '12': {
+    '12-1': 'Set nướng',
+    '12-2': 'Thịt bò',
+    '12-3': 'Thịt heo',
+    '12-4': 'Combo đặc biệt',
+  },
+  '13': {
+    '13-1': 'Lẩu chay',
+    '13-2': 'Lẩu hải sản',
+    '13-3': 'Lẩu bò',
+  },
+  '14': {
+    '14-1': 'Cà phê truyền thống',
+    '14-2': 'Cà phê truyền thống',
+    '14-3': 'Biến tấu ngọt',
+    '14-4': 'Pha máy',
+  },
+  '15': {
+    '15-1': 'Dimsum hấp',
+    '15-2': 'Dimsum hấp',
+    '15-3': 'Dimsum chiên',
+    '15-4': 'Combo gia đình',
+  },
+  '16': {
+    '16-1': 'Xôi truyền thống',
+    '16-2': 'Xôi truyền thống',
+    '16-3': 'Chè mát lạnh',
+    '16-4': 'Chè mát lạnh',
+  },
+  '17': {
+    '17-1': 'Mì cay',
+    '17-2': 'Mì cay',
+    '17-3': 'Mì cay',
+    '17-4': 'Món kèm',
+  },
+  '18': {
+    '18-1': 'Kem truyền thống',
+    '18-2': 'Kem truyền thống',
+    '18-3': 'Kem trái cây',
+    '18-4': 'Combo kem',
+  },
+};

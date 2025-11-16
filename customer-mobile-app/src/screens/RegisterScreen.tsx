@@ -26,27 +26,56 @@ const RegisterScreen = ({ navigation }: any) => {
   const route = useRoute<any>();
 
   const handleRegister = () => {
-    if (name && email && phone && password && password === confirmPassword) {
-      // Đăng ký với thông tin thật từ form
-      dispatch(register({ name, email, phone, password }));
-
-      const pending = route?.params?.pendingAdd;
-      if (pending && pending.product && pending.restaurant) {
-        dispatch(addToCart({
-          id: pending.product.id,
-          name: pending.product.name,
-          price: pending.product.price ?? 0,
-          restaurantId: pending.restaurant.id,
-          restaurantName: pending.restaurant.name,
-          image: (pending.product.images && pending.product.images[0]) || pending.product.image,
-        }));
-        Alert.alert('Thành công', 'Đã thêm vào giỏ hàng');
-        navigation.navigate('Cart');
-        return;
-      }
-
-      navigation.navigate('MainTabs');
+    // Validate form
+    if (!name || !email || !phone || !password || !confirmPassword) {
+      Alert.alert('Lỗi', 'Vui lòng điền đầy đủ thông tin');
+      return;
     }
+
+    if (password !== confirmPassword) {
+      Alert.alert('Lỗi', 'Mật khẩu xác nhận không khớp');
+      return;
+    }
+
+    if (password.length < 6) {
+      Alert.alert('Lỗi', 'Mật khẩu phải có ít nhất 6 ký tự');
+      return;
+    }
+
+    // Validate phone number (simple check)
+    if (!/^[0-9]{10,11}$/.test(phone)) {
+      Alert.alert('Lỗi', 'Số điện thoại không hợp lệ');
+      return;
+    }
+
+    // Validate email
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      Alert.alert('Lỗi', 'Email không hợp lệ');
+      return;
+    }
+
+    // Mock sending OTP
+    Alert.alert(
+      'Gửi mã OTP',
+      `Mã xác thực sẽ được gửi đến số điện thoại ${phone}`,
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Gửi',
+          onPress: () => {
+            // Navigate to OTP screen with registration data
+            const pending = route?.params?.pendingAdd;
+            navigation.navigate('OTPVerification', {
+              name,
+              email,
+              phone,
+              password,
+              pendingAdd: pending,
+            });
+          },
+        },
+      ]
+    );
   };
 
   const handleClose = () => {

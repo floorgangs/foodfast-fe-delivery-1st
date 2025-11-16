@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, View, TouchableOpacity, StyleSheet, Text, useWindowDimensions, PanResponder } from 'react-native';
-import type { PanResponderGestureState } from 'react-native';
+import { Platform, View, TouchableOpacity, StyleSheet, Text, useWindowDimensions, PanResponder, AppState } from 'react-native';
+import type { PanResponderGestureState, AppStateStatus } from 'react-native';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { NavigationContainer, useNavigation, useNavigationState } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -14,6 +15,7 @@ import { setCart } from './src/store/slices/cartSlice';
 // Screens
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
+import OTPVerificationScreen from './src/screens/OTPVerificationScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import RestaurantDetailScreen from './src/screens/RestaurantDetailScreen';
 import ProductDetailScreen from './src/screens/ProductDetailScreen';
@@ -237,6 +239,19 @@ function AppNavigator() {
   const { isAuthenticated } = useSelector((state: RootState) => state.auth);
 
   useEffect(() => {
+    // Kích hoạt keep-awake để màn hình không tự khóa
+    activateKeepAwakeAsync();
+
+    // Lắng nghe thay đổi trạng thái app (incoming call, background, etc)
+    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        // App trở lại active sau khi có cuộc gọi -> không reload
+        console.log('App returned to active state - preserving state');
+      } else if (nextAppState === 'background' || nextAppState === 'inactive') {
+        console.log('App moved to background/inactive - keeping state');
+      }
+    });
+
     // Load user from AsyncStorage
     const loadUser = async () => {
       try {
@@ -265,6 +280,12 @@ function AppNavigator() {
 
     loadUser();
     loadCart();
+
+    // Cleanup
+    return () => {
+      subscription.remove();
+      deactivateKeepAwake();
+    };
   }, []);
 
   return (
@@ -279,6 +300,7 @@ function AppNavigator() {
           <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} />
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Register" component={RegisterScreen} />
+          <Stack.Screen name="OTPVerification" component={OTPVerificationScreen} />
           <Stack.Screen name="PersonalInfo" component={PersonalInfoScreen} />
           <Stack.Screen name="Address" component={AddressScreen} />
           <Stack.Screen name="PaymentMethod" component={PaymentMethodScreen} />

@@ -17,15 +17,15 @@ import { Alert } from 'react-native';
 import { login } from '../store/slices/authSlice';
 
 const LoginScreen = ({ navigation }: any) => {
-  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const dispatch = useDispatch();
 
   const route = useRoute<any>();
 
   const handleLogin = () => {
-    if (email && password) {
-      dispatch(login({ email, password }));
+    if (phone && password) {
+      dispatch(login({ phone, password }));
 
       // Nếu có pendingAdd từ màn hình trước, thêm món vào giỏ ngay sau khi đăng nhập
       const pending = route?.params?.pendingAdd;
@@ -76,13 +76,13 @@ const LoginScreen = ({ navigation }: any) => {
           <Text style={styles.title}>Đăng nhập</Text>
           
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Email</Text>
+            <Text style={styles.label}>Số điện thoại</Text>
             <TextInput
               style={styles.input}
-              placeholder="Nhập email của bạn"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
+              placeholder="Nhập số điện thoại"
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
               autoCapitalize="none"
             />
           </View>

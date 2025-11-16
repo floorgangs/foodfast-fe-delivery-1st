@@ -5,7 +5,7 @@ import { login } from "../../store/slices/authSlice";
 import "./Login.css";
 
 function Login() {
-  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -24,8 +24,8 @@ function Login() {
     const mockUser = {
       id: "1",
       name: "Nguyễn Văn A",
-      email: email,
-      phone: "0901234567",
+      email: "user@foodfast.vn",
+      phone: phone,
       address: "123 Nguyễn Huệ, Q.1, TP.HCM",
     };
 
@@ -51,12 +51,12 @@ function Login() {
           <h2>Đăng nhập</h2>
 
           <div className="form-group">
-            <label>Email</label>
+            <label>Số điện thoại</label>
             <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="example@email.com"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="09xxxxxxxx"
               required
             />
           </div>
@@ -81,7 +81,7 @@ function Login() {
               Chưa có tài khoản? <a href="/register">Đăng ký ngay</a>
             </p>
             <p className="demo-note">
-              Demo: Nhập email/password bất kỳ để đăng nhập
+              Demo: Nhập số điện thoại/password bất kỳ để đăng nhập
             </p>
           </div>
         </form>

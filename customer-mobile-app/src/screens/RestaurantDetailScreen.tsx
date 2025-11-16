@@ -15,7 +15,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { addToCart } from '../store/slices/cartSlice';
 import { RootState } from '../store';
-import { mockProducts } from '../data/mockData';
+import { mockProducts, productCategories } from '../data/mockData';
 
 const RestaurantDetailScreen = ({ route, navigation }: any) => {
   const { restaurant } = route.params;
@@ -43,16 +43,21 @@ const RestaurantDetailScreen = ({ route, navigation }: any) => {
   const enrichedProducts = useMemo(() => {
     const baseRating = restaurant.rating ?? 4.5;
     const baseOrders = restaurant.orders ?? 120;
+    const categoryMap = productCategories[restaurant.id] || {};
+
     return products.map((item: any, index: number) => {
       const derivedRating = item.rating ?? Math.max(3.8, Math.min(5, baseRating - 0.1 + (index % 4) * 0.15));
       const derivedReviews = item.reviewCount ?? (baseOrders > 0 ? Math.max(25, Math.round(baseOrders * 0.25) + index * 12) : 48 + index * 9);
+      const category = categoryMap[item.id] ?? 'Danh mục khác';
+
       return {
         ...item,
         rating: Number(derivedRating.toFixed(1)),
         reviewCount: derivedReviews,
+        category,
       };
     });
-  }, [products, restaurant]);
+  }, [products, restaurant.id, restaurant.orders, restaurant.rating]);
   const restaurantReviewCount = restaurant.orders ?? 0;
 
   const { isAuthenticated } = useSelector((state: RootState) => state.auth);
@@ -96,7 +101,48 @@ const RestaurantDetailScreen = ({ route, navigation }: any) => {
   };
 
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
+  const [selectedCategory, setSelectedCategory] = useState<string>('Tất cả');
   const PLACEHOLDER_IMAGE = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAQCAYAAAB49l8GAAAAHUlEQVR4nGNgGAWjYBSMglEwCkbGhoYGBgYGBgAAMaQF4nKp8OAAAAAElFTkSuQmCC';
+
+  const categoryOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const list: string[] = ['Tất cả'];
+
+    enrichedProducts.forEach(product => {
+      const category = product.category ?? 'Danh mục khác';
+      if (!seen.has(category)) {
+        seen.add(category);
+        list.push(category);
+      }
+    });
+
+    return list;
+  }, [enrichedProducts]);
+
+  const filteredProducts = useMemo(() => {
+    if (selectedCategory === 'Tất cả') {
+      return enrichedProducts;
+    }
+
+    return enrichedProducts.filter(product => product.category === selectedCategory);
+  }, [enrichedProducts, selectedCategory]);
+
+  const groupedProducts = useMemo(() => {
+    const groups = filteredProducts.reduce<Record<string, any[]>>((acc, product) => {
+      const category = product.category ?? 'Danh mục khác';
+      if (!acc[category]) {
+        acc[category] = [];
+      }
+      acc[category].push(product);
+      return acc;
+    }, {});
+
+    const orderedCategories = categoryOptions.filter(category => category !== 'Tất cả');
+
+    return orderedCategories
+      .filter(category => groups[category]?.length)
+      .map(category => ({ category, items: groups[category] }));
+  }, [filteredProducts, categoryOptions]);
 
   const renderProductCard = (product: any) => (
     <TouchableOpacity
@@ -158,13 +204,16 @@ const RestaurantDetailScreen = ({ route, navigation }: any) => {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>←</Text>
+        <TouchableOpacity
+          onPress={() => navigation.canGoBack() ? navigation.goBack() : navigation.navigate('MainTabs')}
+          style={styles.headerIconButton}
+        >
+          <Ionicons name="chevron-back" size={24} color="#EA5034" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Chi tiết nhà hàng</Text>
         <TouchableOpacity 
           onPress={() => navigation.navigate('Cart')}
-          style={styles.cartButton}
+          style={[styles.headerIconButton, styles.cartButton]}
         >
           <Ionicons name="cart-outline" size={26} color="#333" />
           {items.length > 0 && (
@@ -213,7 +262,38 @@ const RestaurantDetailScreen = ({ route, navigation }: any) => {
         {/* Menu */}
         <View style={styles.menuSection}>
           <Text style={styles.sectionTitle}>Thực đơn</Text>
-          {enrichedProducts.map(renderProductCard)}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoryTabs}
+          >
+            {categoryOptions.map(category => {
+              const isActive = category === selectedCategory;
+              return (
+                <TouchableOpacity
+                  key={category}
+                  style={[styles.categoryChip, isActive && styles.categoryChipActive]}
+                  onPress={() => setSelectedCategory(category)}
+                  activeOpacity={0.9}
+                >
+                  <Text style={[styles.categoryChipText, isActive && styles.categoryChipTextActive]}>
+                    {category}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          {groupedProducts.length === 0 ? (
+            <Text style={styles.emptyStateText}>Danh mục này chưa có món ăn.</Text>
+          ) : (
+            groupedProducts.map(group => (
+              <View key={group.category} style={styles.categoryBlock}>
+                <Text style={styles.categoryTitle}>{group.category}</Text>
+                {group.items.map(renderProductCard)}
+              </View>
+            ))
+          )}
         </View>
       </ScrollView>
     </View>
@@ -236,23 +316,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#fff',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+    height: 64,
   },
-  backButton: {
-    fontSize: 24,
-    color: '#EA5034',
-    fontWeight: '500',
+  headerIconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerTitle: {
+    flex: 1,
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
+    textAlign: 'center',
   },
   cartButton: {
     position: 'relative',
-    padding: 4,
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   cartBadge: {
     position: 'absolute',
@@ -327,6 +415,46 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 16,
+    textAlign: 'left',
+  },
+  categoryTabs: {
+    paddingVertical: 4,
+    paddingRight: 12,
+  },
+  categoryChip: {
+    borderWidth: 1,
+    borderColor: '#EA5034',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginRight: 12,
+    backgroundColor: '#fff',
+  },
+  categoryChipActive: {
+    backgroundColor: '#EA5034',
+  },
+  categoryChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#EA5034',
+  },
+  categoryChipTextActive: {
+    color: '#fff',
+  },
+  categoryBlock: {
+    marginTop: 20,
+  },
+  categoryTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 12,
+  },
+  emptyStateText: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 20,
+    textAlign: 'center',
   },
   productCard: {
     flexDirection: 'row',

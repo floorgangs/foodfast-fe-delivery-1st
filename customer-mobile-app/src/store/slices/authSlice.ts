@@ -20,13 +20,13 @@ const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    login: (state, action: PayloadAction<{ email: string; password: string }>) => {
+    login: (state, action: PayloadAction<{ phone: string; password: string }>) => {
       // Mock login
       state.user = {
         id: '1',
         name: 'Nguyễn Văn A',
-        email: action.payload.email,
-        phone: '0901234567',
+        email: 'user@foodfast.vn',
+        phone: action.payload.phone,
       };
       state.isAuthenticated = true;
       AsyncStorage.setItem('user', JSON.stringify(state.user));
