@@ -1,25 +1,34 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useDispatch } from 'react-redux'
-import { login } from '../../store/slices/authSlice'
-import './Login.css'
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import { login } from "../../store/slices/authSlice";
+import "./Login.css";
 
 function Login() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const navigate = useNavigate()
-  const dispatch = useDispatch()
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const { isAuthenticated } = useSelector((state) => state.auth);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate("/");
+    }
+  }, [isAuthenticated, navigate]);
 
   const handleSubmit = (e) => {
-    e.preventDefault()
-    
-    dispatch(login({
-      user: { name: 'Admin User', email, role: 'admin' },
-      token: 'mock-admin-token-' + Date.now()
-    }))
-    
-    navigate('/')
-  }
+    e.preventDefault();
+
+    dispatch(
+      login({
+        user: { name: "Admin User", email, role: "admin" },
+        token: "mock-admin-token-" + Date.now(),
+      })
+    );
+
+    navigate("/");
+  };
 
   return (
     <div className="login-page">
@@ -28,10 +37,10 @@ function Login() {
           <h1>⚙️ FoodFast Admin</h1>
           <p>Hệ thống quản trị</p>
         </div>
-        
+
         <form className="login-form" onSubmit={handleSubmit}>
           <h2>Đăng nhập Admin</h2>
-          
+
           <div className="form-group">
             <label>Email</label>
             <input
@@ -42,7 +51,7 @@ function Login() {
               required
             />
           </div>
-          
+
           <div className="form-group">
             <label>Mật khẩu</label>
             <input
@@ -53,16 +62,18 @@ function Login() {
               required
             />
           </div>
-          
+
           <button type="submit" className="login-btn">
             Đăng nhập
           </button>
-          
-          <p className="demo-note">Demo: Nhập email/password bất kỳ để đăng nhập</p>
+
+          <p className="demo-note">
+            Demo: Nhập email/password bất kỳ để đăng nhập
+          </p>
         </form>
       </div>
     </div>
-  )
+  );
 }
 
-export default Login
+export default Login;

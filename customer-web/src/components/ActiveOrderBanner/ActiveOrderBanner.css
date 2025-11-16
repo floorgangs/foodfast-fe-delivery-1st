@@ -1,0 +1,130 @@
+.active-order-banner {
+  position: fixed;
+  top: 56px; /* Below navbar - adjust based on actual header height */
+  left: 0;
+  right: 0;
+  background: white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 998; /* Below header but above page content */
+  border-left: 5px solid;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.banner-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.order-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+}
+
+.status-icon {
+  font-size: 2rem;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+.order-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.order-title {
+  font-weight: 600;
+  color: #333;
+  font-size: 0.95rem;
+}
+
+.order-status {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.track-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 25px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.3s;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.track-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+}
+
+.track-btn .arrow {
+  transition: transform 0.3s;
+}
+
+.track-btn:hover .arrow {
+  transform: translateX(4px);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .active-order-banner {
+    top: 60px;
+  }
+
+  .banner-content {
+    padding: 0.75rem 1rem;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .track-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .status-icon {
+    font-size: 1.5rem;
+  }
+
+  .order-title {
+    font-size: 0.9rem;
+  }
+
+  .order-status {
+    font-size: 0.8rem;
+  }
+}

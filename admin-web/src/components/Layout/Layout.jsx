@@ -1,52 +1,78 @@
-import { Outlet, Link, useNavigate } from 'react-router-dom'
-import { useSelector, useDispatch } from 'react-redux'
-import { logout } from '../../store/slices/authSlice'
-import './Layout.css'
+import { Outlet, Link, useNavigate } from "react-router-dom";
+import { useSelector, useDispatch } from "react-redux";
+import { logout } from "../../store/slices/authSlice";
+import "./Layout.css";
 
 function Layout() {
-  const { user } = useSelector(state => state.auth)
-  const dispatch = useDispatch()
-  const navigate = useNavigate()
+  const { user } = useSelector((state) => state.auth);
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
 
   const handleLogout = () => {
-    dispatch(logout())
-    navigate('/login')
-  }
+    dispatch(logout());
+    navigate("/login");
+  };
 
   return (
     <div className="layout">
       <aside className="sidebar">
         <div className="sidebar-header">
-          <h2>⚙️ FoodFast Admin</h2>
-          <p className="admin-name">{user?.name}</p>
+          <div className="sidebar-brand">
+            <span className="brand-logo">👑</span>
+            <span className="brand-text">FoodFast Admin</span>
+          </div>
+          <div className="admin-info">
+            <p className="admin-name">{user?.name || "Admin"}</p>
+            <span className="admin-role">Quản trị viên hệ thống</span>
+          </div>
         </div>
         <nav className="sidebar-nav">
-          <Link to="/" className="nav-item">
-            📊 Dashboard
+          <Link to="/dashboard" className="nav-item">
+            <span className="nav-icon">▣</span>
+            <span className="nav-text">Tổng quan</span>
           </Link>
-          <Link to="/users" className="nav-item">
-            👥 Quản lý người dùng
-          </Link>
-          <Link to="/restaurants" className="nav-item">
-            🏪 Quản lý nhà hàng
-          </Link>
-          <Link to="/orders" className="nav-item">
-            📦 Giám sát đơn hàng
-          </Link>
-          <Link to="/drones" className="nav-item">
-            🚁 Quản lý Drone
-          </Link>
+
+          <div className="nav-group">
+            <div className="nav-group-title">Quản lý hệ thống</div>
+            <Link to="/restaurants" className="nav-item">
+              <span className="nav-icon">🏪</span>
+              <span className="nav-text">Nhà hàng</span>
+            </Link>
+            <Link to="/staff" className="nav-item">
+              <span className="nav-icon">👨‍💼</span>
+              <span className="nav-text">Nhân viên</span>
+            </Link>
+            <Link to="/users" className="nav-item">
+              <span className="nav-icon">👥</span>
+              <span className="nav-text">Người dùng</span>
+            </Link>
+            <Link to="/drones" className="nav-item">
+              <span className="nav-icon">🚁</span>
+              <span className="nav-text">Drone</span>
+            </Link>
+            <Link to="/orders" className="nav-item">
+              <span className="nav-icon">📦</span>
+              <span className="nav-text">Đơn hàng</span>
+            </Link>
+          </div>
+
+          <div className="nav-group">
+            <div className="nav-group-title">Phân tích</div>
+            <Link to="/statistics" className="nav-item">
+              <span className="nav-icon">📊</span>
+              <span className="nav-text">Thống kê</span>
+            </Link>
+          </div>
         </nav>
         <button onClick={handleLogout} className="logout-btn">
-          Đăng xuất
+          🚪 Đăng xuất
         </button>
       </aside>
-      
       <main className="main-content">
         <Outlet />
       </main>
     </div>
-  )
+  );
 }
 
-export default Layout
+export default Layout;

@@ -1,21 +1,41 @@
-import { Outlet, Link, useNavigate } from 'react-router-dom'
-import { useSelector, useDispatch } from 'react-redux'
-import { logout } from '../../store/slices/authSlice'
-import './Layout.css'
+import { Outlet, Link, useNavigate } from "react-router-dom";
+import { useSelector, useDispatch } from "react-redux";
+import { useState, useEffect } from "react";
+import { logout } from "../../store/slices/authSlice";
+import { getAllOrders } from "../../services/orderService";
+import ActiveOrderBanner from "../ActiveOrderBanner/ActiveOrderBanner";
+import "./Layout.css";
 
 function Layout() {
-  const { user } = useSelector(state => state.auth)
-  const { items } = useSelector(state => state.cart)
-  const dispatch = useDispatch()
-  const navigate = useNavigate()
+  const { user, isAuthenticated } = useSelector((state) => state.auth);
+  const { items } = useSelector((state) => state.cart);
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const [hasActiveOrder, setHasActiveOrder] = useState(false);
+
+  useEffect(() => {
+    const checkActiveOrders = () => {
+      const orders = getAllOrders();
+      const hasActive = orders.some(
+        (order) => order.status !== "completed" && order.status !== "cancelled"
+      );
+      setHasActiveOrder(hasActive);
+    };
+
+    checkActiveOrders();
+
+    // Check periodically
+    const interval = setInterval(checkActiveOrders, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleLogout = () => {
-    dispatch(logout())
-    navigate('/login')
-  }
+    dispatch(logout());
+    navigate("/login");
+  };
 
   return (
-    <div className="layout">
+    <div className={`layout ${hasActiveOrder ? "has-active-banner" : ""}`}>
       <header className="header">
         <div className="container">
           <Link to="/" className="logo">
@@ -26,11 +46,27 @@ function Layout() {
             <Link to="/cart" className="cart-link">
               🛒 Giỏ hàng ({items.length})
             </Link>
-            <Link to="/profile">👤 {user?.name || 'Tài khoản'}</Link>
-            <button onClick={handleLogout} className="logout-btn">Đăng xuất</button>
+            {isAuthenticated ? (
+              <>
+                <Link to="/profile">👤 {user?.name || "Tài khoản"}</Link>
+                <button onClick={handleLogout} className="logout-btn">
+                  Đăng xuất
+                </button>
+              </>
+            ) : (
+              <>
+                <Link to="/register" className="auth-link">
+                  Đăng ký
+                </Link>
+                <Link to="/login" className="auth-link">
+                  Đăng nhập
+                </Link>
+              </>
+            )}
           </nav>
         </div>
       </header>
+      <ActiveOrderBanner />
       <main className="main">
         <Outlet />
       </main>
@@ -40,7 +76,7 @@ function Layout() {
         </div>
       </footer>
     </div>
-  )
+  );
 }
 
-export default Layout
+export default Layout;

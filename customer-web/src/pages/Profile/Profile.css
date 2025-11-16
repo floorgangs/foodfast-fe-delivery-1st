@@ -40,7 +40,7 @@
   width: 120px;
   height: 120px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #4A90E2 0%, #5BA3F5 100%);
+  background: linear-gradient(135deg, #4a90e2 0%, #5ba3f5 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -92,7 +92,7 @@
 .edit-btn {
   width: 100%;
   padding: 0.875rem;
-  background: #EA5034;
+  background: #ea5034;
   color: white;
   border: none;
   border-radius: 8px;
@@ -112,10 +112,46 @@
   padding: 2rem;
 }
 
-.orders-section h2 {
-  font-size: 1.75rem;
+.orders-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.orders-header h2 {
+  font-size: 1.75rem;
+  margin: 0;
   color: #333;
+}
+
+.order-tabs {
+  display: flex;
+  gap: 0.5rem;
+  background: #f5f5f5;
+  padding: 0.25rem;
+  border-radius: 8px;
+}
+
+.tab-btn {
+  padding: 0.5rem 1.25rem;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.tab-btn.active {
+  background: white;
+  color: #667eea;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .no-orders {
@@ -138,7 +174,7 @@
 }
 
 .order-item:hover {
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .order-header {
@@ -182,6 +218,28 @@
   color: #595959;
 }
 
+.order-status.cancelled {
+  background: #fff1f0;
+  color: #ff4d4f;
+}
+
+.order-status.preparing {
+  background: #fff0f6;
+  color: #eb2f96;
+}
+
+.order-status.ready_for_delivery {
+  background: #f9f0ff;
+  color: #722ed1;
+}
+
+.restaurant-name {
+  font-weight: 600;
+  color: #667eea;
+  margin-bottom: 0.75rem;
+  font-size: 1.05rem;
+}
+
 .order-items {
   margin-bottom: 1rem;
 }
@@ -203,13 +261,54 @@
 }
 
 .total-price {
-  color: #EA5034;
+  color: #ea5034;
   font-size: 1.2rem;
 }
 
 .order-date {
   color: #999;
   font-size: 0.85rem;
+}
+
+.order-actions {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #eee;
+  display: flex;
+  gap: 0.75rem;
+}
+
+.track-order-btn,
+.review-btn {
+  flex: 1;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.track-order-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.track-order-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.review-btn {
+  background: #ffc107;
+  color: #333;
+}
+
+.review-btn:hover {
+  background: #ffb300;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
 }
 
 @media (max-width: 768px) {
