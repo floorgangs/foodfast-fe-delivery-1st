@@ -3,6 +3,8 @@ import "./RestaurantManagement.css";
 
 function RestaurantManagement() {
   const [filter, setFilter] = useState("all"); // all, active, pending, suspended
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [selectedRestaurant, setSelectedRestaurant] = useState(null);
   const [restaurants, setRestaurants] = useState([
     {
       id: 1,
@@ -96,6 +98,11 @@ function RestaurantManagement() {
       ? restaurants
       : restaurants.filter((r) => r.status === filter);
 
+  const handleViewRestaurant = (restaurant) => {
+    setSelectedRestaurant(restaurant);
+    setShowViewModal(true);
+  };
+
   const handleApprove = (id) => {
     setRestaurants(
       restaurants.map((r) => (r.id === id ? { ...r, status: "active" } : r))
@@ -126,7 +133,6 @@ function RestaurantManagement() {
             Quản lý tất cả nhà hàng trong hệ thống
           </p>
         </div>
-        <button className="add-btn">+ Thêm nhà hàng</button>
       </div>
 
       <div className="filter-bar">
@@ -226,7 +232,12 @@ function RestaurantManagement() {
                     )}
                     {restaurant.status === "active" && (
                       <>
-                        <button className="action-btn view">👁 Xem</button>
+                        <button
+                          className="action-btn view"
+                          onClick={() => handleViewRestaurant(restaurant)}
+                        >
+                          👁 Xem
+                        </button>
                         <button
                           className="action-btn suspend"
                           onClick={() => handleSuspend(restaurant.id)}
@@ -250,6 +261,88 @@ function RestaurantManagement() {
           </tbody>
         </table>
       </div>
+
+      {/* View Modal */}
+      {showViewModal && selectedRestaurant && (
+        <div className="modal-overlay" onClick={() => setShowViewModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Thông tin nhà hàng</h2>
+              <button
+                className="close-btn"
+                onClick={() => setShowViewModal(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="info-section">
+                <h3>Thông tin cơ bản</h3>
+                <div className="info-row">
+                  <span className="label">Mã nhà hàng:</span>
+                  <span className="value">#{selectedRestaurant.id}</span>
+                </div>
+                <div className="info-row">
+                  <span className="label">Tên nhà hàng:</span>
+                  <span className="value restaurant-name">
+                    {selectedRestaurant.name}
+                  </span>
+                </div>
+                <div className="info-row">
+                  <span className="label">Chủ quán:</span>
+                  <span className="value">{selectedRestaurant.owner}</span>
+                </div>
+                <div className="info-row">
+                  <span className="label">Số điện thoại:</span>
+                  <span className="value">{selectedRestaurant.phone}</span>
+                </div>
+                <div className="info-row">
+                  <span className="label">Địa chỉ:</span>
+                  <span className="value">{selectedRestaurant.address}</span>
+                </div>
+                <div className="info-row">
+                  <span className="label">Ngày tham gia:</span>
+                  <span className="value">
+                    {new Date(selectedRestaurant.joined).toLocaleDateString(
+                      "vi-VN"
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              <div className="info-section">
+                <h3>Thông tin kinh doanh</h3>
+                <div className="info-row">
+                  <span className="label">Trạng thái:</span>
+                  <span className={`status-badge ${selectedRestaurant.status}`}>
+                    {getStatusText(selectedRestaurant.status)}
+                  </span>
+                </div>
+                <div className="info-row">
+                  <span className="label">Đánh giá:</span>
+                  <span className="value rating-value">
+                    {selectedRestaurant.rating > 0
+                      ? `⭐ ${selectedRestaurant.rating}`
+                      : "Chưa có đánh giá"}
+                  </span>
+                </div>
+                <div className="info-row">
+                  <span className="label">Tổng đơn hàng:</span>
+                  <span className="value order-count">
+                    {selectedRestaurant.orders.toLocaleString("vi-VN")}
+                  </span>
+                </div>
+                <div className="info-row">
+                  <span className="label">Doanh thu:</span>
+                  <span className="value revenue-value">
+                    {selectedRestaurant.revenue.toLocaleString("vi-VN")}đ
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

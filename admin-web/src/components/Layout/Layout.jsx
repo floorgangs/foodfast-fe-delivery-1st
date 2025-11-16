@@ -46,21 +46,21 @@ function Layout() {
               <span className="nav-icon">👥</span>
               <span className="nav-text">Người dùng</span>
             </Link>
+            <Link to="/drones" className="nav-item">
+              <span className="nav-icon">🚁</span>
+              <span className="nav-text">Drone</span>
+            </Link>
+            <Link to="/orders" className="nav-item">
+              <span className="nav-icon">📦</span>
+              <span className="nav-text">Đơn hàng</span>
+            </Link>
           </div>
 
           <div className="nav-group">
-            <div className="nav-group-title">Báo cáo & Phân tích</div>
+            <div className="nav-group-title">Phân tích</div>
             <Link to="/statistics" className="nav-item">
               <span className="nav-icon">📊</span>
               <span className="nav-text">Thống kê</span>
-            </Link>
-            <Link to="/reports" className="nav-item">
-              <span className="nav-icon">📄</span>
-              <span className="nav-text">Báo cáo</span>
-            </Link>
-            <Link to="/settings" className="nav-item">
-              <span className="nav-icon">⚙</span>
-              <span className="nav-text">Cài đặt</span>
             </Link>
           </div>
         </nav>

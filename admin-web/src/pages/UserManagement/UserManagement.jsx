@@ -4,8 +4,11 @@ import "./UserManagement.css";
 function UserManagement() {
   const [selectedRestaurant, setSelectedRestaurant] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
 
-  const [users] = useState([
+  const [users, setUsers] = useState([
     {
       id: "1",
       name: "Nguyễn Văn A",
@@ -88,6 +91,22 @@ function UserManagement() {
     );
   }
 
+  const handleViewUser = (user) => {
+    setSelectedUser(user);
+    setShowViewModal(true);
+  };
+
+  const handleEditUser = (user) => {
+    setSelectedUser(user);
+    setShowEditModal(true);
+  };
+
+  const handleSaveUser = () => {
+    setUsers(users.map((u) => (u.id === selectedUser.id ? selectedUser : u)));
+    setShowEditModal(false);
+    setSelectedUser(null);
+  };
+
   return (
     <div className="user-management-page">
       <div className="page-header">
@@ -163,8 +182,18 @@ function UserManagement() {
                 </td>
                 <td>
                   <div className="action-buttons">
-                    <button className="action-btn view">👁 Xem</button>
-                    <button className="action-btn edit">✏️ Sửa</button>
+                    <button
+                      className="action-btn view"
+                      onClick={() => handleViewUser(user)}
+                    >
+                      👁 Xem
+                    </button>
+                    <button
+                      className="action-btn edit"
+                      onClick={() => handleEditUser(user)}
+                    >
+                      ✏️ Sửa
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -191,6 +220,157 @@ function UserManagement() {
           </div>
         </div>
       </div>
+
+      {/* View Modal */}
+      {showViewModal && selectedUser && (
+        <div className="modal-overlay" onClick={() => setShowViewModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Thông tin khách hàng</h2>
+              <button
+                className="close-btn"
+                onClick={() => setShowViewModal(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="info-section">
+                <h3>Thông tin cá nhân</h3>
+                <div className="info-row">
+                  <span className="label">Mã khách hàng:</span>
+                  <span className="value">#{selectedUser.id}</span>
+                </div>
+                <div className="info-row">
+                  <span className="label">Họ và tên:</span>
+                  <span className="value">{selectedUser.name}</span>
+                </div>
+                <div className="info-row">
+                  <span className="label">Email:</span>
+                  <span className="value">{selectedUser.email}</span>
+                </div>
+                <div className="info-row">
+                  <span className="label">Số điện thoại:</span>
+                  <span className="value">{selectedUser.phone}</span>
+                </div>
+              </div>
+
+              <div className="info-section">
+                <h3>Thông tin hoạt động</h3>
+                <div className="info-row">
+                  <span className="label">Nhà hàng yêu thích:</span>
+                  <span className="value">{selectedUser.restaurantName}</span>
+                </div>
+                <div className="info-row">
+                  <span className="label">Số đơn hàng:</span>
+                  <span className="value order-count">
+                    {selectedUser.orders}
+                  </span>
+                </div>
+                <div className="info-row">
+                  <span className="label">Trạng thái:</span>
+                  <span className={`status-badge ${selectedUser.status}`}>
+                    {selectedUser.status === "active"
+                      ? "✅ Hoạt động"
+                      : "❌ Không hoạt động"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {showEditModal && selectedUser && (
+        <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
+          <div
+            className="modal-content modal-large"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h2>Chỉnh sửa thông tin khách hàng</h2>
+              <button
+                className="close-btn"
+                onClick={() => setShowEditModal(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="form-section">
+                <h3>Thông tin cá nhân</h3>
+                <div className="form-group">
+                  <label>Họ và tên:</label>
+                  <input
+                    type="text"
+                    value={selectedUser.name}
+                    onChange={(e) =>
+                      setSelectedUser({ ...selectedUser, name: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Email:</label>
+                  <input
+                    type="email"
+                    value={selectedUser.email}
+                    onChange={(e) =>
+                      setSelectedUser({
+                        ...selectedUser,
+                        email: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Số điện thoại:</label>
+                  <input
+                    type="tel"
+                    value={selectedUser.phone}
+                    onChange={(e) =>
+                      setSelectedUser({
+                        ...selectedUser,
+                        phone: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="form-section">
+                <h3>Thông tin hoạt động</h3>
+                <div className="form-group">
+                  <label>Trạng thái:</label>
+                  <select
+                    value={selectedUser.status}
+                    onChange={(e) =>
+                      setSelectedUser({
+                        ...selectedUser,
+                        status: e.target.value,
+                      })
+                    }
+                  >
+                    <option value="active">Hoạt động</option>
+                    <option value="inactive">Không hoạt động</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                className="btn-cancel"
+                onClick={() => setShowEditModal(false)}
+              >
+                Hủy
+              </button>
+              <button className="btn-save" onClick={handleSaveUser}>
+                Lưu thay đổi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

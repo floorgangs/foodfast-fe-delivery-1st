@@ -6,7 +6,21 @@ function StaffManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showViewModal, setShowViewModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState(null);
+  const [newStaff, setNewStaff] = useState({
+    name: "",
+    restaurantId: 1,
+    phone: "",
+    email: "",
+    position: "Phục vụ",
+    salary: 8000000,
+    status: "active",
+    joinedDate: new Date().toISOString().split("T")[0],
+    firstWorkDay: new Date().toISOString().split("T")[0],
+    totalWorkDays: 0,
+    daysOff: 0,
+  });
   const [staff, setStaff] = useState([
     {
       id: 1,
@@ -14,10 +28,14 @@ function StaffManagement() {
       restaurantId: 1,
       restaurantName: "Cơm Tấm Sài Gòn",
       phone: "0901234567",
+      email: "nguyenvana@comtam.com",
       position: "Quản lý",
       salary: 15000000,
       status: "active",
       joinedDate: "2024-01-15",
+      firstWorkDay: "2024-01-15",
+      totalWorkDays: 306,
+      daysOff: 12,
     },
     {
       id: 2,
@@ -25,10 +43,14 @@ function StaffManagement() {
       restaurantId: 1,
       restaurantName: "Cơm Tấm Sài Gòn",
       phone: "0912345678",
+      email: "tranthib@comtam.com",
       position: "Nhân viên bếp",
       salary: 10000000,
       status: "active",
       joinedDate: "2024-02-20",
+      firstWorkDay: "2024-02-20",
+      totalWorkDays: 270,
+      daysOff: 8,
     },
     {
       id: 3,
@@ -36,10 +58,14 @@ function StaffManagement() {
       restaurantId: 1,
       restaurantName: "Cơm Tấm Sài Gòn",
       phone: "0923456789",
+      email: "levanc@comtam.com",
       position: "Phục vụ",
       salary: 8000000,
       status: "active",
       joinedDate: "2024-03-10",
+      firstWorkDay: "2024-03-10",
+      totalWorkDays: 252,
+      daysOff: 6,
     },
     {
       id: 4,
@@ -47,10 +73,14 @@ function StaffManagement() {
       restaurantId: 2,
       restaurantName: "Bún Bò Huế 24H",
       phone: "0934567890",
+      email: "phamthid@bunbo.com",
       position: "Quản lý",
       salary: 14000000,
       status: "active",
       joinedDate: "2024-01-20",
+      firstWorkDay: "2024-01-20",
+      totalWorkDays: 301,
+      daysOff: 10,
     },
     {
       id: 5,
@@ -58,10 +88,14 @@ function StaffManagement() {
       restaurantId: 2,
       restaurantName: "Bún Bò Huế 24H",
       phone: "0945678901",
+      email: "hoangvane@bunbo.com",
       position: "Nhân viên bếp",
       salary: 9500000,
       status: "active",
       joinedDate: "2024-02-15",
+      firstWorkDay: "2024-02-15",
+      totalWorkDays: 275,
+      daysOff: 7,
     },
     {
       id: 6,
@@ -69,10 +103,14 @@ function StaffManagement() {
       restaurantId: 3,
       restaurantName: "KFC Hồ Chí Minh",
       phone: "0956789012",
+      email: "vothif@kfc.com",
       position: "Thu ngân",
       salary: 9000000,
       status: "inactive",
       joinedDate: "2024-05-20",
+      firstWorkDay: "2024-05-20",
+      totalWorkDays: 120,
+      daysOff: 15,
     },
     {
       id: 7,
@@ -80,10 +118,14 @@ function StaffManagement() {
       restaurantId: 2,
       restaurantName: "Bún Bò Huế 24H",
       phone: "0967890123",
+      email: "nguyenthig@bunbo.com",
       position: "Thu ngân",
       salary: 8500000,
       status: "active",
       joinedDate: "2024-03-15",
+      firstWorkDay: "2024-03-15",
+      totalWorkDays: 247,
+      daysOff: 5,
     },
     {
       id: 8,
@@ -91,10 +133,14 @@ function StaffManagement() {
       restaurantId: 3,
       restaurantName: "KFC Hồ Chí Minh",
       phone: "0978901234",
+      email: "tranvanh@kfc.com",
       position: "Phục vụ",
       salary: 7500000,
       status: "active",
       joinedDate: "2024-04-10",
+      firstWorkDay: "2024-04-10",
+      totalWorkDays: 221,
+      daysOff: 4,
     },
   ]);
 
@@ -161,6 +207,31 @@ function StaffManagement() {
     alert("Đã cập nhật thông tin nhân viên!");
   };
 
+  const handleAddStaff = () => {
+    const restaurant = restaurants.find((r) => r.id === newStaff.restaurantId);
+    const staffWithId = {
+      ...newStaff,
+      id: staff.length + 1,
+      restaurantName: restaurant.name,
+    };
+    setStaff([...staff, staffWithId]);
+    setShowAddModal(false);
+    setNewStaff({
+      name: "",
+      restaurantId: 1,
+      phone: "",
+      email: "",
+      position: "Phục vụ",
+      salary: 8000000,
+      status: "active",
+      joinedDate: new Date().toISOString().split("T")[0],
+      firstWorkDay: new Date().toISOString().split("T")[0],
+      totalWorkDays: 0,
+      daysOff: 0,
+    });
+    alert("Đã thêm nhân viên mới!");
+  };
+
   return (
     <div className="staff-management-page">
       <div className="page-header">
@@ -170,7 +241,9 @@ function StaffManagement() {
             Quản lý nhân viên của các nhà hàng trong hệ thống
           </p>
         </div>
-        <button className="add-btn">+ Thêm nhân viên</button>
+        <button className="add-btn" onClick={() => setShowAddModal(true)}>
+          + Thêm nhân viên
+        </button>
       </div>
 
       <div className="filter-bar">
@@ -206,10 +279,7 @@ function StaffManagement() {
               <th>ID</th>
               <th>Họ và tên</th>
               <th>Nhà hàng</th>
-              <th>Số điện thoại</th>
               <th>Chức vụ</th>
-              <th>Lương</th>
-              <th>Ngày vào làm</th>
               <th>Trạng thái</th>
               <th>Hành động</th>
             </tr>
@@ -224,15 +294,8 @@ function StaffManagement() {
                   <strong>{member.name}</strong>
                 </td>
                 <td>{member.restaurantName}</td>
-                <td>{member.phone}</td>
                 <td>
                   <span className="position-badge">{member.position}</span>
-                </td>
-                <td className="salary-cell">
-                  {member.salary.toLocaleString("vi-VN")}đ
-                </td>
-                <td>
-                  {new Date(member.joinedDate).toLocaleDateString("vi-VN")}
                 </td>
                 <td>
                   <span className={getStatusClass(member.status)}>
@@ -309,41 +372,76 @@ function StaffManagement() {
               </button>
             </div>
             <div className="modal-body">
-              <div className="info-row">
-                <label>Họ và tên:</label>
-                <span>{selectedStaff.name}</span>
+              <div className="info-section">
+                <h3>Thông tin cá nhân</h3>
+                <div className="info-row">
+                  <label>Họ và tên:</label>
+                  <span>{selectedStaff.name}</span>
+                </div>
+                <div className="info-row">
+                  <label>Số điện thoại:</label>
+                  <span>{selectedStaff.phone}</span>
+                </div>
+                <div className="info-row">
+                  <label>Email:</label>
+                  <span>{selectedStaff.email}</span>
+                </div>
               </div>
-              <div className="info-row">
-                <label>Nhà hàng:</label>
-                <span>{selectedStaff.restaurantName}</span>
+
+              <div className="info-section">
+                <h3>Thông tin công việc</h3>
+                <div className="info-row">
+                  <label>Nhà hàng:</label>
+                  <span>{selectedStaff.restaurantName}</span>
+                </div>
+                <div className="info-row">
+                  <label>Chức vụ:</label>
+                  <span className="position-badge">
+                    {selectedStaff.position}
+                  </span>
+                </div>
+                <div className="info-row">
+                  <label>Lương cơ bản:</label>
+                  <span className="salary-value">
+                    {selectedStaff.salary.toLocaleString("vi-VN")}đ
+                  </span>
+                </div>
+                <div className="info-row">
+                  <label>Trạng thái:</label>
+                  <span className={getStatusClass(selectedStaff.status)}>
+                    {getStatusText(selectedStaff.status)}
+                  </span>
+                </div>
               </div>
-              <div className="info-row">
-                <label>Số điện thoại:</label>
-                <span>{selectedStaff.phone}</span>
-              </div>
-              <div className="info-row">
-                <label>Chức vụ:</label>
-                <span>{selectedStaff.position}</span>
-              </div>
-              <div className="info-row">
-                <label>Lương:</label>
-                <span>{selectedStaff.salary.toLocaleString("vi-VN")}đ</span>
-              </div>
-              <div className="info-row">
-                <label>Ngày vào làm:</label>
-                <span>
-                  {new Date(selectedStaff.joinedDate).toLocaleDateString(
-                    "vi-VN"
-                  )}
-                </span>
-              </div>
-              <div className="info-row">
-                <label>Trạng thái:</label>
-                <span className={`status-badge ${selectedStaff.status}`}>
-                  {selectedStaff.status === "active"
-                    ? "✅ Đang làm"
-                    : "❌ Nghỉ việc"}
-                </span>
+
+              <div className="info-section">
+                <h3>Thông tin làm việc</h3>
+                <div className="info-row">
+                  <label>Ngày đầu tiên đi làm:</label>
+                  <span>
+                    {new Date(selectedStaff.firstWorkDay).toLocaleDateString(
+                      "vi-VN"
+                    )}
+                  </span>
+                </div>
+                <div className="info-row">
+                  <label>Ngày vào làm chính thức:</label>
+                  <span>
+                    {new Date(selectedStaff.joinedDate).toLocaleDateString(
+                      "vi-VN"
+                    )}
+                  </span>
+                </div>
+                <div className="info-row">
+                  <label>Tổng số ngày làm việc:</label>
+                  <span className="work-days">
+                    {selectedStaff.totalWorkDays} ngày
+                  </span>
+                </div>
+                <div className="info-row">
+                  <label>Số ngày nghỉ:</label>
+                  <span className="days-off">{selectedStaff.daysOff} ngày</span>
+                </div>
               </div>
             </div>
           </div>
@@ -353,7 +451,10 @@ function StaffManagement() {
       {/* Modal Sửa */}
       {showEditModal && selectedStaff && (
         <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="modal-content modal-large"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-header">
               <h2>Chỉnh sửa Nhân viên</h2>
               <button
@@ -364,58 +465,152 @@ function StaffManagement() {
               </button>
             </div>
             <div className="modal-body">
-              <div className="form-group">
-                <label>Họ và tên:</label>
-                <input
-                  type="text"
-                  value={selectedStaff.name}
-                  onChange={(e) =>
-                    setSelectedStaff({ ...selectedStaff, name: e.target.value })
-                  }
-                />
+              <div className="form-section">
+                <h3>Thông tin cá nhân</h3>
+                <div className="form-group">
+                  <label>Họ và tên:</label>
+                  <input
+                    type="text"
+                    value={selectedStaff.name}
+                    onChange={(e) =>
+                      setSelectedStaff({
+                        ...selectedStaff,
+                        name: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Số điện thoại:</label>
+                  <input
+                    type="text"
+                    value={selectedStaff.phone}
+                    onChange={(e) =>
+                      setSelectedStaff({
+                        ...selectedStaff,
+                        phone: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Email:</label>
+                  <input
+                    type="email"
+                    value={selectedStaff.email}
+                    onChange={(e) =>
+                      setSelectedStaff({
+                        ...selectedStaff,
+                        email: e.target.value,
+                      })
+                    }
+                  />
+                </div>
               </div>
-              <div className="form-group">
-                <label>Số điện thoại:</label>
-                <input
-                  type="text"
-                  value={selectedStaff.phone}
-                  onChange={(e) =>
-                    setSelectedStaff({
-                      ...selectedStaff,
-                      phone: e.target.value,
-                    })
-                  }
-                />
+
+              <div className="form-section">
+                <h3>Thông tin công việc</h3>
+                <div className="form-group">
+                  <label>Chức vụ:</label>
+                  <select
+                    value={selectedStaff.position}
+                    onChange={(e) =>
+                      setSelectedStaff({
+                        ...selectedStaff,
+                        position: e.target.value,
+                      })
+                    }
+                  >
+                    <option value="Quản lý">Quản lý</option>
+                    <option value="Nhân viên bếp">Nhân viên bếp</option>
+                    <option value="Phục vụ">Phục vụ</option>
+                    <option value="Thu ngân">Thu ngân</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Lương cơ bản (VNĐ):</label>
+                  <input
+                    type="number"
+                    value={selectedStaff.salary}
+                    onChange={(e) =>
+                      setSelectedStaff({
+                        ...selectedStaff,
+                        salary: parseInt(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Trạng thái:</label>
+                  <select
+                    value={selectedStaff.status}
+                    onChange={(e) =>
+                      setSelectedStaff({
+                        ...selectedStaff,
+                        status: e.target.value,
+                      })
+                    }
+                  >
+                    <option value="active">Đang làm</option>
+                    <option value="inactive">Nghỉ việc</option>
+                  </select>
+                </div>
               </div>
-              <div className="form-group">
-                <label>Chức vụ:</label>
-                <select
-                  value={selectedStaff.position}
-                  onChange={(e) =>
-                    setSelectedStaff({
-                      ...selectedStaff,
-                      position: e.target.value,
-                    })
-                  }
-                >
-                  <option value="Quản lý">Quản lý</option>
-                  <option value="Nhân viên bếp">Nhân viên bếp</option>
-                  <option value="Phục vụ">Phục vụ</option>
-                  <option value="Thu ngân">Thu ngân</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Lương:</label>
-                <input
-                  type="number"
-                  value={selectedStaff.salary}
-                  onChange={(e) =>
-                    setSelectedStaff({
-                      ...selectedStaff,
-                      salary: parseInt(e.target.value),
-                    })
-                  }
-                />
+
+              <div className="form-section">
+                <h3>Thông tin làm việc</h3>
+                <div className="form-group">
+                  <label>Ngày đầu tiên đi làm:</label>
+                  <input
+                    type="date"
+                    value={selectedStaff.firstWorkDay}
+                    onChange={(e) =>
+                      setSelectedStaff({
+                        ...selectedStaff,
+                        firstWorkDay: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Ngày vào làm chính thức:</label>
+                  <input
+                    type="date"
+                    value={selectedStaff.joinedDate}
+                    onChange={(e) =>
+                      setSelectedStaff({
+                        ...selectedStaff,
+                        joinedDate: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Tổng số ngày làm việc:</label>
+                  <input
+                    type="number"
+                    value={selectedStaff.totalWorkDays}
+                    onChange={(e) =>
+                      setSelectedStaff({
+                        ...selectedStaff,
+                        totalWorkDays: parseInt(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Số ngày nghỉ:</label>
+                  <input
+                    type="number"
+                    value={selectedStaff.daysOff}
+                    onChange={(e) =>
+                      setSelectedStaff({
+                        ...selectedStaff,
+                        daysOff: parseInt(e.target.value),
+                      })
+                    }
+                  />
+                </div>
               </div>
             </div>
             <div className="modal-footer">
@@ -427,6 +622,210 @@ function StaffManagement() {
               </button>
               <button className="save-btn" onClick={handleSaveEdit}>
                 Lưu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Thêm */}
+      {showAddModal && (
+        <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
+          <div
+            className="modal-content modal-large"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h2>Thêm Nhân viên Mới</h2>
+              <button
+                className="close-btn"
+                onClick={() => setShowAddModal(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="form-section">
+                <h3>Thông tin cá nhân</h3>
+                <div className="form-group">
+                  <label>Họ và tên: *</label>
+                  <input
+                    type="text"
+                    placeholder="Nhập họ và tên"
+                    value={newStaff.name}
+                    onChange={(e) =>
+                      setNewStaff({
+                        ...newStaff,
+                        name: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Số điện thoại: *</label>
+                  <input
+                    type="text"
+                    placeholder="Nhập số điện thoại"
+                    value={newStaff.phone}
+                    onChange={(e) =>
+                      setNewStaff({
+                        ...newStaff,
+                        phone: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Email: *</label>
+                  <input
+                    type="email"
+                    placeholder="Nhập email"
+                    value={newStaff.email}
+                    onChange={(e) =>
+                      setNewStaff({
+                        ...newStaff,
+                        email: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="form-section">
+                <h3>Thông tin công việc</h3>
+                <div className="form-group">
+                  <label>Nhà hàng: *</label>
+                  <select
+                    value={newStaff.restaurantId}
+                    onChange={(e) =>
+                      setNewStaff({
+                        ...newStaff,
+                        restaurantId: parseInt(e.target.value),
+                      })
+                    }
+                  >
+                    {restaurants.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Chức vụ: *</label>
+                  <select
+                    value={newStaff.position}
+                    onChange={(e) =>
+                      setNewStaff({
+                        ...newStaff,
+                        position: e.target.value,
+                      })
+                    }
+                  >
+                    <option value="Quản lý">Quản lý</option>
+                    <option value="Nhân viên bếp">Nhân viên bếp</option>
+                    <option value="Phục vụ">Phục vụ</option>
+                    <option value="Thu ngân">Thu ngân</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Lương cơ bản (VNĐ): *</label>
+                  <input
+                    type="number"
+                    placeholder="Nhập lương"
+                    value={newStaff.salary}
+                    onChange={(e) =>
+                      setNewStaff({
+                        ...newStaff,
+                        salary: parseInt(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Trạng thái: *</label>
+                  <select
+                    value={newStaff.status}
+                    onChange={(e) =>
+                      setNewStaff({
+                        ...newStaff,
+                        status: e.target.value,
+                      })
+                    }
+                  >
+                    <option value="active">Đang làm</option>
+                    <option value="inactive">Nghỉ việc</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-section">
+                <h3>Thông tin làm việc</h3>
+                <div className="form-group">
+                  <label>Ngày đầu tiên đi làm: *</label>
+                  <input
+                    type="date"
+                    value={newStaff.firstWorkDay}
+                    onChange={(e) =>
+                      setNewStaff({
+                        ...newStaff,
+                        firstWorkDay: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Ngày vào làm chính thức: *</label>
+                  <input
+                    type="date"
+                    value={newStaff.joinedDate}
+                    onChange={(e) =>
+                      setNewStaff({
+                        ...newStaff,
+                        joinedDate: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Tổng số ngày làm việc:</label>
+                  <input
+                    type="number"
+                    placeholder="Mặc định 0"
+                    value={newStaff.totalWorkDays}
+                    onChange={(e) =>
+                      setNewStaff({
+                        ...newStaff,
+                        totalWorkDays: parseInt(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Số ngày nghỉ:</label>
+                  <input
+                    type="number"
+                    placeholder="Mặc định 0"
+                    value={newStaff.daysOff}
+                    onChange={(e) =>
+                      setNewStaff({
+                        ...newStaff,
+                        daysOff: parseInt(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                className="cancel-btn"
+                onClick={() => setShowAddModal(false)}
+              >
+                Hủy
+              </button>
+              <button className="save-btn" onClick={handleAddStaff}>
+                Thêm
               </button>
             </div>
           </div>

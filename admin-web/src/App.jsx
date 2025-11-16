@@ -6,6 +6,9 @@ import Dashboard from "./pages/Dashboard/Dashboard";
 import UserManagement from "./pages/UserManagement/UserManagement";
 import RestaurantManagement from "./pages/RestaurantManagement/RestaurantManagement";
 import StaffManagement from "./pages/StaffManagement/StaffManagement";
+import DroneManagement from "./pages/DroneManagement/DroneManagement";
+import OrderManagement from "./pages/OrderManagement/OrderManagement";
+import Statistics from "./pages/Statistics/Statistics";
 import "./App.css";
 
 function App() {
@@ -23,6 +26,9 @@ function App() {
         <Route path="users" element={<UserManagement />} />
         <Route path="restaurants" element={<RestaurantManagement />} />
         <Route path="staff" element={<StaffManagement />} />
+        <Route path="drones" element={<DroneManagement />} />
+        <Route path="orders" element={<OrderManagement />} />
+        <Route path="statistics" element={<Statistics />} />
       </Route>
     </Routes>
   );

@@ -303,6 +303,10 @@
   animation: slideUp 0.3s;
 }
 
+.modal-content.modal-large {
+  max-width: 800px;
+}
+
 @keyframes slideUp {
   from {
     opacity: 0;
@@ -350,6 +354,27 @@
   padding: 24px;
 }
 
+.info-section {
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.info-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.info-section h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a1f2e;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #e0e7ff;
+}
+
 .info-row {
   display: flex;
   justify-content: space-between;
@@ -372,6 +397,43 @@
   font-weight: 500;
   color: #1a1f2e;
   font-size: 14px;
+}
+
+.info-row .salary-value {
+  color: #059669;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.info-row .work-days {
+  color: #2563eb;
+  font-weight: 700;
+}
+
+.info-row .days-off {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.form-section {
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.form-section:last-of-type {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.form-section h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a1f2e;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #e0e7ff;
 }
 
 .form-group {
