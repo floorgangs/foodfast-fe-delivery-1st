@@ -1,14 +1,12 @@
-import { Outlet, NavLink, Link, useNavigate } from "react-router-dom";
+import { Outlet, Link, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { logout } from "../../store/slices/authSlice";
 import "./Layout.css";
-import { useState } from "react";
 
 function Layout() {
   const { user } = useSelector((state) => state.auth);
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const [collapsed, setCollapsed] = useState(false);
 
   const handleLogout = () => {
     dispatch(logout());
@@ -16,95 +14,63 @@ function Layout() {
   };
 
   return (
-    <div className="ff-layout">
-      {/* Sidebar (left) */}
-      <aside className={"ff-sidebar" + (collapsed ? " ff-collapsed" : "")}>
-        <div className="ff-sidebar-header">
-          <Link to="/" className="ff-brand">
-            🍽️ FoodFast Admin
+    <div className="layout">
+      <aside className="sidebar">
+        <div className="sidebar-header">
+          <div className="sidebar-brand">
+            <span className="brand-logo">👑</span>
+            <span className="brand-text">FoodFast Admin</span>
+          </div>
+          <div className="admin-info">
+            <p className="admin-name">{user?.name || "Admin"}</p>
+            <span className="admin-role">Quản trị viên hệ thống</span>
+          </div>
+        </div>
+        <nav className="sidebar-nav">
+          <Link to="/dashboard" className="nav-item">
+            <span className="nav-icon">▣</span>
+            <span className="nav-text">Tổng quan</span>
           </Link>
-          <p className="ff-admin-name">{user?.name}</p>
-        </div>
-        <nav className="ff-sidebar-nav">
-          <NavLink
-            to="/"
-            end
-            className={({ isActive }) =>
-              "ff-nav-item" + (isActive ? " active" : "")
-            }
-          >
-            📊 Dashboard
-          </NavLink>
-          <NavLink
-            to="/users"
-            className={({ isActive }) =>
-              "ff-nav-item" + (isActive ? " active" : "")
-            }
-          >
-            👥 Quản lý người dùng
-          </NavLink>
-          <NavLink
-            to="/restaurants"
-            className={({ isActive }) =>
-              "ff-nav-item" + (isActive ? " active" : "")
-            }
-          >
-            🏪 Quản lý nhà hàng
-          </NavLink>
-          <NavLink
-            to="/orders"
-            className={({ isActive }) =>
-              "ff-nav-item" + (isActive ? " active" : "")
-            }
-          >
-            📦 Giám sát đơn hàng
-          </NavLink>
-          <NavLink
-            to="/drones"
-            className={({ isActive }) =>
-              "ff-nav-item" + (isActive ? " active" : "")
-            }
-          >
-            🚁 Quản lý Drone
-          </NavLink>
+
+          <div className="nav-group">
+            <div className="nav-group-title">Quản lý hệ thống</div>
+            <Link to="/restaurants" className="nav-item">
+              <span className="nav-icon">🏪</span>
+              <span className="nav-text">Nhà hàng</span>
+            </Link>
+            <Link to="/staff" className="nav-item">
+              <span className="nav-icon">👨‍💼</span>
+              <span className="nav-text">Nhân viên</span>
+            </Link>
+            <Link to="/users" className="nav-item">
+              <span className="nav-icon">👥</span>
+              <span className="nav-text">Người dùng</span>
+            </Link>
+          </div>
+
+          <div className="nav-group">
+            <div className="nav-group-title">Báo cáo & Phân tích</div>
+            <Link to="/statistics" className="nav-item">
+              <span className="nav-icon">📊</span>
+              <span className="nav-text">Thống kê</span>
+            </Link>
+            <Link to="/reports" className="nav-item">
+              <span className="nav-icon">📄</span>
+              <span className="nav-text">Báo cáo</span>
+            </Link>
+            <Link to="/settings" className="nav-item">
+              <span className="nav-icon">⚙</span>
+              <span className="nav-text">Cài đặt</span>
+            </Link>
+          </div>
         </nav>
-        <div className="ff-sidebar-footer">
-          <button onClick={handleLogout} className="ff-logout-btn">
-            Đăng xuất
-          </button>
-        </div>
+        <button onClick={handleLogout} className="logout-btn">
+          🚪 Đăng xuất
+        </button>
       </aside>
-
-      {/* Main content area with top navbar (to align with Admin Dashboard look) */}
-      <div className="ff-main">
-        <header className="ff-topbar">
-          <div className="ff-topbar-inner">
-            <div className="ff-topbar-left">
-              <button
-                className="ff-toggle-btn"
-                aria-label="Toggle sidebar"
-                onClick={() => setCollapsed((s) => !s)}
-              >
-                ☰
-              </button>
-              <h4 className="ff-page-title">Admin</h4>
-            </div>
-            <div className="ff-topbar-right">
-              <span className="ff-user">👋 {user?.name || "Quản trị"}</span>
-            </div>
-          </div>
-        </header>
-
-        <main className="ff-content">
-          <Outlet />
-        </main>
-
-        <footer className="ff-footer">
-          <div className="ff-footer-inner">
-            © {new Date().getFullYear()} FoodFast
-          </div>
-        </footer>
-      </div>
+      <main className="main-content">
+        <Outlet />
+      </main>
     </div>
   );
 }
