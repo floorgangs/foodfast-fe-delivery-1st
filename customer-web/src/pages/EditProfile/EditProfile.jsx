@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
-import { updateUser } from "../../store/slices/authSlice";
+import { fetchUserProfile } from "../../store/slices/authSlice";
+import { authAPI } from "../../services/api";
 import "./EditProfile.css";
 
 function EditProfile() {
@@ -16,6 +17,7 @@ function EditProfile() {
   });
 
   const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -64,26 +66,28 @@ function EditProfile() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!validateForm()) {
       return;
     }
 
-    // Update user in Redux store and localStorage
-    const updatedUser = {
-      ...user,
-      ...formData,
-    };
+    setLoading(true);
+    try {
+      // Call API to update profile
+      await authAPI.updateProfile(formData);
 
-    dispatch(updateUser(updatedUser));
+      // Refresh user data from server
+      await dispatch(fetchUserProfile()).unwrap();
 
-    // Save to localStorage
-    localStorage.setItem("customer_user", JSON.stringify(updatedUser));
-
-    alert("Cập nhật thông tin thành công!");
-    navigate("/profile");
+      alert("Cập nhật thông tin thành công!");
+      navigate("/profile");
+    } catch (error) {
+      alert(error.message || "Cập nhật thông tin thất bại!");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCancel = () => {
@@ -167,11 +171,12 @@ function EditProfile() {
                 type="button"
                 onClick={handleCancel}
                 className="cancel-btn"
+                disabled={loading}
               >
                 Hủy
               </button>
-              <button type="submit" className="save-btn">
-                Lưu thay đổi
+              <button type="submit" className="save-btn" disabled={loading}>
+                {loading ? "Đang lưu..." : "Lưu thay đổi"}
               </button>
             </div>
           </form>

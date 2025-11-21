@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { login } from "../../store/slices/authSlice";
+import { loginUser, clearError } from "../../store/slices/authSlice";
+import socketService from "../../services/socket";
 import "./Login.css";
 
 function Login() {
@@ -9,7 +10,9 @@ function Login() {
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const { isAuthenticated } = useSelector((state) => state.auth);
+  const { isAuthenticated, loading, error } = useSelector(
+    (state) => state.auth
+  );
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -17,26 +20,29 @@ function Login() {
     }
   }, [isAuthenticated, navigate]);
 
-  const handleSubmit = (e) => {
+  useEffect(() => {
+    // Clear error when component unmounts
+    return () => {
+      dispatch(clearError());
+    };
+  }, [dispatch]);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Mock login - trong thực tế sẽ gọi API
-    const mockUser = {
-      id: "1",
-      name: "Nguyễn Văn A",
-      email: email,
-      phone: "0901234567",
-      address: "123 Nguyễn Huệ, Q.1, TP.HCM",
-    };
+    try {
+      const result = await dispatch(loginUser({ email, password })).unwrap();
 
-    dispatch(
-      login({
-        user: mockUser,
-        token: "mock-token-" + Date.now(),
-      })
-    );
+      // Kết nối Socket.io sau khi đăng nhập thành công
+      socketService.connect({
+        id: result.user.id,
+        role: result.user.role,
+      });
 
-    navigate("/");
+      navigate("/");
+    } catch (err) {
+      console.error("Login failed:", err);
+    }
   };
 
   return (
@@ -56,8 +62,9 @@ function Login() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="example@email.com"
+              placeholder="customer1@gmail.com"
               required
+              disabled={loading}
             />
           </div>
 
@@ -69,11 +76,14 @@ function Login() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               required
+              disabled={loading}
             />
           </div>
 
-          <button type="submit" className="login-btn">
-            Đăng nhập
+          {error && <div className="error-message">{error}</div>}
+
+          <button type="submit" className="login-btn" disabled={loading}>
+            {loading ? "Đang đăng nhập..." : "Đăng nhập"}
           </button>
 
           <div className="login-footer">
@@ -81,7 +91,7 @@ function Login() {
               Chưa có tài khoản? <a href="/register">Đăng ký ngay</a>
             </p>
             <p className="demo-note">
-              Demo: Nhập email/password bất kỳ để đăng nhập
+              📝 Tài khoản demo: customer1@gmail.com / 123456
             </p>
           </div>
         </form>

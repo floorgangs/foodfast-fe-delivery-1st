@@ -1,179 +1,139 @@
-import { useState } from 'react'
-import './MenuManagement.css'
+import { useState, useEffect } from "react";
+import "./MenuManagement.css";
 
 function MenuManagement() {
-  const [activeTab, setActiveTab] = useState('all')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [showAddModal, setShowAddModal] = useState(false)
-  const [showEditModal, setShowEditModal] = useState(false)
-  const [showDetailModal, setShowDetailModal] = useState(false)
-  const [selectedItem, setSelectedItem] = useState(null)
+  const [activeTab, setActiveTab] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
 
   const [categories, setCategories] = useState([
-    { id: 'cat1', name: 'Món chính', itemCount: 8 },
-    { id: 'cat2', name: 'Món phụ', itemCount: 5 },
-    { id: 'cat3', name: 'Đồ uống', itemCount: 4 },
-    { id: 'cat4', name: 'Tráng miệng', itemCount: 3 },
-  ])
+    { id: "cat1", name: "Món chính", itemCount: 0 },
+    { id: "cat2", name: "Món phụ", itemCount: 0 },
+    { id: "cat3", name: "Đồ uống", itemCount: 0 },
+    { id: "cat4", name: "Tráng miệng", itemCount: 0 },
+  ]);
 
-  const [menuItems, setMenuItems] = useState([
-    { 
-      id: '101', 
-      name: 'Cơm Tấm Sườn Nướng', 
-      price: 35000, 
-      category: 'Món chính',
-      categoryId: 'cat1',
-      description: 'Cơm tấm sườn nướng thơm ngon, ăn kèm với dưa leo và cà chua',
-      image: 'https://images.unsplash.com/photo-1585032226651-759b368d7246?w=400',
-      available: true,
-      cookTime: 15,
-      discount: 0
-    },
-    { 
-      id: '102', 
-      name: 'Cơm Tấm Sườn Bì Chả', 
-      price: 40000, 
-      category: 'Món chính',
-      categoryId: 'cat1',
-      description: 'Cơm tấm đầy đủ với sườn nướng, bì và chả',
-      image: 'https://images.unsplash.com/photo-1559847844-5315695dadae?w=400',
-      available: true,
-      cookTime: 15,
-      discount: 10
-    },
-    { 
-      id: '103', 
-      name: 'Cơm Tấm Đặc Biệt', 
-      price: 45000, 
-      category: 'Món chính',
-      categoryId: 'cat1',
-      description: 'Cơm tấm đặc biệt với đầy đủ topping',
-      image: 'https://images.unsplash.com/photo-1512058564366-18510be2db19?w=400',
-      available: false,
-      cookTime: 20,
-      discount: 0
-    },
-    { 
-      id: '104', 
-      name: 'Bún Bò Huế', 
-      price: 38000, 
-      category: 'Món chính',
-      categoryId: 'cat1',
-      description: 'Bún bò Huế chuẩn vị xứ Huế',
-      image: 'https://images.unsplash.com/photo-1591814468924-caf88d1232e1?w=400',
-      available: true,
-      cookTime: 12,
-      discount: 0
-    },
-    { 
-      id: '105', 
-      name: 'Phở Bò Tái', 
-      price: 42000, 
-      category: 'Món chính',
-      categoryId: 'cat1',
-      description: 'Phở bò tái nóng hổi',
-      image: 'https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=400',
-      available: true,
-      cookTime: 10,
-      discount: 0
-    },
-    { 
-      id: '201', 
-      name: 'Nem Nướng', 
-      price: 15000, 
-      category: 'Món phụ',
-      categoryId: 'cat2',
-      description: 'Nem nướng Nha Trang',
-      image: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=400',
-      available: true,
-      cookTime: 5,
-      discount: 0
-    },
-    { 
-      id: '202', 
-      name: 'Chả Giò', 
-      price: 12000, 
-      category: 'Món phụ',
-      categoryId: 'cat2',
-      description: 'Chả giò giòn tan',
-      image: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400',
-      available: true,
-      cookTime: 8,
-      discount: 0
-    },
-    { 
-      id: '301', 
-      name: 'Trà Đá', 
-      price: 5000, 
-      category: 'Đồ uống',
-      categoryId: 'cat3',
-      description: 'Trà đá mát lạnh',
-      image: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400',
-      available: true,
-      cookTime: 2,
-      discount: 0
-    },
-    { 
-      id: '302', 
-      name: 'Nước Cam', 
-      price: 15000, 
-      category: 'Đồ uống',
-      categoryId: 'cat3',
-      description: 'Nước cam tươi vắt',
-      image: 'https://images.unsplash.com/photo-1600271886742-f049cd451bba?w=400',
-      available: true,
-      cookTime: 3,
-      discount: 0
-    },
-  ])
+  const [menuItems, setMenuItems] = useState([]);
+
+  // Load menu từ localStorage
+  useEffect(() => {
+    const menuKey = "foodfastRestaurantMenu_2";
+    const stored = window.localStorage.getItem(menuKey);
+    if (stored) {
+      try {
+        const items = JSON.parse(stored);
+        // Transform data từ demoData format sang MenuManagement format
+        const transformedItems = items.map((item) => ({
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          category: item.category,
+          categoryId:
+            item.category === "Món chính"
+              ? "cat1"
+              : item.category === "Món phụ"
+              ? "cat2"
+              : item.category === "Đồ uống"
+              ? "cat3"
+              : "cat4",
+          description: item.description,
+          image: item.image,
+          available: item.available,
+          cookTime: item.preparationTime || 15,
+          discount: 0,
+        }));
+        setMenuItems(transformedItems);
+
+        // Update category counts
+        const counts = {
+          cat1: transformedItems.filter((i) => i.categoryId === "cat1").length,
+          cat2: transformedItems.filter((i) => i.categoryId === "cat2").length,
+          cat3: transformedItems.filter((i) => i.categoryId === "cat3").length,
+          cat4: transformedItems.filter((i) => i.categoryId === "cat4").length,
+        };
+        setCategories((prevCats) =>
+          prevCats.map((cat) => ({
+            ...cat,
+            itemCount: counts[cat.id] || 0,
+          }))
+        );
+      } catch (error) {
+        console.error("Error loading menu:", error);
+      }
+    }
+  }, []);
+
+  // Save menu to localStorage whenever it changes
+  useEffect(() => {
+    if (menuItems.length > 0) {
+      const menuKey = "foodfastRestaurantMenu_2";
+      const dataToSave = menuItems.map((item) => ({
+        id: item.id,
+        restaurantId: "2",
+        name: item.name,
+        price: item.price,
+        category: item.category,
+        image: item.image,
+        description: item.description,
+        available: item.available,
+        isPopular: false,
+        preparationTime: item.cookTime,
+        createdAt: new Date().toISOString(),
+      }));
+      window.localStorage.setItem(menuKey, JSON.stringify(dataToSave));
+    }
+  }, [menuItems]);
 
   const [formData, setFormData] = useState({
-    name: '',
-    price: '',
-    categoryId: 'cat1',
-    description: '',
+    name: "",
+    price: "",
+    categoryId: "cat1",
+    description: "",
     image: null,
     cookTime: 10,
     discount: 0,
-    saleTime: 'all-day'
-  })
+    saleTime: "all-day",
+  });
 
   const getFilteredItems = () => {
-    let filtered = menuItems
-    
-    if (activeTab !== 'all') {
-      filtered = filtered.filter(item => item.categoryId === activeTab)
+    let filtered = menuItems;
+
+    if (activeTab !== "all") {
+      filtered = filtered.filter((item) => item.categoryId === activeTab);
     }
-    
+
     if (searchQuery) {
-      filtered = filtered.filter(item => 
+      filtered = filtered.filter((item) =>
         item.name.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+      );
     }
-    
-    return filtered
-  }
+
+    return filtered;
+  };
 
   const handleChange = (e) => {
-    const { name, value, files } = e.target
-    
-    if (name === 'image' && files[0]) {
-      const imageUrl = URL.createObjectURL(files[0])
+    const { name, value, files } = e.target;
+
+    if (name === "image" && files[0]) {
+      const imageUrl = URL.createObjectURL(files[0]);
       setFormData({
         ...formData,
-        [name]: imageUrl
-      })
+        [name]: imageUrl,
+      });
     } else {
       setFormData({
         ...formData,
-        [name]: value
-      })
+        [name]: value,
+      });
     }
-  }
+  };
 
   const handleAddItem = (e) => {
-    e.preventDefault()
-    const category = categories.find(cat => cat.id === formData.categoryId)
+    e.preventDefault();
+    const category = categories.find((cat) => cat.id === formData.categoryId);
     const newItem = {
       id: Date.now().toString(),
       name: formData.name,
@@ -184,17 +144,17 @@ function MenuManagement() {
       image: formData.image,
       available: true,
       cookTime: parseInt(formData.cookTime),
-      discount: parseInt(formData.discount)
-    }
-    setMenuItems([...menuItems, newItem])
-    setShowAddModal(false)
-    resetForm()
-  }
+      discount: parseInt(formData.discount),
+    };
+    setMenuItems([...menuItems, newItem]);
+    setShowAddModal(false);
+    resetForm();
+  };
 
   const handleEditItem = (e) => {
-    e.preventDefault()
-    const category = categories.find(cat => cat.id === formData.categoryId)
-    const updatedItems = menuItems.map(item =>
+    e.preventDefault();
+    const category = categories.find((cat) => cat.id === formData.categoryId);
+    const updatedItems = menuItems.map((item) =>
       item.id === selectedItem.id
         ? {
             ...item,
@@ -205,43 +165,45 @@ function MenuManagement() {
             description: formData.description,
             image: formData.image || item.image,
             cookTime: parseInt(formData.cookTime),
-            discount: parseInt(formData.discount)
+            discount: parseInt(formData.discount),
           }
         : item
-    )
-    setMenuItems(updatedItems)
-    setShowEditModal(false)
-    setSelectedItem(null)
-    resetForm()
-  }
+    );
+    setMenuItems(updatedItems);
+    setShowEditModal(false);
+    setSelectedItem(null);
+    resetForm();
+  };
 
   const resetForm = () => {
     setFormData({
-      name: '',
-      price: '',
-      categoryId: 'cat1',
-      description: '',
+      name: "",
+      price: "",
+      categoryId: "cat1",
+      description: "",
       image: null,
       cookTime: 10,
       discount: 0,
-      saleTime: 'all-day'
-    })
-  }
+      saleTime: "all-day",
+    });
+  };
 
   const toggleAvailability = (id) => {
-    setMenuItems(menuItems.map(item => 
-      item.id === id ? { ...item, available: !item.available } : item
-    ))
-  }
+    setMenuItems(
+      menuItems.map((item) =>
+        item.id === id ? { ...item, available: !item.available } : item
+      )
+    );
+  };
 
   const deleteItem = (id) => {
-    if (window.confirm('Bạn có chắc muốn xóa món này?')) {
-      setMenuItems(menuItems.filter(item => item.id !== id))
+    if (window.confirm("Bạn có chắc muốn xóa món này?")) {
+      setMenuItems(menuItems.filter((item) => item.id !== id));
     }
-  }
+  };
 
   const openEditModal = (item) => {
-    setSelectedItem(item)
+    setSelectedItem(item);
     setFormData({
       name: item.name,
       price: item.price.toString(),
@@ -249,12 +211,12 @@ function MenuManagement() {
       description: item.description,
       image: null,
       cookTime: item.cookTime.toString(),
-      discount: item.discount.toString()
-    })
-    setShowEditModal(true)
-  }
+      discount: item.discount.toString(),
+    });
+    setShowEditModal(true);
+  };
 
-  const filteredItems = getFilteredItems()
+  const filteredItems = getFilteredItems();
 
   return (
     <div className="menu-management-page">
@@ -274,11 +236,15 @@ function MenuManagement() {
           <span className="stat-label">Tổng số món</span>
         </div>
         <div className="stat-card available">
-          <span className="stat-number">{menuItems.filter(i => i.available).length}</span>
+          <span className="stat-number">
+            {menuItems.filter((i) => i.available).length}
+          </span>
           <span className="stat-label">Đang bán</span>
         </div>
         <div className="stat-card unavailable">
-          <span className="stat-number">{menuItems.filter(i => !i.available).length}</span>
+          <span className="stat-number">
+            {menuItems.filter((i) => !i.available).length}
+          </span>
           <span className="stat-label">Hết hàng</span>
         </div>
         <div className="stat-card">
@@ -299,32 +265,38 @@ function MenuManagement() {
         </div>
 
         <div className="category-tabs">
-          <button 
-            className={`tab-btn ${activeTab === 'all' ? 'active' : ''}`}
-            onClick={() => setActiveTab('all')}
+          <button
+            className={`tab-btn ${activeTab === "all" ? "active" : ""}`}
+            onClick={() => setActiveTab("all")}
           >
             Tất cả
             <span className="tab-count">{menuItems.length}</span>
           </button>
-          {categories.map(cat => (
-            <button 
+          {categories.map((cat) => (
+            <button
               key={cat.id}
-              className={`tab-btn ${activeTab === cat.id ? 'active' : ''}`}
+              className={`tab-btn ${activeTab === cat.id ? "active" : ""}`}
               onClick={() => setActiveTab(cat.id)}
             >
               {cat.name}
-              <span className="tab-count">{menuItems.filter(i => i.categoryId === cat.id).length}</span>
+              <span className="tab-count">
+                {menuItems.filter((i) => i.categoryId === cat.id).length}
+              </span>
             </button>
           ))}
         </div>
       </div>
 
       <div className="menu-grid">
-        {filteredItems.map(item => (
-          <div key={item.id} className="menu-card" onClick={() => {
-            setSelectedItem(item)
-            setShowDetailModal(true)
-          }}>
+        {filteredItems.map((item) => (
+          <div
+            key={item.id}
+            className="menu-card"
+            onClick={() => {
+              setSelectedItem(item);
+              setShowDetailModal(true);
+            }}
+          >
             <div className="menu-card-image">
               {item.image ? (
                 <img src={item.image} alt={item.name} />
@@ -341,8 +313,12 @@ function MenuManagement() {
             <div className="menu-card-content">
               <div className="menu-card-header">
                 <h3>{item.name}</h3>
-                <div className={`status-badge ${item.available ? 'available' : 'unavailable'}`}>
-                  {item.available ? 'Đang bán' : 'Hết hàng'}
+                <div
+                  className={`status-badge ${
+                    item.available ? "available" : "unavailable"
+                  }`}
+                >
+                  {item.available ? "Đang bán" : "Hết hàng"}
                 </div>
               </div>
 
@@ -352,25 +328,35 @@ function MenuManagement() {
                 <div className="price-section">
                   {item.discount > 0 ? (
                     <>
-                      <span className="original-price">{item.price.toLocaleString('vi-VN')}đ</span>
+                      <span className="original-price">
+                        {item.price.toLocaleString("vi-VN")}đ
+                      </span>
                       <span className="discounted-price">
-                        {(item.price * (100 - item.discount) / 100).toLocaleString('vi-VN')}đ
+                        {(
+                          (item.price * (100 - item.discount)) /
+                          100
+                        ).toLocaleString("vi-VN")}
+                        đ
                       </span>
                     </>
                   ) : (
-                    <span className="price">{item.price.toLocaleString('vi-VN')}đ</span>
+                    <span className="price">
+                      {item.price.toLocaleString("vi-VN")}đ
+                    </span>
                   )}
                 </div>
 
                 <div className="menu-actions">
-                  <button 
+                  <button
                     onClick={(e) => {
-                      e.stopPropagation()
-                      toggleAvailability(item.id)
+                      e.stopPropagation();
+                      toggleAvailability(item.id);
                     }}
-                    className={`action-btn ${item.available ? 'btn-hide' : 'btn-show'}`}
+                    className={`action-btn ${
+                      item.available ? "btn-hide" : "btn-show"
+                    }`}
                   >
-                    {item.available ? 'Ẩn' : 'Hiện'}
+                    {item.available ? "Ẩn" : "Hiện"}
                   </button>
                 </div>
               </div>
@@ -392,7 +378,12 @@ function MenuManagement() {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>Thêm món mới</h2>
-              <button className="close-btn" onClick={() => setShowAddModal(false)}>✕</button>
+              <button
+                className="close-btn"
+                onClick={() => setShowAddModal(false)}
+              >
+                ✕
+              </button>
             </div>
             <form onSubmit={handleAddItem}>
               <div className="form-group">
@@ -422,9 +413,15 @@ function MenuManagement() {
 
                 <div className="form-group">
                   <label>Danh mục *</label>
-                  <select name="categoryId" value={formData.categoryId} onChange={handleChange}>
-                    {categories.map(cat => (
-                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  <select
+                    name="categoryId"
+                    value={formData.categoryId}
+                    onChange={handleChange}
+                  >
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -470,7 +467,11 @@ function MenuManagement() {
 
               <div className="form-group">
                 <label>Thời gian bán *</label>
-                <select name="saleTime" value={formData.saleTime} onChange={handleChange}>
+                <select
+                  name="saleTime"
+                  value={formData.saleTime}
+                  onChange={handleChange}
+                >
                   <option value="all-day">Cả ngày</option>
                   <option value="morning">Sáng (6h-11h)</option>
                   <option value="afternoon">Trưa (11h-14h)</option>
@@ -490,7 +491,11 @@ function MenuManagement() {
               </div>
 
               <div className="modal-actions">
-                <button type="button" onClick={() => setShowAddModal(false)} className="cancel-btn">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="cancel-btn"
+                >
                   Hủy
                 </button>
                 <button type="submit" className="submit-btn">
@@ -507,7 +512,12 @@ function MenuManagement() {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>Chỉnh sửa món ăn</h2>
-              <button className="close-btn" onClick={() => setShowEditModal(false)}>✕</button>
+              <button
+                className="close-btn"
+                onClick={() => setShowEditModal(false)}
+              >
+                ✕
+              </button>
             </div>
             <form onSubmit={handleEditItem}>
               <div className="form-group">
@@ -537,9 +547,15 @@ function MenuManagement() {
 
                 <div className="form-group">
                   <label>Danh mục *</label>
-                  <select name="categoryId" value={formData.categoryId} onChange={handleChange}>
-                    {categories.map(cat => (
-                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  <select
+                    name="categoryId"
+                    value={formData.categoryId}
+                    onChange={handleChange}
+                  >
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -594,7 +610,11 @@ function MenuManagement() {
               </div>
 
               <div className="modal-actions">
-                <button type="button" onClick={() => setShowEditModal(false)} className="cancel-btn">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="cancel-btn"
+                >
                   Hủy
                 </button>
                 <button type="submit" className="submit-btn">
@@ -607,11 +627,22 @@ function MenuManagement() {
       )}
 
       {showDetailModal && selectedItem && (
-        <div className="modal-overlay" onClick={() => setShowDetailModal(false)}>
-          <div className="modal-content detail-modal" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="modal-overlay"
+          onClick={() => setShowDetailModal(false)}
+        >
+          <div
+            className="modal-content detail-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-header">
               <h2>Chi tiết món ăn</h2>
-              <button className="close-btn" onClick={() => setShowDetailModal(false)}>×</button>
+              <button
+                className="close-btn"
+                onClick={() => setShowDetailModal(false)}
+              >
+                ×
+              </button>
             </div>
 
             <div className="detail-body">
@@ -627,8 +658,12 @@ function MenuManagement() {
 
               <div className="detail-info">
                 <h3>{selectedItem.name}</h3>
-                <div className={`status-badge ${selectedItem.available ? 'available' : 'unavailable'}`}>
-                  {selectedItem.available ? 'Đang bán' : 'Hết hàng'}
+                <div
+                  className={`status-badge ${
+                    selectedItem.available ? "available" : "unavailable"
+                  }`}
+                >
+                  {selectedItem.available ? "Đang bán" : "Hết hàng"}
                 </div>
 
                 <p className="detail-description">{selectedItem.description}</p>
@@ -640,36 +675,42 @@ function MenuManagement() {
 
                 <div className="detail-row">
                   <span className="detail-label">Giá:</span>
-                  <span className="detail-value price-large">{selectedItem.price.toLocaleString('vi-VN')}đ</span>
+                  <span className="detail-value price-large">
+                    {selectedItem.price.toLocaleString("vi-VN")}đ
+                  </span>
                 </div>
 
                 {selectedItem.discount > 0 && (
                   <div className="detail-row">
                     <span className="detail-label">Giảm giá:</span>
-                    <span className="detail-value discount-value">{selectedItem.discount}%</span>
+                    <span className="detail-value discount-value">
+                      {selectedItem.discount}%
+                    </span>
                   </div>
                 )}
 
                 <div className="detail-row">
                   <span className="detail-label">Thời gian chế biến:</span>
-                  <span className="detail-value">{selectedItem.cookTime} phút</span>
+                  <span className="detail-value">
+                    {selectedItem.cookTime} phút
+                  </span>
                 </div>
 
                 <div className="detail-actions">
-                  <button 
+                  <button
                     onClick={() => {
-                      setShowDetailModal(false)
-                      openEditModal(selectedItem)
+                      setShowDetailModal(false);
+                      openEditModal(selectedItem);
                     }}
                     className="detail-btn btn-edit"
                   >
                     Sửa món
                   </button>
-                  <button 
+                  <button
                     onClick={() => {
-                      if (confirm('Bạn có chắc muốn xóa món này?')) {
-                        deleteItem(selectedItem.id)
-                        setShowDetailModal(false)
+                      if (confirm("Bạn có chắc muốn xóa món này?")) {
+                        deleteItem(selectedItem.id);
+                        setShowDetailModal(false);
                       }
                     }}
                     className="detail-btn btn-delete"
@@ -683,7 +724,7 @@ function MenuManagement() {
         </div>
       )}
     </div>
-  )
+  );
 }
 
-export default MenuManagement
+export default MenuManagement;

@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { login } from "../../store/slices/authSlice";
+import { registerUser, clearError } from "../../store/slices/authSlice";
+import socketService from "../../services/socket";
 import "./Register.css";
 
 function Register() {
@@ -14,10 +15,11 @@ function Register() {
   const [phoneError, setPhoneError] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [confirmError, setConfirmError] = useState("");
-  const [checkingEmail, setCheckingEmail] = useState(false);
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const { isAuthenticated } = useSelector((state) => state.auth);
+  const { isAuthenticated, loading, error } = useSelector(
+    (state) => state.auth
+  );
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -25,33 +27,50 @@ function Register() {
     }
   }, [isAuthenticated, navigate]);
 
-  const handleSubmit = (e) => {
+  useEffect(() => {
+    return () => {
+      dispatch(clearError());
+    };
+  }, [dispatch]);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // validate email and phone before submit
+    // Validate
     const emailValid = validateEmail(email);
     const phoneValid = validatePhone(phone);
     setEmailError(emailValid ? "" : "Email không hợp lệ");
     setPhoneError(phoneValid ? "" : "Số điện thoại không hợp lệ");
-    // password length
-    const pwdOk = password && password.length >= 8;
-    setPasswordError(pwdOk ? "" : "Mật khẩu phải có ít nhất 8 ký tự");
+
+    const pwdOk = password && password.length >= 6;
+    setPasswordError(pwdOk ? "" : "Mật khẩu phải có ít nhất 6 ký tự");
+
     const confirmOk = password === confirm;
     setConfirmError(confirmOk ? "" : "Mật khẩu xác nhận không khớp");
 
     if (!emailValid || !phoneValid || !pwdOk || !confirmOk) return;
-    if (emailError) return; // if email already marked as existing
 
-    const mockUser = {
-      id: Date.now().toString(),
-      name,
-      email,
-      phone,
-      address: "",
-    };
+    try {
+      const result = await dispatch(
+        registerUser({
+          name,
+          email,
+          phone,
+          password,
+          role: "customer",
+        })
+      ).unwrap();
 
-    dispatch(login({ user: mockUser, token: "mock-token-" + Date.now() }));
-    navigate("/");
+      // Kết nối Socket.io sau khi đăng ký thành công
+      socketService.connect({
+        id: result.user.id,
+        role: result.user.role,
+      });
+
+      navigate("/");
+    } catch (err) {
+      console.error("Register failed:", err);
+    }
   };
 
   function validateEmail(value) {
@@ -63,34 +82,6 @@ function Register() {
     const v = String(value).trim();
     const re = /^(?:0|\+84)\d{9}$/;
     return re.test(v);
-  }
-
-  // mock API: treat emails ending with @taken.com as already used
-  function mockCheckEmailExists(value) {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const lowered = (value || "").toLowerCase();
-        if (!lowered) return resolve(false);
-        // sample rule: if email endsWith "@taken.com" or is "used@example.com" -> exists
-        if (lowered.endsWith("@taken.com") || lowered === "used@example.com")
-          return resolve(true);
-        return resolve(false);
-      }, 650);
-    });
-  }
-
-  async function handleEmailBlur() {
-    // quick client-side format check first
-    if (!email) return;
-    if (!validateEmail(email)) {
-      setEmailError("Email không hợp lệ");
-      return;
-    }
-    setCheckingEmail(true);
-    const exists = await mockCheckEmailExists(email);
-    setCheckingEmail(false);
-    if (exists) setEmailError("Email này đã được sử dụng");
-    else setEmailError("");
   }
 
   return (
@@ -123,13 +114,10 @@ function Register() {
                 setEmail(e.target.value);
                 if (emailError) setEmailError("");
               }}
-              onBlur={handleEmailBlur}
               placeholder="example@email.com"
               required
+              disabled={loading}
             />
-            {checkingEmail && (
-              <div className="input-note">Đang kiểm tra email...</div>
-            )}
             {emailError && <div className="input-error">{emailError}</div>}
           </div>
 
@@ -143,11 +131,12 @@ function Register() {
                 if (phoneError) setPhoneError("");
               }}
               onBlur={() => {
-                if (!validatePhone(phone))
+                if (phone && !validatePhone(phone))
                   setPhoneError("Số điện thoại không hợp lệ");
               }}
               placeholder="09xxxxxxxx"
               required
+              disabled={loading}
             />
             {phoneError && <div className="input-error">{phoneError}</div>}
           </div>
@@ -162,8 +151,9 @@ function Register() {
                 setPassword(e.target.value);
                 if (passwordError) setPasswordError("");
               }}
-              placeholder="••••••••"
+              placeholder="Ít nhất 6 ký tự"
               required
+              disabled={loading}
             />
             {passwordError && (
               <div className="input-error">{passwordError}</div>
@@ -182,31 +172,25 @@ function Register() {
               }}
               placeholder="••••••••"
               required
+              disabled={loading}
             />
             {confirmError && <div className="input-error">{confirmError}</div>}
           </div>
 
+          {error && <div className="error-message">{error}</div>}
+
           <div className="agree">
-            <input type="checkbox" id="agree" required />
+            <input type="checkbox" id="agree" required disabled={loading} />
             <label htmlFor="agree">
               Tôi đồng ý với Điều khoản sử dụng và Chính sách bảo mật
             </label>
           </div>
 
-          <button className="register-btn" type="submit">
-            Đăng ký
+          <button className="register-btn" type="submit" disabled={loading}>
+            {loading ? "Đang đăng ký..." : "Đăng ký"}
           </button>
 
-          <div className="divider">Hoặc đăng ký với</div>
-
-          <div className="socials">
-            <button type="button" className="btn-google">
-              G Đăng ký với Google
-            </button>
-            <button type="button" className="btn-fb">
-              f Đăng ký với Facebook
-            </button>
-          </div>
+          <div className="divider">Hoặc</div>
 
           <p className="have-account">
             Đã có tài khoản? <a href="/login">Đăng nhập ngay</a>

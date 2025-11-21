@@ -1,88 +1,67 @@
-import { useState } from 'react'
-import './Promotions.css'
+import { useState, useEffect } from "react";
+import "./Promotions.css";
 
 function Promotions() {
-  const [activeTab, setActiveTab] = useState('active')
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [promotions, setPromotions] = useState([
-    {
-      id: 'p001',
-      name: 'Giảm 20% cho đơn từ 100k',
-      code: 'GIAM20',
-      type: 'percentage',
-      value: 20,
-      minOrder: 100000,
-      maxDiscount: 50000,
-      startDate: '2024-11-01',
-      endDate: '2024-11-30',
-      usageLimit: 100,
-      usedCount: 45,
-      status: 'active'
-    },
-    {
-      id: 'p002',
-      name: 'Miễn phí ship đơn 150k',
-      code: 'FREESHIP150',
-      type: 'freeship',
-      value: 0,
-      minOrder: 150000,
-      maxDiscount: 30000,
-      startDate: '2024-11-01',
-      endDate: '2024-11-30',
-      usageLimit: 50,
-      usedCount: 28,
-      status: 'active'
-    },
-    {
-      id: 'p003',
-      name: 'Giảm 50k cho món mới',
-      code: 'NEW50',
-      type: 'fixed',
-      value: 50000,
-      minOrder: 200000,
-      maxDiscount: 50000,
-      startDate: '2024-10-01',
-      endDate: '2024-10-31',
-      usageLimit: 30,
-      usedCount: 30,
-      status: 'expired'
-    },
-  ])
+  const [activeTab, setActiveTab] = useState("active");
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [promotions, setPromotions] = useState([]);
+
+  // Load promotions từ localStorage
+  useEffect(() => {
+    const promotionsKey = "foodfastRestaurantPromotions_2";
+    const stored = window.localStorage.getItem(promotionsKey);
+    if (stored) {
+      try {
+        const promos = JSON.parse(stored);
+        setPromotions(promos);
+      } catch (error) {
+        console.error("Error loading promotions:", error);
+      }
+    }
+  }, []);
+
+  // Save promotions to localStorage whenever it changes
+  useEffect(() => {
+    if (promotions.length > 0) {
+      const promotionsKey = "foodfastRestaurantPromotions_2";
+      window.localStorage.setItem(promotionsKey, JSON.stringify(promotions));
+    }
+  }, [promotions]);
 
   const [formData, setFormData] = useState({
-    name: '',
-    code: '',
-    type: 'percentage',
-    value: '',
-    minOrder: '',
-    maxDiscount: '',
-    startDate: '',
-    endDate: '',
-    usageLimit: ''
-  })
+    name: "",
+    code: "",
+    type: "percentage",
+    value: "",
+    minOrder: "",
+    maxDiscount: "",
+    startDate: "",
+    endDate: "",
+    usageLimit: "",
+  });
 
   const getFilteredPromotions = () => {
-    switch(activeTab) {
-      case 'active':
-        return promotions.filter(p => p.status === 'active')
-      case 'expired':
-        return promotions.filter(p => p.status === 'expired')
-      case 'upcoming':
-        return promotions.filter(p => p.status === 'upcoming')
+    switch (activeTab) {
+      case "active":
+        return promotions.filter((p) => p.status === "active");
+      case "expired":
+        return promotions.filter((p) => p.status === "expired");
+      case "upcoming":
+        return promotions.filter((p) => p.status === "upcoming");
       default:
-        return promotions
+        return promotions;
     }
-  }
+  };
 
   const handleChange = (e) => {
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
-    })
-  }
+      [e.target.name]: e.target.value,
+    });
+  };
 
   const handleSubmit = (e) => {
-    e.preventDefault()
+    e.preventDefault();
     const newPromotion = {
       id: `p${Date.now()}`,
       ...formData,
@@ -91,38 +70,43 @@ function Promotions() {
       maxDiscount: parseFloat(formData.maxDiscount),
       usageLimit: parseInt(formData.usageLimit),
       usedCount: 0,
-      status: 'active'
-    }
-    setPromotions([newPromotion, ...promotions])
-    setShowCreateModal(false)
+      status: "active",
+    };
+    setPromotions([newPromotion, ...promotions]);
+    setShowCreateModal(false);
     setFormData({
-      name: '',
-      code: '',
-      type: 'percentage',
-      value: '',
-      minOrder: '',
-      maxDiscount: '',
-      startDate: '',
-      endDate: '',
-      usageLimit: ''
-    })
-  }
+      name: "",
+      code: "",
+      type: "percentage",
+      value: "",
+      minOrder: "",
+      maxDiscount: "",
+      startDate: "",
+      endDate: "",
+      usageLimit: "",
+    });
+  };
 
   const toggleStatus = (id) => {
-    setPromotions(promotions.map(promo =>
-      promo.id === id 
-        ? { ...promo, status: promo.status === 'active' ? 'expired' : 'active' }
-        : promo
-    ))
-  }
+    setPromotions(
+      promotions.map((promo) =>
+        promo.id === id
+          ? {
+              ...promo,
+              status: promo.status === "active" ? "expired" : "active",
+            }
+          : promo
+      )
+    );
+  };
 
   const deletePromotion = (id) => {
-    if (window.confirm('Bạn có chắc muốn xóa khuyến mãi này?')) {
-      setPromotions(promotions.filter(p => p.id !== id))
+    if (window.confirm("Bạn có chắc muốn xóa khuyến mãi này?")) {
+      setPromotions(promotions.filter((p) => p.id !== id));
     }
-  }
+  };
 
-  const filteredPromotions = getFilteredPromotions()
+  const filteredPromotions = getFilteredPromotions();
 
   return (
     <div className="promotions-page">
@@ -137,26 +121,32 @@ function Promotions() {
       </div>
 
       <div className="promotions-tabs">
-        <button 
-          className={`tab-btn ${activeTab === 'active' ? 'active' : ''}`}
-          onClick={() => setActiveTab('active')}
+        <button
+          className={`tab-btn ${activeTab === "active" ? "active" : ""}`}
+          onClick={() => setActiveTab("active")}
         >
           Đang hoạt động
-          <span className="tab-count">{promotions.filter(p => p.status === 'active').length}</span>
+          <span className="tab-count">
+            {promotions.filter((p) => p.status === "active").length}
+          </span>
         </button>
-        <button 
-          className={`tab-btn ${activeTab === 'expired' ? 'active' : ''}`}
-          onClick={() => setActiveTab('expired')}
+        <button
+          className={`tab-btn ${activeTab === "expired" ? "active" : ""}`}
+          onClick={() => setActiveTab("expired")}
         >
           Đã kết thúc
-          <span className="tab-count">{promotions.filter(p => p.status === 'expired').length}</span>
+          <span className="tab-count">
+            {promotions.filter((p) => p.status === "expired").length}
+          </span>
         </button>
-        <button 
-          className={`tab-btn ${activeTab === 'upcoming' ? 'active' : ''}`}
-          onClick={() => setActiveTab('upcoming')}
+        <button
+          className={`tab-btn ${activeTab === "upcoming" ? "active" : ""}`}
+          onClick={() => setActiveTab("upcoming")}
         >
           Sắp diễn ra
-          <span className="tab-count">{promotions.filter(p => p.status === 'upcoming').length}</span>
+          <span className="tab-count">
+            {promotions.filter((p) => p.status === "upcoming").length}
+          </span>
         </button>
       </div>
 
@@ -166,23 +156,25 @@ function Promotions() {
             <p>Không có khuyến mãi nào</p>
           </div>
         ) : (
-          filteredPromotions.map(promo => (
+          filteredPromotions.map((promo) => (
             <div key={promo.id} className={`promo-card ${promo.status}`}>
               <div className="promo-header">
                 <div className="promo-info">
                   <span className={`promo-type ${promo.type}`}>
-                    {promo.type === 'percentage' && '% Giảm giá'}
-                    {promo.type === 'fixed' && '₫ Giảm tiền'}
-                    {promo.type === 'freeship' && '🚁 Miễn phí ship'}
+                    {promo.type === "percentage" && "% Giảm giá"}
+                    {promo.type === "fixed" && "₫ Giảm tiền"}
+                    {promo.type === "freeship" && "🚁 Miễn phí ship"}
                   </span>
                   <h3>{promo.name}</h3>
-                  <p className="promo-code">Mã: <strong>{promo.code}</strong></p>
+                  <p className="promo-code">
+                    Mã: <strong>{promo.code}</strong>
+                  </p>
                 </div>
                 <div className="promo-status">
                   <span className={`status-badge ${promo.status}`}>
-                    {promo.status === 'active' && 'Đang hoạt động'}
-                    {promo.status === 'expired' && 'Đã kết thúc'}
-                    {promo.status === 'upcoming' && 'Sắp diễn ra'}
+                    {promo.status === "active" && "Đang hoạt động"}
+                    {promo.status === "expired" && "Đã kết thúc"}
+                    {promo.status === "upcoming" && "Sắp diễn ra"}
                   </span>
                 </div>
               </div>
@@ -191,31 +183,42 @@ function Promotions() {
                 <div className="detail-row">
                   <span className="detail-label">Giá trị:</span>
                   <span className="detail-value">
-                    {promo.type === 'percentage' && `${promo.value}%`}
-                    {promo.type === 'fixed' && `${promo.value.toLocaleString('vi-VN')}đ`}
-                    {promo.type === 'freeship' && 'Miễn phí ship'}
+                    {promo.type === "percentage" && `${promo.value}%`}
+                    {promo.type === "fixed" &&
+                      `${promo.value.toLocaleString("vi-VN")}đ`}
+                    {promo.type === "freeship" && "Miễn phí ship"}
                   </span>
                 </div>
                 <div className="detail-row">
                   <span className="detail-label">Đơn tối thiểu:</span>
-                  <span className="detail-value">{promo.minOrder.toLocaleString('vi-VN')}đ</span>
+                  <span className="detail-value">
+                    {promo.minOrder.toLocaleString("vi-VN")}đ
+                  </span>
                 </div>
                 <div className="detail-row">
                   <span className="detail-label">Giảm tối đa:</span>
-                  <span className="detail-value">{promo.maxDiscount.toLocaleString('vi-VN')}đ</span>
+                  <span className="detail-value">
+                    {promo.maxDiscount.toLocaleString("vi-VN")}đ
+                  </span>
                 </div>
                 <div className="detail-row">
                   <span className="detail-label">Thời gian:</span>
-                  <span className="detail-value">{promo.startDate} - {promo.endDate}</span>
+                  <span className="detail-value">
+                    {promo.startDate} - {promo.endDate}
+                  </span>
                 </div>
                 <div className="detail-row">
                   <span className="detail-label">Lượt sử dụng:</span>
                   <span className="detail-value">
                     {promo.usedCount}/{promo.usageLimit}
                     <div className="usage-bar">
-                      <div 
-                        className="usage-fill" 
-                        style={{ width: `${(promo.usedCount / promo.usageLimit) * 100}%` }}
+                      <div
+                        className="usage-fill"
+                        style={{
+                          width: `${
+                            (promo.usedCount / promo.usageLimit) * 100
+                          }%`,
+                        }}
                       ></div>
                     </div>
                   </span>
@@ -223,13 +226,16 @@ function Promotions() {
               </div>
 
               <div className="promo-actions">
-                <button 
-                  onClick={() => toggleStatus(promo.id)} 
+                <button
+                  onClick={() => toggleStatus(promo.id)}
                   className={`toggle-btn ${promo.status}`}
                 >
-                  {promo.status === 'active' ? 'Tạm dừng' : 'Kích hoạt'}
+                  {promo.status === "active" ? "Tạm dừng" : "Kích hoạt"}
                 </button>
-                <button onClick={() => deletePromotion(promo.id)} className="delete-btn">
+                <button
+                  onClick={() => deletePromotion(promo.id)}
+                  className="delete-btn"
+                >
                   Xóa
                 </button>
               </div>
@@ -239,7 +245,10 @@ function Promotions() {
       </div>
 
       {showCreateModal && (
-        <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
+        <div
+          className="modal-overlay"
+          onClick={() => setShowCreateModal(false)}
+        >
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h2>Tạo khuyến mãi mới</h2>
             <form onSubmit={handleSubmit}>
@@ -269,7 +278,11 @@ function Promotions() {
 
               <div className="form-group">
                 <label>Loại khuyến mãi *</label>
-                <select name="type" value={formData.type} onChange={handleChange}>
+                <select
+                  name="type"
+                  value={formData.type}
+                  onChange={handleChange}
+                >
                   <option value="percentage">Giảm theo phần trăm (%)</option>
                   <option value="fixed">Giảm theo số tiền cố định (₫)</option>
                   <option value="freeship">Miễn phí ship</option>
@@ -284,7 +297,9 @@ function Promotions() {
                     name="value"
                     value={formData.value}
                     onChange={handleChange}
-                    placeholder={formData.type === 'percentage' ? '20' : '50000'}
+                    placeholder={
+                      formData.type === "percentage" ? "20" : "50000"
+                    }
                     required
                   />
                 </div>
@@ -351,7 +366,11 @@ function Promotions() {
               </div>
 
               <div className="modal-actions">
-                <button type="button" onClick={() => setShowCreateModal(false)} className="cancel-btn">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="cancel-btn"
+                >
                   Hủy
                 </button>
                 <button type="submit" className="submit-btn">
@@ -363,7 +382,7 @@ function Promotions() {
         </div>
       )}
     </div>
-  )
+  );
 }
 
-export default Promotions
+export default Promotions;

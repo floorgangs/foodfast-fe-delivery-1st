@@ -1,0 +1,98 @@
+import mongoose from "mongoose";
+
+const restaurantSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: [true, "Vui lòng nhập tên nhà hàng"],
+      trim: true,
+    },
+    owner: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    description: {
+      type: String,
+      trim: true,
+    },
+    cuisine: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
+    avatar: {
+      type: String,
+      default: "https://via.placeholder.com/300x200",
+    },
+    coverImage: {
+      type: String,
+      default: "https://via.placeholder.com/800x300",
+    },
+    address: {
+      street: String,
+      city: String,
+      district: String,
+      ward: String,
+      coordinates: {
+        lat: Number,
+        lng: Number,
+      },
+    },
+    phone: {
+      type: String,
+      required: true,
+    },
+    email: String,
+    openingHours: {
+      monday: { open: String, close: String, isOpen: Boolean },
+      tuesday: { open: String, close: String, isOpen: Boolean },
+      wednesday: { open: String, close: String, isOpen: Boolean },
+      thursday: { open: String, close: String, isOpen: Boolean },
+      friday: { open: String, close: String, isOpen: Boolean },
+      saturday: { open: String, close: String, isOpen: Boolean },
+      sunday: { open: String, close: String, isOpen: Boolean },
+    },
+    rating: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 5,
+    },
+    totalReviews: {
+      type: Number,
+      default: 0,
+    },
+    deliveryFee: {
+      type: Number,
+      default: 0,
+    },
+    minOrder: {
+      type: Number,
+      default: 0,
+    },
+    estimatedDeliveryTime: {
+      type: String,
+      default: "30-45 phút",
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+    isApproved: {
+      type: Boolean,
+      default: false,
+    },
+    isBusy: {
+      type: Boolean,
+      default: false,
+    },
+    tags: [String],
+  },
+  {
+    timestamps: true,
+  }
+);
+
+export default mongoose.model("Restaurant", restaurantSchema);

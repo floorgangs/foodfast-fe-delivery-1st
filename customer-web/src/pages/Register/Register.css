@@ -119,9 +119,25 @@ body {
   font-weight: 700;
   font-size: 1rem;
   cursor: pointer;
+  transition: background 0.2s ease;
 }
-.register-btn:hover {
+.register-btn:hover:not(:disabled) {
   background: #e86920;
+}
+.register-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.error-message {
+  background: #fee;
+  color: #c33;
+  padding: 0.75rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  text-align: center;
+  border: 1px solid #fcc;
 }
 
 .divider {
