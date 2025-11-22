@@ -198,7 +198,11 @@ connectDB().then(() => {
       });
     });
 
-    console.log(`🚀 Server running on http://${HOST === "0.0.0.0" ? "localhost" : HOST}:${PORT}`);
+    console.log(
+      `🚀 Server running on http://${
+        HOST === "0.0.0.0" ? "localhost" : HOST
+      }:${PORT}`
+    );
     if (addresses.length) {
       console.log(`🌐 Accessible on: ${addresses.join(", ")}`);
     }

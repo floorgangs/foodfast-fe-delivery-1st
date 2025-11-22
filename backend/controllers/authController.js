@@ -113,40 +113,40 @@ export const login = async (req, res) => {
       const restaurant = await Restaurant.findOne({ owner: user._id });
 
       if (!restaurant) {
-        return res.status(404).json({
-          success: false,
-          message: "Không tìm thấy thông tin nhà hàng",
-        });
+        console.log("⚠️ No restaurant found for user, but allowing login");
+        // Tạm thời cho phép login mà không có restaurant data
+        // User cần tạo restaurant sau khi login
+        responseData.restaurant = null;
+      } else {
+        if (!restaurant.isApproved) {
+          return res.status(403).json({
+            success: false,
+            message: "Nhà hàng chưa được phê duyệt",
+          });
+        }
+
+        responseData.restaurant = {
+          id: restaurant._id,
+          name: restaurant.name,
+          phone: restaurant.phone,
+          avatar: restaurant.avatar,
+          coverImage: restaurant.coverImage,
+          description: restaurant.description,
+          cuisine: restaurant.cuisine,
+          address: restaurant.address,
+          openingHours: restaurant.openingHours,
+          rating: restaurant.rating,
+          totalReviews: restaurant.totalReviews,
+          deliveryFee: restaurant.deliveryFee,
+          minOrder: restaurant.minOrder,
+          estimatedDeliveryTime: restaurant.estimatedDeliveryTime,
+          isApproved: restaurant.isApproved,
+          isBusy: restaurant.isBusy,
+          tags: restaurant.tags,
+        };
+
+        console.log("✅ Restaurant login successful");
       }
-
-      if (!restaurant.isApproved) {
-        return res.status(403).json({
-          success: false,
-          message: "Nhà hàng chưa được phê duyệt",
-        });
-      }
-
-      responseData.restaurant = {
-        id: restaurant._id,
-        name: restaurant.name,
-        phone: restaurant.phone,
-        avatar: restaurant.avatar,
-        coverImage: restaurant.coverImage,
-        description: restaurant.description,
-        cuisine: restaurant.cuisine,
-        address: restaurant.address,
-        openingHours: restaurant.openingHours,
-        rating: restaurant.rating,
-        totalReviews: restaurant.totalReviews,
-        deliveryFee: restaurant.deliveryFee,
-        minOrder: restaurant.minOrder,
-        estimatedDeliveryTime: restaurant.estimatedDeliveryTime,
-        isApproved: restaurant.isApproved,
-        isBusy: restaurant.isBusy,
-        tags: restaurant.tags,
-      };
-
-      console.log("✅ Restaurant login successful");
     } else if (user.role === "customer") {
       responseData.user.addresses = user.addresses;
       console.log("✅ Customer login successful");

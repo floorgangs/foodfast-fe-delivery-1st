@@ -33,6 +33,13 @@ const seedData = async () => {
     }
 
     try {
+      await Restaurant.deleteMany({});
+      console.log("✅ Deleted all restaurants");
+    } catch (err) {
+      console.log("⚠️ Error deleting restaurants:", err.message);
+    }
+
+    try {
       await Product.deleteMany({});
       console.log("✅ Deleted all products");
     } catch (err) {
@@ -135,21 +142,21 @@ const seedData = async () => {
         name: "Nguyễn Văn Phở",
         email: "phoviet@restaurant.com",
         phone: "0902345678",
-        password: hashedPassword,
+        password: "123456",
         role: "restaurant",
       },
       {
         name: "Trần Thị Hải Sản",
         email: "lauhaisan@restaurant.com",
         phone: "0903456789",
-        password: hashedPassword,
+        password: "123456",
         role: "restaurant",
       },
       {
         name: "Lê Văn Cơm",
         email: "comtam@restaurant.com",
         phone: "0904567890",
-        password: hashedPassword,
+        password: "123456",
         role: "restaurant",
       },
       // Customers
@@ -237,10 +244,13 @@ const seedData = async () => {
       {
         owner: restaurantOwners[0]._id,
         name: "Nhà Hàng Phở Việt",
-        description: "Phở bò truyền thống Hà Nội, nước dùng ngọt thanh từ xương hầm 24 giờ",
+        description:
+          "Phở bò truyền thống Hà Nội, nước dùng ngọt thanh từ xương hầm 24 giờ",
         cuisine: ["Việt Nam", "Phở", "Món nóng"],
-        avatar: "https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=400",
-        coverImage: "https://images.unsplash.com/photo-1547928576-664d7b4c7f0a?w=800",
+        avatar:
+          "https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=400",
+        coverImage:
+          "https://images.unsplash.com/photo-1547928576-664d7b4c7f0a?w=800",
         address: {
           street: "12 Lý Quốc Sư",
           city: "Hà Nội",
@@ -269,10 +279,13 @@ const seedData = async () => {
       {
         owner: restaurantOwners[1]._id,
         name: "Lẩu Hải Sản Ngon",
-        description: "Lẩu hải sản tươi sống, nước lẩu đậm đà từ tôm càng, cua biển",
+        description:
+          "Lẩu hải sản tươi sống, nước lẩu đậm đà từ tôm càng, cua biển",
         cuisine: ["Hải sản", "Lẩu", "Nhà hàng"],
-        avatar: "https://images.unsplash.com/photo-1582270691936-82d7c86d9e38?w=400",
-        coverImage: "https://images.unsplash.com/photo-1585032226651-759b368d7246?w=800",
+        avatar:
+          "https://images.unsplash.com/photo-1582270691936-82d7c86d9e38?w=400",
+        coverImage:
+          "https://images.unsplash.com/photo-1585032226651-759b368d7246?w=800",
         address: {
           street: "89 Đinh Tiên Hoàng",
           city: "Hồ Chí Minh",
@@ -303,8 +316,10 @@ const seedData = async () => {
         name: "Cơm Tấm Sườn Bì Chả",
         description: "Cơm tấm sườn nướng thơm lừng, bì giòn, chả trứng mềm",
         cuisine: ["Việt Nam", "Cơm", "Đồ nướng"],
-        avatar: "https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?w=400",
-        coverImage: "https://images.unsplash.com/photo-1604329760661-e71dc83f8f26?w=800",
+        avatar:
+          "https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?w=400",
+        coverImage:
+          "https://images.unsplash.com/photo-1604329760661-e71dc83f8f26?w=800",
         address: {
           street: "234 Trần Hưng Đạo",
           city: "Hồ Chí Minh",
