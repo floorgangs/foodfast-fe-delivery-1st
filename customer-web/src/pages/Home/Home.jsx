@@ -38,6 +38,9 @@ function Home() {
   };
 
   const filteredRestaurants = restaurantList.filter((restaurant) => {
+    // Only show active and approved restaurants
+    if (!restaurant.isActive || !restaurant.isApproved) return false;
+
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch =
       restaurant.name.toLowerCase().includes(searchLower) ||

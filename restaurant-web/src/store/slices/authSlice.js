@@ -62,12 +62,14 @@ const authSlice = createSlice({
         return;
       }
 
-      if (token && userStr && restaurantStr) {
+      if (token && userStr) {
         try {
           state.token = token;
           state.user = JSON.parse(userStr);
           state.restaurant =
-            restaurantStr === "null" ? null : JSON.parse(restaurantStr);
+            restaurantStr && restaurantStr !== "null"
+              ? JSON.parse(restaurantStr)
+              : null;
           state.isAuthenticated = true;
           console.log("✅ Auth restored successfully");
           console.log("User:", state.user);

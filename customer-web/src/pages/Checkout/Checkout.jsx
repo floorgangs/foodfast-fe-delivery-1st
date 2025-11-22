@@ -4,9 +4,11 @@ import { useSelector, useDispatch } from "react-redux";
 import { clearCart } from "../../store/slices/cartSlice";
 import { checkAuth } from "../../store/slices/authSlice";
 import { vietnamLocations } from "../../data/vietnamLocations";
-import { restaurants } from "../../data/mockData";
 import { createOrder } from "../../services/orderService";
+import axios from "axios";
 import "./Checkout.css";
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 function Checkout() {
   const navigate = useNavigate();
@@ -47,37 +49,8 @@ function Checkout() {
   const [showVoucherModal, setShowVoucherModal] = useState(false);
   const [selectedVoucher, setSelectedVoucher] = useState(null);
   const [voucherCode, setVoucherCode] = useState("");
-
-  // Mock vouchers
-  const [availableVouchers] = useState([
-    {
-      id: 1,
-      code: "FREESHIP50",
-      title: "Miễn phí vận chuyển",
-      description: "Giảm 50% phí vận chuyển",
-      discount: 7500,
-      type: "shipping",
-      minOrder: 0,
-    },
-    {
-      id: 2,
-      code: "GIAM20K",
-      title: "Giảm 20K",
-      description: "Giảm 20.000đ cho đơn hàng từ 100.000đ",
-      discount: 20000,
-      type: "order",
-      minOrder: 100000,
-    },
-    {
-      id: 3,
-      code: "NEWUSER",
-      title: "Khách hàng mới",
-      description: "Giảm 30.000đ cho đơn hàng đầu tiên",
-      discount: 30000,
-      type: "order",
-      minOrder: 50000,
-    },
-  ]);
+  const [availableVouchers, setAvailableVouchers] = useState([]);
+  const [loadingVouchers, setLoadingVouchers] = useState(false);
 
   // Saved addresses from user profile
   const [savedAddresses] = useState(
@@ -155,6 +128,24 @@ function Checkout() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Fetch vouchers from API
+  useEffect(() => {
+    const fetchVouchers = async () => {
+      try {
+        setLoadingVouchers(true);
+        const response = await axios.get(`${API_URL}/vouchers`);
+        if (response.data.success) {
+          setAvailableVouchers(response.data.data);
+        }
+      } catch (error) {
+        console.error("Error fetching vouchers:", error);
+      } finally {
+        setLoadingVouchers(false);
+      }
+    };
+    fetchVouchers();
+  }, []);
+
   useEffect(() => {
     // Check localStorage first on mount
     const token = localStorage.getItem("token");
@@ -188,13 +179,16 @@ function Checkout() {
   const subtotal = calculateTotal();
 
   // Calculate discount
-  const discount = selectedVoucher ? selectedVoucher.discount : 0;
+  const discount = selectedVoucher
+    ? selectedVoucher.discount || selectedVoucher.discountAmount || 0
+    : 0;
   const total = subtotal + shippingFee - discount;
 
   const handleApplyVoucher = (voucher) => {
-    if (voucher.minOrder > subtotal) {
+    const minRequired = voucher.minPurchase || voucher.minOrder || 0;
+    if (minRequired > subtotal) {
       alert(
-        `Đơn hàng tối thiểu ${voucher.minOrder.toLocaleString()}đ để áp dụng mã này`
+        `Đơn hàng tối thiểu ${minRequired.toLocaleString()}đ để áp dụng mã này`
       );
       return;
     }
@@ -207,19 +201,20 @@ function Checkout() {
     setVoucherCode("");
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validate
-    if (
-      !name ||
-      !phone ||
-      !streetAddress ||
-      !selectedCity ||
-      !selectedDistrict ||
-      !selectedWard
-    ) {
-      alert("Vui lòng điền đầy đủ thông tin giao hàng!");
+    // Validate with detailed messages
+    const errors = [];
+    if (!name) errors.push("Họ và tên");
+    if (!phone) errors.push("Số điện thoại");
+    if (!streetAddress) errors.push("Địa chỉ (trước số nhà)");
+    if (!selectedCity) errors.push("Thành phố");
+    if (!selectedDistrict) errors.push("Quận/Huyện");
+    if (!selectedWard) errors.push("Phường/Xã");
+
+    if (errors.length > 0) {
+      alert(`Vui lòng nhập: ${errors.join(", ")}`);
       return;
     }
 
@@ -234,53 +229,137 @@ function Checkout() {
     const fullAddress = `${streetAddress}, ${wardName}, ${districtName}, ${cityName}`;
 
     // Get restaurant info - ALWAYS use cartRestaurantId first
-    const restaurantId = cartRestaurantId || items[0]?.restaurantId || "2";
+    const restaurantId = cartRestaurantId || items[0]?.restaurantId;
 
-    // Get restaurant details from mockData
-    const restaurant = restaurants.find((r) => r.id === restaurantId);
-    const restaurantName = restaurant?.name || "Bún Bò Huế 24H";
-    const restaurantAddress = restaurant?.address || "456 Lê Lợi, Q.1, TP.HCM";
-
-    console.log("=== Creating order with restaurantId:", restaurantId);
-
-    // Prepare order data
-    const orderData = {
-      restaurantId,
-      restaurantName,
-      restaurantAddress,
-      items: items.map((item) => ({
-        id: item.id,
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity,
-        note: "",
-      })),
-      customerName: name,
-      customerPhone: phone,
-      deliveryAddress: fullAddress,
-      note,
-      subtotal,
-      shippingFee,
-      discount: selectedVoucher?.discount || 0,
-      total,
-    };
-
-    // If online payment selected, redirect to mock payment gateway
-    if (paymentMethod === "vnpay" || paymentMethod === "momo") {
-      navigate("/payment", { state: { orderData, paymentMethod } });
+    if (!restaurantId) {
+      alert("Không tìm thấy thông tin nhà hàng!");
       return;
     }
 
-    // COD: create order immediately
-    const newOrder = createOrder({
-      ...orderData,
-      customerId: user?.id || "guest",
-      customerEmail: user?.email || "",
-      paymentMethod: "Tiền mặt",
-    });
+    // Fetch restaurant details from API
+    let restaurantName = "Nhà hàng";
+    let restaurantAddress = "";
 
-    dispatch(clearCart());
-    navigate(`/order-tracking/${newOrder.id}`);
+    try {
+      const res = await axios.get(`${API_URL}/restaurants/${restaurantId}`);
+      if (res.data.success) {
+        restaurantName = res.data.data.name;
+        restaurantAddress = `${res.data.data.address?.street}, ${res.data.data.address?.district}, ${res.data.data.address?.city}`;
+      }
+    } catch (error) {
+      console.error("Error fetching restaurant:", error);
+    }
+
+    console.log("=== Creating order with restaurantId:", restaurantId);
+
+    try {
+      // Create order first (for all payment methods)
+      const orderPayload = {
+        restaurant: restaurantId,
+        items: items.map((item) => ({
+          product: item._id || item.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+        })),
+        deliveryAddress: {
+          address: fullAddress,
+          phone: phone,
+          note: note || "",
+        },
+        paymentMethod: paymentMethod === "vnpay" ? "banking" : paymentMethod,
+        subtotal: subtotal,
+        deliveryFee: shippingFee,
+        discount: selectedVoucher?.discount || 0,
+        total: total,
+        customerNote: note || "",
+      };
+
+      // Add customer if authenticated
+      if (user?.id) {
+        orderPayload.customer = user.id;
+      } else {
+        // Guest order
+        orderPayload.customerInfo = {
+          name: name,
+          phone: phone,
+          email: user?.email || `${phone}@guest.foodfast.vn`,
+        };
+      }
+
+      console.log("📦 Creating order:", orderPayload);
+
+      const token = localStorage.getItem("token");
+      const orderResponse = await axios.post(
+        `${API_URL}/orders`,
+        orderPayload,
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        }
+      );
+
+      if (!orderResponse.data.success) {
+        throw new Error(orderResponse.data.message || "Không thể tạo đơn hàng");
+      }
+
+      const createdOrder = orderResponse.data.data;
+      console.log("✅ Order created:", createdOrder);
+
+      // Handle payment based on method
+      if (paymentMethod === "vnpay") {
+        // Create VNPay payment
+        const paymentResponse = await axios.post(
+          `${API_URL}/payments/vnpay/create`,
+          {
+            orderId: createdOrder._id,
+            amount: total,
+            orderInfo: `Thanh toán đơn hàng ${createdOrder.orderNumber}`,
+          },
+          {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          }
+        );
+
+        if (paymentResponse.data.success) {
+          // Redirect to VNPay
+          window.location.href = paymentResponse.data.data.paymentUrl;
+        } else {
+          throw new Error("Không thể tạo thanh toán VNPay");
+        }
+      } else if (paymentMethod === "momo") {
+        // Create MoMo payment
+        const paymentResponse = await axios.post(
+          `${API_URL}/payments/momo/create`,
+          {
+            orderId: createdOrder._id,
+            amount: total,
+            orderInfo: `Thanh toán đơn hàng ${createdOrder.orderNumber}`,
+          },
+          {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          }
+        );
+
+        if (paymentResponse.data.success) {
+          // Redirect to MoMo
+          window.location.href = paymentResponse.data.data.paymentUrl;
+        } else {
+          throw new Error("Không thể tạo thanh toán MoMo");
+        }
+      } else {
+        // COD: Navigate to order tracking immediately
+        dispatch(clearCart());
+        navigate(`/order-tracking/${createdOrder._id}`);
+      }
+    } catch (error) {
+      console.error("❌ Error creating order:", error);
+      console.error("❌ Backend response:", error.response?.data);
+      alert(
+        error.response?.data?.message ||
+          error.message ||
+          "Có lỗi xảy ra khi đặt hàng"
+      );
+    }
   };
 
   return (
@@ -595,7 +674,7 @@ function Checkout() {
 
               <div className="order-items">
                 {items.map((item) => (
-                  <div key={item.id} className="order-item">
+                  <div key={item._id || item.id} className="order-item">
                     <div className="item-info">
                       <strong>{item.name}</strong>
                       <p>
@@ -693,28 +772,46 @@ function Checkout() {
                 </button>
               </div>
 
-              {availableVouchers.length > 0 ? (
+              {loadingVouchers ? (
+                <div className="voucher-loading">
+                  <p>Đang tải mã khuyến mãi...</p>
+                </div>
+              ) : availableVouchers.length > 0 ? (
                 <div className="voucher-list">
                   {availableVouchers.map((voucher) => (
-                    <div key={voucher.id} className="voucher-item">
+                    <div
+                      key={voucher._id || voucher.id}
+                      className="voucher-item"
+                    >
                       <div className="voucher-item-content">
                         <div className="voucher-icon">🎟️</div>
                         <div className="voucher-details">
-                          <strong>{voucher.title}</strong>
+                          <strong>{voucher.name || voucher.title}</strong>
                           <p>{voucher.description}</p>
                           <small>
-                            {voucher.minOrder > 0
-                              ? `Đơn tối thiểu ${voucher.minOrder.toLocaleString()}đ`
-                              : "Không giới hạn"}
+                            Giảm:{" "}
+                            {(
+                              voucher.discount ||
+                              voucher.discountAmount ||
+                              0
+                            ).toLocaleString()}
+                            đ
+                            {voucher.minPurchase > 0
+                              ? ` - Đơn tối thiểu ${voucher.minPurchase.toLocaleString()}đ`
+                              : ""}
                           </small>
                         </div>
                       </div>
                       <button
                         className="select-voucher-btn"
                         onClick={() => handleApplyVoucher(voucher)}
-                        disabled={voucher.minOrder > subtotal}
+                        disabled={
+                          (voucher.minPurchase || voucher.minOrder || 0) >
+                          subtotal
+                        }
                       >
-                        {voucher.minOrder > subtotal
+                        {(voucher.minPurchase || voucher.minOrder || 0) >
+                        subtotal
                           ? "Không đủ điều kiện"
                           : "Chọn"}
                       </button>

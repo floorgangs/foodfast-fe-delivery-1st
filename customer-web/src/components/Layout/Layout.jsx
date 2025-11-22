@@ -48,6 +48,7 @@ function Layout() {
             </Link>
             {isAuthenticated ? (
               <>
+                <Link to="/orders">📦 Đơn hàng</Link>
                 <Link to="/profile">👤 {user?.name || "Tài khoản"}</Link>
                 <button onClick={handleLogout} className="logout-btn">
                   Đăng xuất

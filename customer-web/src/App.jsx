@@ -12,9 +12,11 @@ import Cart from "./pages/Cart/Cart";
 import Checkout from "./pages/Checkout/Checkout";
 import OrderTracking from "./pages/OrderTracking/OrderTracking";
 import PaymentGateway from "./pages/PaymentGateway/PaymentGateway";
+import PaymentReturn from "./pages/PaymentReturn/PaymentReturn";
 import Profile from "./pages/Profile/Profile";
 import Review from "./pages/Review/Review";
 import EditProfile from "./pages/EditProfile/EditProfile";
+import Orders from "./pages/Orders/Orders";
 import "./App.css";
 
 function App() {
@@ -73,6 +75,8 @@ function App() {
             </PrivateRoute>
           }
         />
+        <Route path="payment/vnpay-return" element={<PaymentReturn />} />
+        <Route path="payment/momo-return" element={<PaymentReturn />} />
         <Route
           path="review/:orderId"
           element={
@@ -86,6 +90,14 @@ function App() {
           element={
             <PrivateRoute>
               <Profile />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="orders"
+          element={
+            <PrivateRoute>
+              <Orders />
             </PrivateRoute>
           }
         />

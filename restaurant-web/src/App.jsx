@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { checkAuth } from "./store/slices/authSlice";
@@ -22,41 +22,39 @@ import "./App.css";
 function App() {
   const dispatch = useDispatch();
   const { isAuthenticated, restaurant } = useSelector((state) => state.auth);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
-    // Clear all auth data on app startup in development mode
-    if (import.meta.env.DEV) {
-      console.log("🧹 DEV MODE: Clearing all auth data on startup...");
-      localStorage.removeItem("restaurant_token");
-      localStorage.removeItem("restaurant_user");
-      localStorage.removeItem("restaurant_data");
-      localStorage.removeItem("foodfastLastRestaurantId");
-      console.log("✅ All auth data cleared - please login");
-    } else {
-      // Restore auth state from localStorage in production
-      console.log("=== Restaurant App.jsx: Calling checkAuth ===");
-      console.log("localStorage keys:", Object.keys(localStorage));
-      console.log(
-        "restaurant_token:",
-        localStorage.getItem("restaurant_token")
-      );
-      console.log("restaurant_user:", localStorage.getItem("restaurant_user"));
-      console.log("restaurant_data:", localStorage.getItem("restaurant_data"));
+    // Check if we have auth data in localStorage
+    const token = localStorage.getItem("restaurant_token");
+    const userStr = localStorage.getItem("restaurant_user");
 
+    if (token && userStr) {
+      // We have saved auth, dispatch checkAuth
       dispatch(checkAuth());
     }
+
+    // Mark as initialized after a tick to allow Redux to update
+    setTimeout(() => setIsInitialized(true), 0);
   }, [dispatch]);
+
+  // Show nothing until initialized to prevent flash of redirect
+  if (!isInitialized) {
+    return null;
+  }
 
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      
+
       {/* Sau khi login, chuyển đến trang chọn nhà hàng */}
       <Route
         path="/select-restaurant"
-        element={isAuthenticated ? <RestaurantSelection /> : <Navigate to="/login" />}
+        element={
+          isAuthenticated ? <RestaurantSelection /> : <Navigate to="/login" />
+        }
       />
-      
+
       <Route
         path="/partner-hub"
         element={isAuthenticated ? <PartnerHub /> : <Navigate to="/login" />}
@@ -75,13 +73,17 @@ function App() {
           isAuthenticated ? <AccountSettings /> : <Navigate to="/login" />
         }
       />
-      
+
       {/* Dashboard chỉ truy cập được khi đã chọn nhà hàng */}
       <Route
         path="/"
         element={
           isAuthenticated ? (
-            restaurant ? <Layout /> : <Navigate to="/select-restaurant" />
+            restaurant ? (
+              <Layout />
+            ) : (
+              <Navigate to="/select-restaurant" />
+            )
           ) : (
             <Navigate to="/login" />
           )
