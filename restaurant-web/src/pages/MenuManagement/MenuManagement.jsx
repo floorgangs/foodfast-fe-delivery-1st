@@ -35,7 +35,8 @@ function MenuManagement() {
     try {
       setLoading(true);
       setError("");
-      const response = await productAPI.getByRestaurant(restaurant._id);
+      // Truyền includeHidden=true để lấy cả món ẩn
+      const response = await productAPI.getByRestaurant(restaurant._id, true);
       
       if (response?.success) {
         const items = response.data || [];
@@ -113,11 +114,16 @@ function MenuManagement() {
     return filtered;
   };
 
+  const [imageFile, setImageFile] = useState(null);
+
   const handleChange = (e) => {
     const { name, value, files } = e.target;
 
     if (name === "image" && files[0]) {
-      const imageUrl = URL.createObjectURL(files[0]);
+      const file = files[0];
+      setImageFile(file);
+      // Show preview
+      const imageUrl = URL.createObjectURL(file);
       setFormData({
         ...formData,
         [name]: imageUrl,
@@ -130,6 +136,15 @@ function MenuManagement() {
     }
   };
 
+  const convertImageToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleAddItem = async (e) => {
     e.preventDefault();
     try {
@@ -139,17 +154,23 @@ function MenuManagement() {
         price: parseInt(formData.price),
         category: category.name,
         description: formData.description,
-        image: formData.image,
         restaurant: restaurant._id,
         isAvailable: true,
         preparationTime: parseInt(formData.cookTime),
       };
+      
+      // Convert image to base64 if uploaded
+      if (imageFile) {
+        const base64Image = await convertImageToBase64(imageFile);
+        payload.image = base64Image;
+      }
       
       const response = await productAPI.create(payload);
       if (response?.success) {
         await loadMenuItems(); // Reload danh sách
         setShowAddModal(false);
         resetForm();
+        setImageFile(null);
       } else {
         alert(response?.message || "Không thể thêm món");
       }
@@ -170,8 +191,10 @@ function MenuManagement() {
         preparationTime: parseInt(formData.cookTime),
       };
       
-      if (formData.image && formData.image !== selectedItem.image) {
-        payload.image = formData.image;
+      // Convert image to base64 if uploaded new one
+      if (imageFile) {
+        const base64Image = await convertImageToBase64(imageFile);
+        payload.image = base64Image;
       }
       
       const response = await productAPI.update(selectedItem.id, payload);
@@ -180,6 +203,7 @@ function MenuManagement() {
         setShowEditModal(false);
         setSelectedItem(null);
         resetForm();
+        setImageFile(null);
       } else {
         alert(response?.message || "Không thể cập nhật món");
       }
@@ -199,6 +223,7 @@ function MenuManagement() {
       discount: 0,
       saleTime: "all-day",
     });
+    setImageFile(null);
   };
 
   const toggleAvailability = async (id) => {
@@ -208,7 +233,12 @@ function MenuManagement() {
         isAvailable: !item.available,
       });
       if (response?.success) {
-        await loadMenuItems();
+        // Cập nhật local state thay vì reload
+        setMenuItems(prevItems => 
+          prevItems.map(i => 
+            i.id === id ? { ...i, available: !i.available } : i
+          )
+        );
       }
     } catch (err) {
       alert(err?.message || "Không thể cập nhật trạng thái");
@@ -298,7 +328,7 @@ function MenuManagement() {
           <span className="stat-number">
             {menuItems.filter((i) => !i.available).length}
           </span>
-          <span className="stat-label">Hết hàng</span>
+          <span className="stat-label">Đang ẩn</span>
         </div>
         <div className="stat-card">
           <span className="stat-number">{categories.length}</span>
@@ -371,7 +401,7 @@ function MenuManagement() {
                     item.available ? "available" : "unavailable"
                   }`}
                 >
-                  {item.available ? "Đang bán" : "Hết hàng"}
+                  {item.available ? "Đang bán" : "Đang ẩn"}
                 </div>
               </div>
 
@@ -409,7 +439,7 @@ function MenuManagement() {
                       item.available ? "btn-hide" : "btn-show"
                     }`}
                   >
-                    {item.available ? "Ẩn" : "Hiện"}
+                    {item.available ? "Ẩn" : "Hiển thị"}
                   </button>
                 </div>
               </div>

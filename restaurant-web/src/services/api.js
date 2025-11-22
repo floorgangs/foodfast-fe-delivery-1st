@@ -105,8 +105,8 @@ export const restaurantAPI = {
 
 // Product APIs
 export const productAPI = {
-  getByRestaurant: (restaurantId) =>
-    api.get('/products', { params: { restaurantId } }),
+  getByRestaurant: (restaurantId, includeHidden = false) =>
+    api.get('/products', { params: { restaurantId, includeHidden: includeHidden ? 'true' : 'false' } }),
   
   getById: (id) =>
     api.get(`/products/${id}`),

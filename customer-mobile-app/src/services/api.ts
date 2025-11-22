@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Windows: Chạy ipconfig trong CMD để xem IPv4 Address
 // Mac/Linux: Chạy ifconfig để xem IP
 const API_URL = __DEV__ 
-  ? 'http://172.24.176.1:5000/api' // IP máy tính đang chạy backend
+  ? 'http://192.168.1.140:5000/api' // IP máy tính đang chạy backend
   : 'https://your-production-api.com/api';
 
 const api = axios.create({
@@ -143,7 +143,22 @@ export const reviewAPI = {
 
 export const paymentAPI = {
   confirmThirdParty: (payload: { orderId: string; sessionId: string; status: 'success' | 'failed' }) =>
-    api.post('/payments/third-party/confirm', payload),
+    api.post('/orders/confirm-payment', payload),
+};
+
+// Notification APIs
+export const notificationAPI = {
+  getAll: () =>
+    api.get('/notifications'),
+  
+  getUnreadCount: () =>
+    api.get('/notifications/unread-count'),
+  
+  markAsRead: (id: string) =>
+    api.put(`/notifications/${id}/read`),
+  
+  markAllAsRead: () =>
+    api.put('/notifications/mark-all-read'),
 };
 
 export default api;

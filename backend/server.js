@@ -6,6 +6,7 @@ import cors from "cors";
 import os from "os";
 import { connectDB } from "./config/database.js";
 import { errorHandler } from "./middleware/errorHandler.js";
+import { cleanupExpiredOrders, cleanupOldPendingOrders } from "./utils/orderCleanup.js";
 
 // Routes
 import authRoutes from "./routes/authRoutes.js";
@@ -16,6 +17,7 @@ import droneRoutes from "./routes/droneRoutes.js";
 import voucherRoutes from "./routes/voucherRoutes.js";
 import reviewRoutes from "./routes/reviewRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
 
 dotenv.config();
 
@@ -125,8 +127,9 @@ app.use(
   })
 );
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Increase payload limit for base64 images
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Make io accessible to routes
 app.use((req, res, next) => {
@@ -176,6 +179,7 @@ app.use("/api/drones", droneRoutes);
 app.use("/api/vouchers", voucherRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // Error handler
 app.use(errorHandler);
@@ -185,6 +189,10 @@ const PORT = process.env.PORT || 5000;
 const HOST = process.env.HOST || "0.0.0.0";
 
 connectDB().then(() => {
+  // Start cron jobs for automatic order cleanup
+  cleanupExpiredOrders(); // Clean expired orders every 5 minutes
+  cleanupOldPendingOrders(); // Clean old pending orders daily
+
   httpServer.listen(PORT, HOST, () => {
     const nets = os.networkInterfaces();
     const addresses = [];

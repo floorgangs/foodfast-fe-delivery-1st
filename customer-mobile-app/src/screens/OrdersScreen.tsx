@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,12 +10,15 @@ import {
   Alert,
   Modal,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
 import { restoreSavedCart, deleteSavedCart } from '../store/slices/cartSlice';
 import { Ionicons } from '@expo/vector-icons';
-import { submitOrderReview, Order as OrderType } from '../store/slices/orderSlice';
+import { submitOrderReview, Order as OrderType, setOrders } from '../store/slices/orderSlice';
+import { orderAPI } from '../services/api';
+import { useFocusEffect } from '@react-navigation/native';
 
 const OrdersScreen = ({ navigation }: any) => {
   const [activeTab, setActiveTab] = useState<'active' | 'reviews' | 'history' | 'saved'>('active');
@@ -26,6 +29,64 @@ const OrdersScreen = ({ navigation }: any) => {
   const [reviewModalVisible, setReviewModalVisible] = useState(false);
   const [reviewRating, setReviewRating] = useState(0);
   const [reviewComment, setReviewComment] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  // Fetch orders when screen is focused
+  useFocusEffect(
+    React.useCallback(() => {
+      const normalizeStatus = (status: string) => {
+        if (status === 'completed') return 'delivered';
+        return status;
+      };
+
+      const fetchOrders = async () => {
+        try {
+          setLoading(true);
+          const response = await orderAPI.getMyOrders();
+          if (response?.data) {
+            // Transform backend orders to match frontend Order type
+            const transformedOrders = response.data.map((order: any) => ({
+              id: order._id,
+              restaurantName: order.restaurant?.name || 'Nhà hàng',
+              items: order.items.map((item: any) => ({
+                id: item.product?._id || item.product,
+                name: item.product?.name || 'Sản phẩm',
+                quantity: item.quantity,
+                price: item.price,
+              })),
+              total: order.totalAmount || order.total,
+              status: normalizeStatus(order.status),
+              createdAt: order.createdAt,
+              deliveryAddress: `${order.deliveryAddress?.street || ''}, ${order.deliveryAddress?.ward || ''}, ${order.deliveryAddress?.district || ''}, ${order.deliveryAddress?.city || ''}`,
+              pickupCoordinate: order.pickupCoordinate,
+              dropoffCoordinate: order.dropoffCoordinate,
+              unlockPin: order.unlockPin,
+              isReviewed: order.review ? true : false,
+              rating: order.review?.rating || null,
+              reviewComment: order.review?.comment || '',
+            }));
+            dispatch(setOrders(transformedOrders));
+          }
+        } catch (error: any) {
+          console.error('Failed to fetch orders:', error);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchOrders();
+
+      // Set up interval to refresh orders every 10 seconds when screen is focused
+      const intervalId = setInterval(() => {
+        fetchOrders();
+      }, 10000);
+
+      // Cleanup interval when screen loses focus
+      return () => {
+        clearInterval(intervalId);
+      };
+    }, [])
+  );
 
   const activeOrders = useMemo(
     () => orders.filter(order => order.status !== 'delivered'),
@@ -86,7 +147,13 @@ const OrdersScreen = ({ navigation }: any) => {
         return { label: '🚁 Đang giao', style: styles.statusDelivering };
       case 'preparing':
         return { label: '👨‍🍳 Đang chuẩn bị', style: styles.statusPreparing };
+      case 'ready':
+        return { label: '🚚 Sẵn sàng giao', style: styles.statusPreparing };
       case 'confirmed':
+        return { label: '✅ Đã xác nhận', style: styles.statusPreparing };
+      case 'cancelled':
+        return { label: '✕ Đã hủy', style: styles.statusConfirmed };
+      case 'pending':
       default:
         return { label: '⏳ Chờ xác nhận', style: styles.statusConfirmed };
     }

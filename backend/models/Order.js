@@ -85,7 +85,7 @@ const orderSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ["momo", "zalopay", "card", "banking", "dronepay"],
+      enum: ["momo", "vnpay", "zalopay", "card", "banking", "dronepay"],
       required: true,
     },
     paymentProvider: {
@@ -100,6 +100,13 @@ const orderSchema = new mongoose.Schema(
       enum: ["pending", "paid", "failed", "refunded"],
       default: "pending",
     },
+    paymentTransaction: {
+      transactionId: String,
+      paidAt: Date,
+      amount: Number,
+      method: String,
+      provider: String,
+    },
     status: {
       type: String,
       enum: [
@@ -109,6 +116,7 @@ const orderSchema = new mongoose.Schema(
         "ready",
         "delivering",
         "delivered",
+        "completed",
         "cancelled",
       ],
       default: "pending",

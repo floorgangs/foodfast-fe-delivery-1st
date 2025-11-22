@@ -3,9 +3,19 @@ import Restaurant from "../models/Restaurant.js";
 
 export const getProducts = async (req, res) => {
   try {
-    const { restaurantId, category, search } = req.query;
+    const { restaurantId, category, search, includeHidden } = req.query;
 
-    let query = { isAvailable: true };
+    console.log('getProducts called with:', { restaurantId, includeHidden });
+
+    let query = {};
+    
+    // Chỉ filter isAvailable nếu không phải restaurant owner xem món của mình
+    if (includeHidden !== 'true') {
+      query.isAvailable = true;
+      console.log('Filtering by isAvailable=true');
+    } else {
+      console.log('Including hidden items');
+    }
 
     if (restaurantId) {
       query.restaurant = restaurantId;

@@ -27,7 +27,7 @@ const CheckoutScreen = ({ navigation }: any) => {
   const [applyingVoucher, setApplyingVoucher] = useState(false);
 
   // Addresses - từ user profile hoặc default
-  const [addresses] = useState(() => {
+  const [addresses, setAddresses] = useState(() => {
     if (user?.addresses && user.addresses.length > 0) {
       return user.addresses;
     }
@@ -44,8 +44,8 @@ const CheckoutScreen = ({ navigation }: any) => {
 
   const paymentMethods = PAYMENT_METHODS;
 
-  const [selectedAddress, setSelectedAddress] = useState(addresses[0]?.id || '');
-  const [selectedPayment, setSelectedPayment] = useState('dronepay');
+  const [selectedAddress, setSelectedAddress] = useState(addresses[0]?._id || addresses[0]?.id || '');
+  const [selectedPayment, setSelectedPayment] = useState('momo');
   const [note, setNote] = useState('');
   const [voucherCode, setVoucherCode] = useState('');
   const [discount, setDiscount] = useState(0);
@@ -58,6 +58,18 @@ const CheckoutScreen = ({ navigation }: any) => {
 
   const deliveryFee = 15000; // Fixed drone delivery fee
   const finalTotal = total + deliveryFee - discount;
+
+  // Update addresses when user changes (e.g., after adding new address)
+  useEffect(() => {
+    if (user?.addresses && user.addresses.length > 0) {
+      setAddresses(user.addresses);
+      // If no address is selected or selected address doesn't exist, select the first one
+      const addressId = user.addresses[0]._id || user.addresses[0].id;
+      if (!selectedAddress || !user.addresses.find(a => (a._id || a.id) === selectedAddress)) {
+        setSelectedAddress(addressId);
+      }
+    }
+  }, [user?.addresses]);
 
   const handleGuestInfoChange = (field: keyof typeof guestInfo, value: string) => {
     setGuestInfo((prev) => ({ ...prev, [field]: value }));
@@ -104,12 +116,15 @@ const CheckoutScreen = ({ navigation }: any) => {
         Alert.alert('Thông báo', 'Vui lòng nhập địa chỉ để drone giao hàng.');
         return;
       }
-    } else if (!selectedAddress) {
+    }
+
+    // For authenticated users, validate address exists
+    const selectedAddressData = isAuthenticated ? addresses.find(a => (a._id || a.id) === selectedAddress) : null;
+    if (isAuthenticated && !selectedAddressData) {
       Alert.alert('Thông báo', 'Vui lòng chọn địa chỉ giao hàng');
       return;
     }
 
-    const selectedAddressData = addresses.find(a => a.id === selectedAddress);
     const selectedPaymentData = paymentMethods.find(p => p.id === selectedPayment);
 
     try {
@@ -162,6 +177,7 @@ const CheckoutScreen = ({ navigation }: any) => {
         amount: response.data.total,
         sessionId: response.paymentSession.sessionId,
         providerName: response.paymentSession.providerName,
+        paymentMethod: selectedPayment,
         redirectUrl: response.paymentSession.redirectUrl,
         expiresAt: response.paymentSession.expiresAt,
         restaurantName: items[0]?.restaurantName,
@@ -229,25 +245,33 @@ const CheckoutScreen = ({ navigation }: any) => {
                 <Text style={styles.addAddressText}>+ Thêm địa chỉ mới</Text>
               </TouchableOpacity>
             ) : (
-              addresses.map(address => (
-                <TouchableOpacity
-                  key={address.id}
-                  style={[
-                    styles.addressCard,
-                    selectedAddress === address.id && styles.addressCardSelected,
-                  ]}
-                  onPress={() => setSelectedAddress(address.id)}
-                >
-                  <View style={styles.radioButton}>
-                    {selectedAddress === address.id && <View style={styles.radioButtonInner} />}
-                  </View>
+              addresses.map(address => {
+                const addressId = address._id || address.id;
+                return (
+                  <TouchableOpacity
+                    key={addressId}
+                    style={[
+                      styles.addressCard,
+                      selectedAddress === addressId && styles.addressCardSelected,
+                    ]}
+                    onPress={() => setSelectedAddress(addressId)}
+                  >
+                    <View style={styles.radioButton}>
+                      {selectedAddress === addressId && <View style={styles.radioButtonInner} />}
+                    </View>
                   <View style={styles.addressInfo}>
-                    <Text style={styles.addressName}>{address.name}</Text>
-                    <Text style={styles.addressText}>{address.address}</Text>
+                    <Text style={styles.addressName}>{address.name || address.label}</Text>
+                    <Text style={styles.addressText}>
+                      {address.address}
+                      {address.ward && `, ${address.ward}`}
+                      {address.district && `, ${address.district}`}
+                      {address.city && `, ${address.city}`}
+                    </Text>
                     <Text style={styles.addressPhone}>{address.phone}</Text>
                   </View>
                 </TouchableOpacity>
-              ))
+              );
+              })
             )
           ) : (
             <View style={styles.guestForm}>

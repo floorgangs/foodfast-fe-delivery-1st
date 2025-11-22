@@ -1,6 +1,7 @@
 // Payment Methods
 export const PAYMENT_METHODS = [
-  { id: 'dronepay', name: 'DronePay Gateway (bên thứ 3)', icon: '🚀' },
+  { id: 'momo', name: 'Ví MoMo', icon: 'Ⓜ' },
+  { id: 'vnpay', name: 'VNPay', icon: 'Ⓥ' },
 ];
 
 // Order Status

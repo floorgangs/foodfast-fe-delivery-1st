@@ -86,8 +86,11 @@ const orderSlice = createSlice({
         state.currentOrder.reviewComment = action.payload.comment ?? '';
       }
     },
+    setOrders: (state, action: PayloadAction<Order[]>) => {
+      state.orders = action.payload;
+    },
   },
 });
 
-export const { createOrder, updateOrderStatus, setCurrentOrder, submitOrderReview } = orderSlice.actions;
+export const { createOrder, updateOrderStatus, setCurrentOrder, submitOrderReview, setOrders } = orderSlice.actions;
 export default orderSlice.reducer;
