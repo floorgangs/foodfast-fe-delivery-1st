@@ -1,46 +1,53 @@
 import { useEffect, useState } from 'react'
-import { useDispatch } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import { setRestaurant } from '../../store/slices/authSlice'
+import { restaurantAPI } from '../../services/api'
 import './PartnerHub.css'
 
+const getErrorMessage = (error, fallback) => {
+  if (!error) return fallback
+  if (typeof error === 'string') return error
+  if (error.message) return error.message
+  if (error.error) return error.error
+  return fallback
+}
+
 function PartnerHub() {
-  const [account, setAccount] = useState(null)
-  const [restaurants, setRestaurants] = useState([])
   const dispatch = useDispatch()
   const navigate = useNavigate()
+  const authState = useSelector((state) => state.auth)
+  const [restaurants, setRestaurants] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
-      return
-    }
+    const fetchMyRestaurant = async () => {
+      setLoading(true)
+      setError('')
 
-    const loadFromStorage = () => {
-      const storedAccount = window.localStorage.getItem('foodfastPartnerAccount')
-      if (storedAccount) {
-        try {
-          setAccount(JSON.parse(storedAccount))
-        } catch (error) {
-          setAccount(null)
-        }
-      }
-
-      const storedRestaurants = window.localStorage.getItem('foodfastRegisteredRestaurants')
-      if (storedRestaurants) {
-        try {
-          setRestaurants(JSON.parse(storedRestaurants) || [])
-        } catch (error) {
+      try {
+        const response = await restaurantAPI.getMyRestaurant()
+        if (response?.success && response.data) {
+          setRestaurants([response.data])
+          dispatch(setRestaurant(response.data))
+        } else {
           setRestaurants([])
         }
-      } else {
-        setRestaurants([])
+      } catch (apiError) {
+        const message = getErrorMessage(apiError, '')
+        if (message === 'Bạn chưa có nhà hàng') {
+          setRestaurants([])
+        } else if (message) {
+          setError(message)
+        }
+      } finally {
+        setLoading(false)
       }
     }
 
-    loadFromStorage()
-    window.addEventListener('storage', loadFromStorage)
-    return () => window.removeEventListener('storage', loadFromStorage)
-  }, [])
+    fetchMyRestaurant()
+  }, [dispatch])
 
   const handleCreateRestaurant = () => {
     navigate('/onboarding')
@@ -60,7 +67,7 @@ function PartnerHub() {
         <div className="partner-hero__content">
           <p className="partner-hero__eyebrow">FoodFast Partner Center</p>
           <h1>
-            Xin chào{account?.fullName ? `, ${account.fullName}` : ''}
+            Xin chào{authState?.user?.name ? `, ${authState.user.name}` : ''}
             <span>! Bắt đầu quản lý nhà hàng của bạn.</span>
           </h1>
           <p className="partner-hero__subtitle">
@@ -109,15 +116,30 @@ function PartnerHub() {
             <h2>Nhà hàng đã đăng ký</h2>
             <span className="hub-count">{restaurants.length}</span>
           </div>
-          {hasRestaurants ? (
+
+          {loading ? (
+            <div className="hub-empty">
+              <p>Đang tải dữ liệu nhà hàng...</p>
+            </div>
+          ) : error ? (
+            <div className="hub-empty">
+              <p>{error}</p>
+              <button type="button" onClick={handleCreateRestaurant} className="hub-secondary">
+                Đăng ký mới
+              </button>
+            </div>
+          ) : hasRestaurants ? (
             <ul className="hub-list">
               {restaurants.map((restaurant) => (
-                <li key={restaurant.id} className="hub-list__item">
+                <li key={restaurant._id} className="hub-list__item">
                   <div>
                     <strong>{restaurant.name}</strong>
-                    <p>{restaurant.address || 'Chưa cập nhật địa chỉ'}</p>
+                    <p>
+                      {restaurant.address?.street || 'Chưa cập nhật địa chỉ'}
+                      {restaurant.address?.district ? `, ${restaurant.address.district}` : ''}
+                    </p>
                     <span className="hub-meta">
-                      {restaurant.district ? `Khu vực: ${restaurant.district}` : 'Khu vực đang cập nhật'}
+                      {restaurant.isApproved ? '✓ Đã duyệt' : '⏳ Chờ duyệt'}
                     </span>
                   </div>
                   <button type="button" onClick={() => handleManageRestaurant(restaurant)} className="hub-secondary">

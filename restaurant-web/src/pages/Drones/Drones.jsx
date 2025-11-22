@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSelector } from 'react-redux'
+import { droneAPI } from '../../services/api'
 import './Drones.css'
 
 function Drones() {
@@ -6,89 +8,58 @@ function Drones() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [selectedDrone, setSelectedDrone] = useState(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  const [drones, setDrones] = useState([
-    {
-      id: 'DR001',
-      name: 'FoodFast Drone 01',
-      model: 'FF-D100',
-      status: 'delivering',
-      battery: 85,
-      currentOrder: 'FF1003',
-      totalFlights: 245,
-      totalDistance: 1230,
-      lastMaintenance: '10/11/2024',
-      nextMaintenance: '10/12/2024',
-      location: 'Quận 1, TP.HCM',
-      maxWeight: 5,
-      maxDistance: 15,
-      averageSpeed: 45
-    },
-    {
-      id: 'DR002',
-      name: 'FoodFast Drone 02',
-      model: 'FF-D100',
-      status: 'available',
-      battery: 100,
-      currentOrder: null,
-      totalFlights: 198,
-      totalDistance: 980,
-      lastMaintenance: '12/11/2024',
-      nextMaintenance: '12/12/2024',
-      location: 'Quận 3, TP.HCM',
-      maxWeight: 5,
-      maxDistance: 15,
-      averageSpeed: 45
-    },
-    {
-      id: 'DR003',
-      name: 'FoodFast Drone 03',
-      model: 'FF-D200',
-      status: 'charging',
-      battery: 45,
-      currentOrder: null,
-      totalFlights: 312,
-      totalDistance: 1580,
-      lastMaintenance: '08/11/2024',
-      nextMaintenance: '08/12/2024',
-      location: 'Quận 1, TP.HCM',
-      maxWeight: 7,
-      maxDistance: 20,
-      averageSpeed: 50
-    },
-    {
-      id: 'DR004',
-      name: 'FoodFast Drone 04',
-      model: 'FF-D100',
-      status: 'maintenance',
-      battery: 0,
-      currentOrder: null,
-      totalFlights: 156,
-      totalDistance: 745,
-      lastMaintenance: '14/11/2024',
-      nextMaintenance: '14/12/2024',
-      location: 'Trạm bảo trì',
-      maxWeight: 5,
-      maxDistance: 15,
-      averageSpeed: 45
-    },
-    {
-      id: 'DR005',
-      name: 'FoodFast Drone 05',
-      model: 'FF-D200',
-      status: 'available',
-      battery: 92,
-      currentOrder: null,
-      totalFlights: 289,
-      totalDistance: 1456,
-      lastMaintenance: '13/11/2024',
-      nextMaintenance: '13/12/2024',
-      location: 'Quận 5, TP.HCM',
-      maxWeight: 7,
-      maxDistance: 20,
-      averageSpeed: 50
-    },
-  ])
+  const restaurant = useSelector((state) => state.auth.restaurant)
+  const [drones, setDrones] = useState([])
+
+  useEffect(() => {
+    if (restaurant?._id) {
+      loadDrones()
+    }
+  }, [restaurant])
+
+  const loadDrones = async () => {
+    try {
+      setLoading(true)
+      setError('')
+      const response = await droneAPI.getMyDrones(restaurant._id)
+      
+      if (response?.success) {
+        const apiDrones = response.data || []
+        // Transform API data sang format của Drones page
+        const transformedDrones = apiDrones.map((drone) => ({
+          id: drone._id,
+          name: drone.name,
+          model: drone.model,
+          status: drone.status,
+          battery: drone.batteryLevel,
+          currentOrder: drone.currentOrder?._id || null,
+          totalFlights: drone.totalFlights || 0,
+          totalDistance: drone.totalDistance || 0,
+          lastMaintenance: drone.lastMaintenance
+            ? new Date(drone.lastMaintenance).toLocaleDateString('vi-VN')
+            : '',
+          nextMaintenance: drone.nextMaintenance
+            ? new Date(drone.nextMaintenance).toLocaleDateString('vi-VN')
+            : '',
+          location: drone.location || 'Không xác định',
+          maxWeight: drone.maxPayload || 5,
+          maxDistance: drone.maxRange || 15,
+          averageSpeed: 45,
+        }))
+        setDrones(transformedDrones)
+      } else {
+        throw new Error(response?.message || 'Không thể tải danh sách drone')
+      }
+    } catch (err) {
+      setError(err?.message || 'Đã xảy ra lỗi khi tải drone')
+      console.error('Error loading drones:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const [formData, setFormData] = useState({
     name: '',
@@ -137,22 +108,34 @@ function Drones() {
     }
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    const newDrone = {
-      id: `DR${String(drones.length + 1).padStart(3, '0')}`,
-      ...formData,
-      status: 'available',
-      battery: 100,
-      currentOrder: null,
-      totalFlights: 0,
-      totalDistance: 0,
-      lastMaintenance: new Date().toLocaleDateString('vi-VN'),
-      nextMaintenance: new Date(Date.now() + 30*24*60*60*1000).toLocaleDateString('vi-VN'),
-      location: 'Trạm chính'
+    try {
+      const payload = {
+        name: formData.name,
+        model: formData.model,
+        serialNumber: formData.serialNumber,
+        restaurant: restaurant._id,
+        status: 'available',
+        batteryLevel: 100,
+        maxPayload: parseInt(formData.maxWeight),
+        maxRange: parseInt(formData.maxDistance),
+      }
+      
+      const response = await droneAPI.create(payload)
+      if (response?.success) {
+        await loadDrones()
+        setShowAddModal(false)
+        resetForm()
+      } else {
+        alert(response?.message || 'Không thể thêm drone')
+      }
+    } catch (err) {
+      alert(err?.message || 'Không thể thêm drone')
     }
-    setDrones([...drones, newDrone])
-    setShowAddModal(false)
+  }
+
+  const resetForm = () => {
     setFormData({
       name: '',
       serialNumber: '',
@@ -173,16 +156,32 @@ function Drones() {
     setShowDetailModal(true)
   }
 
-  const updateDroneStatus = (droneId, newStatus) => {
-    setDrones(drones.map(drone =>
-      drone.id === droneId ? { ...drone, status: newStatus } : drone
-    ))
+  const updateDroneStatus = async (droneId, newStatus) => {
+    try {
+      const response = await droneAPI.updateStatus(droneId, newStatus, 100)
+      if (response?.success) {
+        await loadDrones()
+      } else {
+        alert(response?.message || 'Không thể cập nhật trạng thái')
+      }
+    } catch (err) {
+      alert(err?.message || 'Không thể cập nhật trạng thái drone')
+    }
   }
 
-  const deleteDrone = (droneId) => {
+  const deleteDrone = async (droneId) => {
     if (window.confirm('Bạn có chắc muốn xóa drone này?')) {
-      setDrones(drones.filter(d => d.id !== droneId))
-      setShowDetailModal(false)
+      try {
+        const response = await droneAPI.delete(droneId)
+        if (response?.success) {
+          await loadDrones()
+          setShowDetailModal(false)
+        } else {
+          alert(response?.message || 'Không thể xóa drone')
+        }
+      } catch (err) {
+        alert(err?.message || 'Không thể xóa drone')
+      }
     }
   }
 
@@ -208,12 +207,37 @@ function Drones() {
 
   const filteredDrones = getFilteredDrones()
 
+  if (loading) {
+    return (
+      <div className="drones-page">
+        <div className="loading-state">
+          <div className="spinner"></div>
+          <p>Đang tải danh sách drone...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="drones-page">
+        <div className="error-state">
+          <span>⚠️</span>
+          <p>{error}</p>
+          <button onClick={loadDrones} className="retry-btn">
+            Thử lại
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="drones-page">
       <div className="page-header">
         <div>
-          <h1>Quản lý Drone (Thời gian thực)</h1>
-          <p className="subtitle">Theo dõi và quản lý đội drone giao hàng</p>
+          <h1>Quản lý Drone</h1>
+          <p className="subtitle">Đội drone của {restaurant?.name}</p>
         </div>
         <button onClick={() => setShowAddModal(true)} className="add-btn">
           + Thêm Drone mới

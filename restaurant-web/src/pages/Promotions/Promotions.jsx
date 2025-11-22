@@ -1,32 +1,68 @@
 import { useState, useEffect } from "react";
+import { useSelector } from "react-redux";
+import { voucherAPI } from "../../services/api";
 import "./Promotions.css";
 
 function Promotions() {
   const [activeTab, setActiveTab] = useState("active");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [promotions, setPromotions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  // Load promotions từ localStorage
+  const restaurant = useSelector((state) => state.auth.restaurant);
+
+  // Load promotions từ API
   useEffect(() => {
-    const promotionsKey = "foodfastRestaurantPromotions_2";
-    const stored = window.localStorage.getItem(promotionsKey);
-    if (stored) {
-      try {
-        const promos = JSON.parse(stored);
-        setPromotions(promos);
-      } catch (error) {
-        console.error("Error loading promotions:", error);
+    if (restaurant?._id) {
+      loadPromotions();
+    }
+  }, [restaurant]);
+
+  const loadPromotions = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const response = await voucherAPI.getAll({ restaurant: restaurant._id });
+      
+      if (response?.success) {
+        const vouchers = response.data || [];
+        // Transform API data sang format của Promotions page
+        const transformedPromotions = vouchers.map((voucher) => {
+          const now = new Date();
+          const startDate = new Date(voucher.validFrom);
+          const endDate = new Date(voucher.validUntil);
+          
+          let status = 'expired';
+          if (now < startDate) status = 'upcoming';
+          else if (now >= startDate && now <= endDate && voucher.isActive) status = 'active';
+          
+          return {
+            id: voucher._id,
+            name: voucher.name,
+            code: voucher.code,
+            type: voucher.type,
+            value: voucher.value,
+            minOrder: voucher.minOrderValue,
+            maxDiscount: voucher.maxDiscount,
+            startDate: voucher.validFrom,
+            endDate: voucher.validUntil,
+            usageLimit: voucher.usageLimit,
+            usedCount: voucher.usedCount || 0,
+            status: status,
+          };
+        });
+        setPromotions(transformedPromotions);
+      } else {
+        throw new Error(response?.message || "Không thể tải khuyến mãi");
       }
+    } catch (err) {
+      setError(err?.message || "Đã xảy ra lỗi khi tải khuyến mãi");
+      console.error("Error loading promotions:", err);
+    } finally {
+      setLoading(false);
     }
-  }, []);
-
-  // Save promotions to localStorage whenever it changes
-  useEffect(() => {
-    if (promotions.length > 0) {
-      const promotionsKey = "foodfastRestaurantPromotions_2";
-      window.localStorage.setItem(promotionsKey, JSON.stringify(promotions));
-    }
-  }, [promotions]);
+  };
 
   const [formData, setFormData] = useState({
     name: "",
@@ -60,20 +96,37 @@ function Promotions() {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const newPromotion = {
-      id: `p${Date.now()}`,
-      ...formData,
-      value: parseFloat(formData.value),
-      minOrder: parseFloat(formData.minOrder),
-      maxDiscount: parseFloat(formData.maxDiscount),
-      usageLimit: parseInt(formData.usageLimit),
-      usedCount: 0,
-      status: "active",
-    };
-    setPromotions([newPromotion, ...promotions]);
-    setShowCreateModal(false);
+    try {
+      const payload = {
+        name: formData.name,
+        code: formData.code,
+        type: formData.type,
+        value: parseFloat(formData.value),
+        minOrderValue: parseFloat(formData.minOrder),
+        maxDiscount: parseFloat(formData.maxDiscount),
+        validFrom: formData.startDate,
+        validUntil: formData.endDate,
+        usageLimit: parseInt(formData.usageLimit),
+        applicableRestaurants: [restaurant._id],
+        isActive: true,
+      };
+      
+      const response = await voucherAPI.create(payload);
+      if (response?.success) {
+        await loadPromotions();
+        setShowCreateModal(false);
+        resetForm();
+      } else {
+        alert(response?.message || "Không thể tạo khuyến mãi");
+      }
+    } catch (err) {
+      alert(err?.message || "Không thể tạo khuyến mãi");
+    }
+  };
+
+  const resetForm = () => {
     setFormData({
       name: "",
       code: "",
@@ -87,33 +140,70 @@ function Promotions() {
     });
   };
 
-  const toggleStatus = (id) => {
-    setPromotions(
-      promotions.map((promo) =>
-        promo.id === id
-          ? {
-              ...promo,
-              status: promo.status === "active" ? "expired" : "active",
-            }
-          : promo
-      )
-    );
+  const toggleStatus = async (id) => {
+    try {
+      const promo = promotions.find((p) => p.id === id);
+      const response = await voucherAPI.update(id, {
+        isActive: promo.status !== "active",
+      });
+      if (response?.success) {
+        await loadPromotions();
+      } else {
+        alert(response?.message || "Không thể cập nhật trạng thái");
+      }
+    } catch (err) {
+      alert(err?.message || "Không thể cập nhật trạng thái");
+    }
   };
 
-  const deletePromotion = (id) => {
+  const deletePromotion = async (id) => {
     if (window.confirm("Bạn có chắc muốn xóa khuyến mãi này?")) {
-      setPromotions(promotions.filter((p) => p.id !== id));
+      try {
+        const response = await voucherAPI.delete(id);
+        if (response?.success) {
+          await loadPromotions();
+        } else {
+          alert(response?.message || "Không thể xóa khuyến mãi");
+        }
+      } catch (err) {
+        alert(err?.message || "Không thể xóa khuyến mãi");
+      }
     }
   };
 
   const filteredPromotions = getFilteredPromotions();
+
+  if (loading) {
+    return (
+      <div className="promotions-page">
+        <div className="loading-state">
+          <div className="spinner"></div>
+          <p>Đang tải khuyến mãi...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="promotions-page">
+        <div className="error-state">
+          <span>⚠️</span>
+          <p>{error}</p>
+          <button onClick={loadPromotions} className="retry-btn">
+            Thử lại
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="promotions-page">
       <div className="page-header">
         <div>
           <h1>Quản lý khuyến mãi</h1>
-          <p className="subtitle">Tạo và quản lý các chương trình khuyến mãi</p>
+          <p className="subtitle">Khuyến mãi của {restaurant?.name}</p>
         </div>
         <button onClick={() => setShowCreateModal(true)} className="create-btn">
           + Tạo khuyến mãi mới

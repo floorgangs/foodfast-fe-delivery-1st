@@ -27,10 +27,20 @@ export const getProducts = async (req, res) => {
       "name avatar"
     );
 
+    const normalizedProducts = products.map((doc) => {
+      const obj = doc.toObject ? doc.toObject() : doc;
+      const images = Array.isArray(obj.images) ? obj.images : [];
+      const fallback = images.length > 0 ? images[0] : obj.image;
+      return {
+        ...obj,
+        image: obj.image || fallback,
+      };
+    });
+
     res.json({
       success: true,
-      count: products.length,
-      data: products,
+      count: normalizedProducts.length,
+      data: normalizedProducts,
     });
   } catch (error) {
     res.status(500).json({
@@ -54,9 +64,17 @@ export const getProduct = async (req, res) => {
       });
     }
 
+    const obj = product.toObject ? product.toObject() : product;
+    const images = Array.isArray(obj.images) ? obj.images : [];
+    const fallback = images.length > 0 ? images[0] : obj.image;
+    const normalized = {
+      ...obj,
+      image: obj.image || fallback,
+    };
+
     res.json({
       success: true,
-      data: product,
+      data: normalized,
     });
   } catch (error) {
     res.status(500).json({
@@ -85,9 +103,17 @@ export const createProduct = async (req, res) => {
 
     const product = await Product.create(productData);
 
+    const obj = product.toObject ? product.toObject() : product;
+    const images = Array.isArray(obj.images) ? obj.images : [];
+    const fallback = images.length > 0 ? images[0] : obj.image;
+    const normalized = {
+      ...obj,
+      image: obj.image || fallback,
+    };
+
     res.status(201).json({
       success: true,
-      data: product,
+      data: normalized,
     });
   } catch (error) {
     res.status(500).json({
@@ -127,9 +153,17 @@ export const updateProduct = async (req, res) => {
       { new: true, runValidators: true }
     );
 
+    const obj = updatedProduct.toObject ? updatedProduct.toObject() : updatedProduct;
+    const images = Array.isArray(obj.images) ? obj.images : [];
+    const fallback = images.length > 0 ? images[0] : obj.image;
+    const normalized = {
+      ...obj,
+      image: obj.image || fallback,
+    };
+
     res.json({
       success: true,
-      data: updatedProduct,
+      data: normalized,
     });
   } catch (error) {
     res.status(500).json({

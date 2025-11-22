@@ -15,6 +15,9 @@ import { addToCart } from '../store/slices/cartSlice';
 import { Alert } from 'react-native';
 import { register } from '../store/slices/authSlice';
 
+const resolveRestaurantImage = (restaurant: any) =>
+  restaurant?.image || restaurant?.coverImage || restaurant?.avatar || '';
+
 const RegisterScreen = ({ navigation }: any) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -32,13 +35,20 @@ const RegisterScreen = ({ navigation }: any) => {
 
       const pending = route?.params?.pendingAdd;
       if (pending && pending.product && pending.restaurant) {
+        const restaurantImage = resolveRestaurantImage(pending.restaurant);
+        const productImageCandidates = Array.isArray(pending.product.images)
+          ? pending.product.images.filter((item: string) => typeof item === 'string' && item.trim().length > 0)
+          : [];
+        const fallbackProductImage = productImageCandidates[0]
+          || pending.product.image
+          || restaurantImage;
         dispatch(addToCart({
-          id: pending.product.id,
+          id: pending.product.id || pending.product._id || `${Date.now()}`,
           name: pending.product.name,
           price: pending.product.price ?? 0,
-          restaurantId: pending.restaurant.id,
+          restaurantId: pending.restaurant.id || pending.restaurant._id,
           restaurantName: pending.restaurant.name,
-          image: (pending.product.images && pending.product.images[0]) || pending.product.image,
+          image: fallbackProductImage,
         }));
         Alert.alert('Thành công', 'Đã thêm vào giỏ hàng');
         navigation.navigate('Cart');

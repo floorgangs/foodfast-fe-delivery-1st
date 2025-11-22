@@ -27,9 +27,53 @@ import PersonalInfoScreen from './src/screens/PersonalInfoScreen';
 import AddressScreen from './src/screens/AddressScreen';
 import PaymentMethodScreen from './src/screens/PaymentMethodScreen';
 import VouchersScreen from './src/screens/VouchersScreen';
+import ThirdPartyPaymentScreen from './src/screens/ThirdPartyPaymentScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
+
+class RootErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: any) {
+    console.log('[ErrorBoundary] message:', error?.message);
+    console.log('[ErrorBoundary] componentStack:', errorInfo?.componentStack);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 12 }}>Đã xảy ra lỗi</Text>
+          <Text style={{ textAlign: 'center', color: '#666' }}>{this.state.error.message}</Text>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const setupGlobalErrorLogging = () => {
+  const globalErrorUtils = (global as any).ErrorUtils;
+
+  if (globalErrorUtils?.setGlobalHandler) {
+    const defaultHandler = globalErrorUtils.getGlobalHandler?.();
+    globalErrorUtils.setGlobalHandler((error: any, isFatal?: boolean) => {
+      const stack = error?.componentStack || error?.stack;
+      console.log('[GlobalError]', error?.message, stack);
+      if (typeof defaultHandler === 'function') {
+        defaultHandler(error, isFatal);
+      }
+    });
+  }
+};
 
 function HomeTabs() {
   return (
@@ -119,7 +163,7 @@ const deriveInitialPosition = (width: number, height: number) => {
 
 function CartFloatingButton() {
   const navigation = useNavigation<any>();
-  const items = useSelector((state: RootState) => state.cart.items);
+  const items = useSelector((state: RootState) => state?.cart?.items || []);
   const routeName = useNavigationState((state: any) => {
     const currentRoute = state?.routes?.[state?.index];
     const nestedRoute = currentRoute?.state?.routes?.[currentRoute?.state?.index];
@@ -226,7 +270,7 @@ function CartFloatingButton() {
       <Ionicons name="bag-handle-outline" size={24} color="#EA5034" />
       <View style={floatingStyles.cartBadge}>
         <Text style={floatingStyles.cartBadgeText}>
-          {totalItems > 99 ? '99+' : totalItems}
+          {totalItems > 99 ? '99+' : String(totalItems)}
         </Text>
       </View>
     </TouchableOpacity>
@@ -276,6 +320,7 @@ function AppNavigator() {
           <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
           <Stack.Screen name="Cart" component={CartScreen} />
           <Stack.Screen name="Checkout" component={CheckoutScreen} />
+          <Stack.Screen name="ThirdPartyPayment" component={ThirdPartyPaymentScreen} options={{ headerShown: false }} />
           <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} />
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Register" component={RegisterScreen} />
@@ -328,9 +373,15 @@ const floatingStyles = StyleSheet.create({
 });
 
 export default function App() {
+  React.useEffect(() => {
+    setupGlobalErrorLogging();
+  }, []);
+
   return (
     <Provider store={store}>
-      <AppNavigator />
+      <RootErrorBoundary>
+        <AppNavigator />
+      </RootErrorBoundary>
     </Provider>
   );
 }

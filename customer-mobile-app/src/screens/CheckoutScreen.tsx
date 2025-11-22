@@ -9,153 +9,168 @@ import {
   Alert,
   Platform,
   StatusBar,
-  Modal,
-  Animated,
+  ActivityIndicator,
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
-import { createOrder } from '../store/slices/orderSlice';
-import { clearCart } from '../store/slices/cartSlice';
-import { Ionicons } from '@expo/vector-icons';
+import type { AppDispatch } from '../store';
+import { orderAPI, voucherAPI } from '../services/api';
+import { PAYMENT_METHODS, DEFAULT_ADDRESS } from '../constants';
 
 const CheckoutScreen = ({ navigation }: any) => {
-  const { items, total } = useSelector((state: RootState) => state.cart);
-  const user = useSelector((state: RootState) => state.auth.user);
-  const dispatch = useDispatch();
+  const { items, total, currentRestaurantId } = useSelector((state: RootState) => state.cart);
+  const { user, isAuthenticated } = useSelector((state: RootState) => state.auth);
+  const dispatch = useDispatch<AppDispatch>();
 
   // Success Modal State
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const scaleAnim = useState(new Animated.Value(0))[0];
-  const fadeAnim = useState(new Animated.Value(0))[0];
+  const [loading, setLoading] = useState(false);
+  const [applyingVoucher, setApplyingVoucher] = useState(false);
 
-  // Mock addresses - In real app, get from Redux/API
-  const [addresses] = useState([
-    {
-      id: '1',
-      name: 'Nhà riêng',
-      address: '123 Đường ABC, Phường XYZ, Quận 1, TP.HCM',
-      phone: '0901234567',
-    },
-    {
-      id: '2',
-      name: 'Văn phòng',
-      address: '456 Đường DEF, Phường GHI, Quận 3, TP.HCM',
-      phone: '0901234567',
-    },
-  ]);
+  // Addresses - từ user profile hoặc default
+  const [addresses] = useState(() => {
+    if (user?.addresses && user.addresses.length > 0) {
+      return user.addresses;
+    }
+    // Default address nếu user chưa có
+    return [
+      {
+        id: 'temp1',
+        name: 'Nhà riêng',
+        address: '123 Đường ABC, Phường XYZ, Quận 1, TP.HCM',
+        phone: user?.phone || '0901234567',
+      }
+    ];
+  });
 
-  const [paymentMethods] = useState([
-    { id: 'momo', name: 'MoMo', icon: '🅼' },
-    { id: 'zalopay', name: 'ZaloPay', icon: '🇿' },
-    { id: 'card', name: 'Thẻ tín dụng', icon: '💳' },
-  ]);
+  const paymentMethods = PAYMENT_METHODS;
 
   const [selectedAddress, setSelectedAddress] = useState(addresses[0]?.id || '');
-  const [selectedPayment, setSelectedPayment] = useState('momo');
+  const [selectedPayment, setSelectedPayment] = useState('dronepay');
   const [note, setNote] = useState('');
   const [voucherCode, setVoucherCode] = useState('');
   const [discount, setDiscount] = useState(0);
+  const [guestInfo, setGuestInfo] = useState({
+    name: user?.name || '',
+    phone: user?.phone || '',
+    email: user?.email || '',
+    address: user?.addresses?.[0]?.address || '',
+  });
 
   const deliveryFee = 15000; // Fixed drone delivery fee
   const finalTotal = total + deliveryFee - discount;
 
-  // Animation for success modal
-  useEffect(() => {
-    if (showSuccessModal) {
-      // Reset animations
-      scaleAnim.setValue(0);
-      fadeAnim.setValue(0);
-
-      // Start animations
-      Animated.parallel([
-        Animated.spring(scaleAnim, {
-          toValue: 1,
-          tension: 50,
-          friction: 7,
-          useNativeDriver: false,
-        }),
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: false,
-        }),
-      ]).start();
-
-      // Auto hide after 2 seconds and navigate
-      const timer = setTimeout(() => {
-        setShowSuccessModal(false);
-        navigation.navigate('Orders');
-      }, 2000);
-
-      return () => clearTimeout(timer);
-    }
-  }, [showSuccessModal]);
-
-  const handleApplyVoucher = () => {
-    // Mock voucher validation
-    if (voucherCode.toUpperCase() === 'FREESHIP50') {
-      setDiscount(15000);
-      if (Platform.OS === 'web') {
-        alert('Áp dụng voucher thành công!');
-      } else {
-        Alert.alert('Thành công', 'Áp dụng voucher thành công!');
-      }
-    } else if (voucherCode.toUpperCase() === 'SALE20') {
-      setDiscount(total * 0.2);
-      if (Platform.OS === 'web') {
-        alert('Giảm 20% đơn hàng!');
-      } else {
-        Alert.alert('Thành công', 'Giảm 20% đơn hàng!');
-      }
-    } else {
-      if (Platform.OS === 'web') {
-        alert('Mã voucher không hợp lệ');
-      } else {
-        Alert.alert('Lỗi', 'Mã voucher không hợp lệ');
-      }
-    }
+  const handleGuestInfoChange = (field: keyof typeof guestInfo, value: string) => {
+    setGuestInfo((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handlePlaceOrder = () => {
-    if (!selectedAddress) {
-      if (Platform.OS === 'web') {
-        alert('Vui lòng chọn địa chỉ giao hàng');
-      } else {
-        Alert.alert('Thông báo', 'Vui lòng chọn địa chỉ giao hàng');
-      }
+  // Animation for success modal
+
+  const handleApplyVoucher = async () => {
+    if (!voucherCode.trim()) {
+      Alert.alert('Lỗi', 'Vui lòng nhập mã voucher');
       return;
     }
 
+    try {
+      setApplyingVoucher(true);
+      const response = await voucherAPI.apply(
+        voucherCode.toUpperCase(),
+        total + deliveryFee,
+        currentRestaurantId
+      );
+      
+      setDiscount(response.data.discount);
+      Alert.alert('Thành công', `Giảm giá ${response.data.discount.toLocaleString()}đ!`);
+    } catch (error: any) {
+      Alert.alert('Lỗi', error.message || 'Mã voucher không hợp lệ');
+      setDiscount(0);
+    } finally {
+      setApplyingVoucher(false);
+    }
+  };
+
+  const handlePlaceOrder = async () => {
     if (!selectedPayment) {
-      if (Platform.OS === 'web') {
-        alert('Vui lòng chọn phương thức thanh toán');
-      } else {
-        Alert.alert('Thông báo', 'Vui lòng chọn phương thức thanh toán');
+      Alert.alert('Thông báo', 'Vui lòng chọn phương thức thanh toán');
+      return;
+    }
+
+    if (!isAuthenticated) {
+      if (!guestInfo.name.trim() || !guestInfo.phone.trim() || !guestInfo.email.trim()) {
+        Alert.alert('Thông báo', 'Vui lòng nhập đầy đủ họ tên, số điện thoại và email.');
+        return;
       }
+      if (!guestInfo.address.trim()) {
+        Alert.alert('Thông báo', 'Vui lòng nhập địa chỉ để drone giao hàng.');
+        return;
+      }
+    } else if (!selectedAddress) {
+      Alert.alert('Thông báo', 'Vui lòng chọn địa chỉ giao hàng');
       return;
     }
 
     const selectedAddressData = addresses.find(a => a.id === selectedAddress);
     const selectedPaymentData = paymentMethods.find(p => p.id === selectedPayment);
 
-    const order = {
-      items: items.map((item, index) => ({
-        id: `${item.id}-${Date.now()}-${index}`,
-        productId: item.id,
-        name: item.name,
-        quantity: item.quantity,
-        price: item.price,
-      })),
-      restaurantId: items[0].restaurantId,
-      restaurantName: items[0].restaurantName,
-      total: finalTotal,
-    };
+    try {
+      setLoading(true);
+      
+      const deliveryAddressPayload = isAuthenticated
+        ? {
+            street: selectedAddressData?.address || '',
+            city: 'TP.HCM',
+            district: 'Quận 1',
+            ward: 'Phường 1',
+            phone: selectedAddressData?.phone || user?.phone || '',
+          }
+        : {
+            street: guestInfo.address,
+            city: 'TP.HCM',
+            district: 'Quận 1',
+            ward: 'Phường 1',
+            phone: guestInfo.phone,
+            label: 'Khách lẻ',
+          };
 
-    dispatch(createOrder(order as any));
-    dispatch(clearCart());
-    
-    // Show success modal
-    setShowSuccessModal(true);
+      const orderData = {
+        restaurant: currentRestaurantId,
+        items: items.map((item) => ({
+          product: item.id,
+          quantity: item.quantity,
+          price: item.price,
+        })),
+        deliveryAddress: deliveryAddressPayload,
+        paymentMethod: selectedPayment,
+        note: note,
+        voucherCode: voucherCode || undefined,
+        subtotal: total,
+        deliveryFee: deliveryFee,
+        discount: discount,
+        totalAmount: finalTotal,
+        customerInfo: isAuthenticated ? undefined : guestInfo,
+      };
+
+      const response = await orderAPI.create(orderData);
+
+      if (!response?.data?._id || !response?.paymentSession?.sessionId) {
+        throw new Error('Không thể khởi tạo phiên thanh toán. Vui lòng thử lại.');
+      }
+
+      navigation.replace('ThirdPartyPayment', {
+        orderId: response.data._id,
+        orderNumber: response.data.orderNumber,
+        amount: response.data.total,
+        sessionId: response.paymentSession.sessionId,
+        providerName: response.paymentSession.providerName,
+        redirectUrl: response.paymentSession.redirectUrl,
+        expiresAt: response.paymentSession.expiresAt,
+        restaurantName: items[0]?.restaurantName,
+      });
+    } catch (error: any) {
+      Alert.alert('Lỗi', error.message || 'Không thể tạo đơn hàng. Vui lòng thử lại!');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (items.length === 0) {
@@ -199,37 +214,78 @@ const CheckoutScreen = ({ navigation }: any) => {
               <Text style={styles.sectionIcon}>📍</Text>
               <Text style={styles.sectionTitle}>Địa chỉ giao hàng</Text>
             </View>
-            <TouchableOpacity onPress={() => navigation.navigate('Address')}>
-              <Text style={styles.changeButton}>Thay đổi</Text>
-            </TouchableOpacity>
-          </View>
-          {addresses.length === 0 ? (
-            <TouchableOpacity 
-              style={styles.addAddressButton}
-              onPress={() => navigation.navigate('Address')}
-            >
-              <Text style={styles.addAddressText}>+ Thêm địa chỉ mới</Text>
-            </TouchableOpacity>
-          ) : (
-            addresses.map(address => (
-              <TouchableOpacity
-                key={address.id}
-                style={[
-                  styles.addressCard,
-                  selectedAddress === address.id && styles.addressCardSelected,
-                ]}
-                onPress={() => setSelectedAddress(address.id)}
-              >
-                <View style={styles.radioButton}>
-                  {selectedAddress === address.id && <View style={styles.radioButtonInner} />}
-                </View>
-                <View style={styles.addressInfo}>
-                  <Text style={styles.addressName}>{address.name}</Text>
-                  <Text style={styles.addressText}>{address.address}</Text>
-                  <Text style={styles.addressPhone}>{address.phone}</Text>
-                </View>
+            {isAuthenticated && (
+              <TouchableOpacity onPress={() => navigation.navigate('Address')}>
+                <Text style={styles.changeButton}>Thay đổi</Text>
               </TouchableOpacity>
-            ))
+            )}
+          </View>
+          {isAuthenticated ? (
+            addresses.length === 0 ? (
+              <TouchableOpacity 
+                style={styles.addAddressButton}
+                onPress={() => navigation.navigate('Address')}
+              >
+                <Text style={styles.addAddressText}>+ Thêm địa chỉ mới</Text>
+              </TouchableOpacity>
+            ) : (
+              addresses.map(address => (
+                <TouchableOpacity
+                  key={address.id}
+                  style={[
+                    styles.addressCard,
+                    selectedAddress === address.id && styles.addressCardSelected,
+                  ]}
+                  onPress={() => setSelectedAddress(address.id)}
+                >
+                  <View style={styles.radioButton}>
+                    {selectedAddress === address.id && <View style={styles.radioButtonInner} />}
+                  </View>
+                  <View style={styles.addressInfo}>
+                    <Text style={styles.addressName}>{address.name}</Text>
+                    <Text style={styles.addressText}>{address.address}</Text>
+                    <Text style={styles.addressPhone}>{address.phone}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )
+          ) : (
+            <View style={styles.guestForm}>
+              <Text style={styles.guestHelper}>Bạn chưa đăng nhập – vui lòng cung cấp thông tin để nhận hàng.</Text>
+              <Text style={styles.guestLabel}>Họ và tên</Text>
+              <TextInput
+                style={styles.guestInput}
+                placeholder="Ví dụ: Nguyễn Văn A"
+                value={guestInfo.name}
+                onChangeText={(text) => handleGuestInfoChange('name', text)}
+              />
+              <Text style={styles.guestLabel}>Số điện thoại</Text>
+              <TextInput
+                style={styles.guestInput}
+                placeholder="09xx xxx xxx"
+                keyboardType="phone-pad"
+                value={guestInfo.phone}
+                onChangeText={(text) => handleGuestInfoChange('phone', text)}
+              />
+              <Text style={styles.guestLabel}>Email nhận hóa đơn</Text>
+              <TextInput
+                style={styles.guestInput}
+                placeholder="ban@example.com"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                value={guestInfo.email}
+                onChangeText={(text) => handleGuestInfoChange('email', text)}
+              />
+              <Text style={styles.guestLabel}>Địa chỉ giao hàng</Text>
+              <TextInput
+                style={[styles.guestInput, styles.guestInputMultiline]}
+                placeholder="Số nhà, đường, phường, quận"
+                multiline
+                numberOfLines={2}
+                value={guestInfo.address}
+                onChangeText={(text) => handleGuestInfoChange('address', text)}
+              />
+            </View>
           )}
         </View>
 
@@ -267,8 +323,16 @@ const CheckoutScreen = ({ navigation }: any) => {
               onChangeText={setVoucherCode}
               autoCapitalize="characters"
             />
-            <TouchableOpacity style={styles.applyButton} onPress={handleApplyVoucher}>
-              <Text style={styles.applyButtonText}>Áp dụng</Text>
+            <TouchableOpacity 
+              style={[styles.applyButton, applyingVoucher && styles.applyButtonDisabled]} 
+              onPress={handleApplyVoucher}
+              disabled={applyingVoucher}
+            >
+              {applyingVoucher ? (
+                <ActivityIndicator size="small" color="#EA5034" />
+              ) : (
+                <Text style={styles.applyButtonText}>Áp dụng</Text>
+              )}
             </TouchableOpacity>
           </View>
           {discount > 0 && (
@@ -300,7 +364,10 @@ const CheckoutScreen = ({ navigation }: any) => {
                 {selectedPayment === method.id && <View style={styles.radioButtonInner} />}
               </View>
               <Text style={styles.paymentIcon}>{method.icon}</Text>
-              <Text style={styles.paymentName}>{method.name}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.paymentName}>{method.name}</Text>
+                <Text style={styles.paymentDescription}>Thanh toán được xử lý trên hệ thống thứ 3 để xác nhận trước khi drone cất cánh.</Text>
+              </View>
             </TouchableOpacity>
           ))}
         </View>
@@ -351,35 +418,21 @@ const CheckoutScreen = ({ navigation }: any) => {
           <Text style={styles.footerTotalLabel}>Tổng thanh toán</Text>
           <Text style={styles.footerTotalValue}>{`${finalTotal.toLocaleString('vi-VN')}đ`}</Text>
         </View>
-        <TouchableOpacity style={styles.checkoutButton} onPress={handlePlaceOrder}>
-          <Text style={styles.checkoutButtonText}>Đặt hàng</Text>
+        <TouchableOpacity 
+          style={[styles.checkoutButton, loading && styles.checkoutButtonDisabled]} 
+          onPress={handlePlaceOrder}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.checkoutButtonText}>Đặt hàng</Text>
+          )}
         </TouchableOpacity>
       </View>
 
       {/* Success Modal */}
-      <Modal
-        visible={showSuccessModal}
-        transparent={true}
-        animationType="none"
-      >
-        <View style={styles.modalOverlay}>
-          <Animated.View
-            style={[
-              styles.successModal,
-              {
-                opacity: fadeAnim,
-                transform: [{ scale: scaleAnim }],
-              },
-            ]}
-          >
-            <View style={styles.successIconContainer}>
-              <Ionicons name="checkmark-circle" size={80} color="#4CAF50" />
-            </View>
-            <Text style={styles.successTitle}>Đặt hàng thành công!</Text>
-            <Text style={styles.successMessage}>Đơn hàng của bạn đang được xử lý</Text>
-          </Animated.View>
-        </View>
-      </Modal>
+
     </View>
   );
 };
@@ -387,31 +440,28 @@ const CheckoutScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+    backgroundColor: '#F8F9FB',
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0,
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
   },
   backButtonContainer: {
-    padding: 4,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   backButton: {
     fontSize: 24,
-    color: '#333',
-    fontWeight: '600',
+    color: '#EA5034',
   },
   headerTitle: {
     fontSize: 20,
@@ -518,6 +568,38 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999',
   },
+  guestForm: {
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: '#FFFDF8',
+  },
+  guestHelper: {
+    fontSize: 13,
+    color: '#555',
+    marginBottom: 12,
+  },
+  guestLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 6,
+  },
+  guestInput: {
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    marginBottom: 12,
+    backgroundColor: '#fff',
+  },
+  guestInputMultiline: {
+    minHeight: 60,
+    textAlignVertical: 'top',
+  },
   restaurantInfo: {
     marginBottom: 12,
   },
@@ -605,6 +687,11 @@ const styles = StyleSheet.create({
     color: '#333',
     flex: 1,
   },
+  paymentDescription: {
+    fontSize: 11,
+    color: '#777',
+    marginTop: 2,
+  },
   noteInput: {
     borderWidth: 1,
     borderColor: '#e0e0e0',
@@ -676,6 +763,12 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  checkoutButtonDisabled: {
+    opacity: 0.6,
+  },
+  applyButtonDisabled: {
+    opacity: 0.6,
   },
   emptyCart: {
     flex: 1,

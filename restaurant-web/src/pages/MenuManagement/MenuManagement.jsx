@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { useSelector } from "react-redux";
+import { productAPI } from "../../services/api";
 import "./MenuManagement.css";
 
 function MenuManagement() {
@@ -8,6 +10,10 @@ function MenuManagement() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const restaurant = useSelector((state) => state.auth.restaurant);
 
   const [categories, setCategories] = useState([
     { id: "cat1", name: "Món chính", itemCount: 0 },
@@ -18,30 +24,31 @@ function MenuManagement() {
 
   const [menuItems, setMenuItems] = useState([]);
 
-  // Load menu từ localStorage
+  // Load menu từ API
   useEffect(() => {
-    const menuKey = "foodfastRestaurantMenu_2";
-    const stored = window.localStorage.getItem(menuKey);
-    if (stored) {
-      try {
-        const items = JSON.parse(stored);
-        // Transform data từ demoData format sang MenuManagement format
+    if (restaurant?._id) {
+      loadMenuItems();
+    }
+  }, [restaurant]);
+
+  const loadMenuItems = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const response = await productAPI.getByRestaurant(restaurant._id);
+      
+      if (response?.success) {
+        const items = response.data || [];
+        // Transform API data sang MenuManagement format
         const transformedItems = items.map((item) => ({
-          id: item.id,
+          id: item._id,
           name: item.name,
           price: item.price,
           category: item.category,
-          categoryId:
-            item.category === "Món chính"
-              ? "cat1"
-              : item.category === "Món phụ"
-              ? "cat2"
-              : item.category === "Đồ uống"
-              ? "cat3"
-              : "cat4",
+          categoryId: getCategoryId(item.category),
           description: item.description,
-          image: item.image,
-          available: item.available,
+          image: item.image || item.images?.[0],
+          available: item.isAvailable,
           cookTime: item.preparationTime || 15,
           discount: 0,
         }));
@@ -60,32 +67,24 @@ function MenuManagement() {
             itemCount: counts[cat.id] || 0,
           }))
         );
-      } catch (error) {
-        console.error("Error loading menu:", error);
       }
+    } catch (err) {
+      setError(err?.message || "Không thể tải thực đơn");
+      console.error("Error loading menu:", err);
+    } finally {
+      setLoading(false);
     }
-  }, []);
+  };
 
-  // Save menu to localStorage whenever it changes
-  useEffect(() => {
-    if (menuItems.length > 0) {
-      const menuKey = "foodfastRestaurantMenu_2";
-      const dataToSave = menuItems.map((item) => ({
-        id: item.id,
-        restaurantId: "2",
-        name: item.name,
-        price: item.price,
-        category: item.category,
-        image: item.image,
-        description: item.description,
-        available: item.available,
-        isPopular: false,
-        preparationTime: item.cookTime,
-        createdAt: new Date().toISOString(),
-      }));
-      window.localStorage.setItem(menuKey, JSON.stringify(dataToSave));
-    }
-  }, [menuItems]);
+  const getCategoryId = (categoryName) => {
+    if (!categoryName) return "cat1";
+    const lower = categoryName.toLowerCase();
+    if (lower.includes("chính") || lower.includes("main")) return "cat1";
+    if (lower.includes("phụ") || lower.includes("side")) return "cat2";
+    if (lower.includes("uống") || lower.includes("drink")) return "cat3";
+    if (lower.includes("miệng") || lower.includes("dessert")) return "cat4";
+    return "cat1";
+  };
 
   const [formData, setFormData] = useState({
     name: "",
@@ -131,48 +130,62 @@ function MenuManagement() {
     }
   };
 
-  const handleAddItem = (e) => {
+  const handleAddItem = async (e) => {
     e.preventDefault();
-    const category = categories.find((cat) => cat.id === formData.categoryId);
-    const newItem = {
-      id: Date.now().toString(),
-      name: formData.name,
-      price: parseInt(formData.price),
-      category: category.name,
-      categoryId: formData.categoryId,
-      description: formData.description,
-      image: formData.image,
-      available: true,
-      cookTime: parseInt(formData.cookTime),
-      discount: parseInt(formData.discount),
-    };
-    setMenuItems([...menuItems, newItem]);
-    setShowAddModal(false);
-    resetForm();
+    try {
+      const category = categories.find((cat) => cat.id === formData.categoryId);
+      const payload = {
+        name: formData.name,
+        price: parseInt(formData.price),
+        category: category.name,
+        description: formData.description,
+        image: formData.image,
+        restaurant: restaurant._id,
+        isAvailable: true,
+        preparationTime: parseInt(formData.cookTime),
+      };
+      
+      const response = await productAPI.create(payload);
+      if (response?.success) {
+        await loadMenuItems(); // Reload danh sách
+        setShowAddModal(false);
+        resetForm();
+      } else {
+        alert(response?.message || "Không thể thêm món");
+      }
+    } catch (err) {
+      alert(err?.message || "Không thể thêm món");
+    }
   };
 
-  const handleEditItem = (e) => {
+  const handleEditItem = async (e) => {
     e.preventDefault();
-    const category = categories.find((cat) => cat.id === formData.categoryId);
-    const updatedItems = menuItems.map((item) =>
-      item.id === selectedItem.id
-        ? {
-            ...item,
-            name: formData.name,
-            price: parseInt(formData.price),
-            category: category.name,
-            categoryId: formData.categoryId,
-            description: formData.description,
-            image: formData.image || item.image,
-            cookTime: parseInt(formData.cookTime),
-            discount: parseInt(formData.discount),
-          }
-        : item
-    );
-    setMenuItems(updatedItems);
-    setShowEditModal(false);
-    setSelectedItem(null);
-    resetForm();
+    try {
+      const category = categories.find((cat) => cat.id === formData.categoryId);
+      const payload = {
+        name: formData.name,
+        price: parseInt(formData.price),
+        category: category.name,
+        description: formData.description,
+        preparationTime: parseInt(formData.cookTime),
+      };
+      
+      if (formData.image && formData.image !== selectedItem.image) {
+        payload.image = formData.image;
+      }
+      
+      const response = await productAPI.update(selectedItem.id, payload);
+      if (response?.success) {
+        await loadMenuItems(); // Reload danh sách
+        setShowEditModal(false);
+        setSelectedItem(null);
+        resetForm();
+      } else {
+        alert(response?.message || "Không thể cập nhật món");
+      }
+    } catch (err) {
+      alert(err?.message || "Không thể cập nhật món");
+    }
   };
 
   const resetForm = () => {
@@ -188,17 +201,32 @@ function MenuManagement() {
     });
   };
 
-  const toggleAvailability = (id) => {
-    setMenuItems(
-      menuItems.map((item) =>
-        item.id === id ? { ...item, available: !item.available } : item
-      )
-    );
+  const toggleAvailability = async (id) => {
+    try {
+      const item = menuItems.find((i) => i.id === id);
+      const response = await productAPI.update(id, {
+        isAvailable: !item.available,
+      });
+      if (response?.success) {
+        await loadMenuItems();
+      }
+    } catch (err) {
+      alert(err?.message || "Không thể cập nhật trạng thái");
+    }
   };
 
-  const deleteItem = (id) => {
+  const deleteItem = async (id) => {
     if (window.confirm("Bạn có chắc muốn xóa món này?")) {
-      setMenuItems(menuItems.filter((item) => item.id !== id));
+      try {
+        const response = await productAPI.delete(id);
+        if (response?.success) {
+          await loadMenuItems();
+        } else {
+          alert(response?.message || "Không thể xóa món");
+        }
+      } catch (err) {
+        alert(err?.message || "Không thể xóa món");
+      }
     }
   };
 
@@ -218,12 +246,37 @@ function MenuManagement() {
 
   const filteredItems = getFilteredItems();
 
+  if (loading) {
+    return (
+      <div className="menu-management-page">
+        <div className="loading-state">
+          <div className="spinner"></div>
+          <p>Đang tải thực đơn...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="menu-management-page">
+        <div className="error-state">
+          <span>⚠️</span>
+          <p>{error}</p>
+          <button onClick={loadMenuItems} className="retry-btn">
+            Thử lại
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="menu-management-page">
       <div className="page-header">
         <div>
           <h1>Quản lý thực đơn</h1>
-          <p className="subtitle">Quản lý món ăn và danh mục</p>
+          <p className="subtitle">Quản lý món ăn và danh mục của {restaurant?.name}</p>
         </div>
         <button onClick={() => setShowAddModal(true)} className="add-btn">
           + Thêm món mới

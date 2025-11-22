@@ -160,11 +160,11 @@ const OrdersScreen = ({ navigation }: any) => {
     <View style={styles.orderItems}>
       {order.items.slice(0, 2).map((orderItem, idx) => (
         <Text key={orderItem.id ?? `${order.id}-${idx}`} style={styles.itemText}>
-          {orderItem.quantity}x {orderItem.name}
+          {`${orderItem.quantity}x ${orderItem.name}`}
         </Text>
       ))}
       {order.items.length > 2 && (
-        <Text style={styles.moreItems}>và {order.items.length - 2} món khác</Text>
+        <Text style={styles.moreItems}>{`và ${order.items.length - 2} món khác`}</Text>
       )}
     </View>
   );
@@ -186,9 +186,9 @@ const OrdersScreen = ({ navigation }: any) => {
         {renderItemsPreview(item)}
         <View style={styles.orderFooter}>
           <Text style={styles.orderDate}>
-            {new Date(item.createdAt).toLocaleDateString('vi-VN')}
+            {String(new Date(item.createdAt).toLocaleDateString('vi-VN'))}
           </Text>
-          <Text style={styles.orderTotal}>{item.total.toLocaleString('vi-VN')}đ</Text>
+          <Text style={styles.orderTotal}>{`${item.total.toLocaleString('vi-VN')}đ`}</Text>
         </View>
         <View style={styles.orderActions}>
           <Ionicons name="navigate-outline" size={16} color="#EA5034" style={styles.orderActionIcon} />
@@ -209,9 +209,9 @@ const OrdersScreen = ({ navigation }: any) => {
       {renderItemsPreview(item)}
       <View style={styles.orderFooter}>
         <Text style={styles.orderDate}>
-          Giao ngày {new Date(item.createdAt).toLocaleDateString('vi-VN')}
+          {`Giao ngày ${new Date(item.createdAt).toLocaleDateString('vi-VN')}`}
         </Text>
-        <Text style={styles.orderTotal}>{item.total.toLocaleString('vi-VN')}đ</Text>
+        <Text style={styles.orderTotal}>{`${item.total.toLocaleString('vi-VN')}đ`}</Text>
       </View>
       <TouchableOpacity
         style={styles.reviewButton}
@@ -235,15 +235,15 @@ const OrdersScreen = ({ navigation }: any) => {
       {renderItemsPreview(item)}
       <View style={styles.orderFooter}>
         <Text style={styles.orderDate}>
-          {new Date(item.createdAt).toLocaleDateString('vi-VN')}
+          {String(new Date(item.createdAt).toLocaleDateString('vi-VN'))}
         </Text>
-        <Text style={styles.orderTotal}>{item.total.toLocaleString('vi-VN')}đ</Text>
+        <Text style={styles.orderTotal}>{`${item.total.toLocaleString('vi-VN')}đ`}</Text>
       </View>
       <View style={styles.historyReviewRow}>
         {item.isReviewed ? (
           <View style={styles.historyRatingGroup}>
             {renderStarRow(item.rating ?? 0)}
-            <Text style={styles.historyRatingText}>{(item.rating ?? 0).toFixed(1)}/5</Text>
+            <Text style={styles.historyRatingText}>{`${(item.rating ?? 0).toFixed(1)}/5`}</Text>
           </View>
         ) : (
           <Text style={styles.pendingReviewText}>Chưa có đánh giá</Text>
@@ -384,7 +384,7 @@ const OrdersScreen = ({ navigation }: any) => {
       </View>
 
       <View style={styles.savedCartFooter}>
-        <Text style={styles.savedCartTotal}>{item.total.toLocaleString('vi-VN')}đ</Text>
+        <Text style={styles.savedCartTotal}>{`${item.total.toLocaleString('vi-VN')}đ`}</Text>
         <View style={styles.savedCartActions}>
           <TouchableOpacity
             style={styles.deleteButton}

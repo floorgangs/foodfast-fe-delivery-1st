@@ -76,6 +76,13 @@ const restaurantSchema = new mongoose.Schema(
       type: String,
       default: "30-45 phút",
     },
+    dronePadSize: {
+      type: Number,
+    },
+    brandStory: {
+      type: String,
+      trim: true,
+    },
     isActive: {
       type: Boolean,
       default: true,

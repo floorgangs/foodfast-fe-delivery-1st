@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,18 +10,116 @@ import {
   StatusBar,
   Platform,
   Alert,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { addToCart } from '../store/slices/cartSlice';
 import { RootState } from '../store';
-import { mockProducts } from '../data/mockData';
+import { productAPI, reviewAPI } from '../services/api';
+
+const RATING_BREAKDOWN_TEMPLATE = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+
+const resolveRestaurantImage = (restaurant: any) =>
+  restaurant?.image || restaurant?.coverImage || restaurant?.avatar || '';
 
 const RestaurantDetailScreen = ({ route, navigation }: any) => {
   const { restaurant } = route.params;
   const dispatch = useDispatch();
   const { items, currentRestaurantId, currentRestaurantName } = useSelector((state: RootState) => state.cart);
-  const products = mockProducts[restaurant.id] || [];
+  const { isAuthenticated } = useSelector((state: RootState) => state.auth);
+  const restaurantId = (restaurant._id || restaurant.id || '').toString();
+  const restaurantImageUri = resolveRestaurantImage(restaurant);
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [reviewSummary, setReviewSummary] = useState({
+    averageRating: restaurant.rating ?? 0,
+    totalReviews: restaurant.totalReviews ?? restaurant.orders ?? 0,
+    breakdown: { ...RATING_BREAKDOWN_TEMPLATE },
+  });
+  const [latestReviews, setLatestReviews] = useState<any[]>([]);
+  const [reviewLoading, setReviewLoading] = useState(true);
+  const [showReviews, setShowReviews] = useState(false);
+
+  useEffect(() => {
+    loadProducts();
+    loadReviewData();
+  }, [restaurantId]);
+
+  const formatReviewDate = (value?: string) => {
+    if (!value) {
+      return '';
+    }
+    try {
+      return new Date(value).toLocaleDateString('vi-VN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      });
+    } catch (error) {
+      return value;
+    }
+  };
+
+  const loadProducts = async () => {
+    if (!restaurantId) {
+      return;
+    }
+    try {
+      setLoading(true);
+      const response = await productAPI.getByRestaurant(restaurantId);
+      setProducts(response.data || []);
+    } catch (error) {
+      console.error('Error loading products:', error);
+      Alert.alert('Lỗi', 'Không thể tải menu nhà hàng');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadReviewData = async () => {
+    if (!restaurantId) {
+      return;
+    }
+    try {
+      setReviewLoading(true);
+      const [summaryRes, listRes] = await Promise.all([
+        reviewAPI.getSummary({ restaurantId }),
+        reviewAPI.getAll({ restaurantId, limit: 5 }),
+      ]);
+
+      const summaryPayload = summaryRes?.data ?? {};
+      setReviewSummary({
+        averageRating: summaryPayload.averageRating ?? 0,
+        totalReviews: summaryPayload.totalReviews ?? 0,
+        breakdown: {
+          ...RATING_BREAKDOWN_TEMPLATE,
+          ...(summaryPayload.breakdown || {}),
+        },
+      });
+
+      const reviewList = Array.isArray(listRes?.data) ? listRes.data : [];
+      setLatestReviews(reviewList);
+    } catch (error) {
+      console.error('Error loading restaurant reviews:', error);
+      setReviewSummary((prev) => ({
+        averageRating: prev.averageRating,
+        totalReviews: prev.totalReviews,
+        breakdown: prev.breakdown,
+      }));
+      setLatestReviews([]);
+    } finally {
+      setReviewLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([loadProducts(), loadReviewData()]);
+    setRefreshing(false);
+  };
 
   const renderStarRow = (rating: number, size = 14) => (
     <View style={styles.starRow}>
@@ -41,29 +139,38 @@ const RestaurantDetailScreen = ({ route, navigation }: any) => {
   );
 
   const enrichedProducts = useMemo(() => {
-    const baseRating = restaurant.rating ?? 4.5;
-    const baseOrders = restaurant.orders ?? 120;
-    return products.map((item: any, index: number) => {
-      const derivedRating = item.rating ?? Math.max(3.8, Math.min(5, baseRating - 0.1 + (index % 4) * 0.15));
-      const derivedReviews = item.reviewCount ?? (baseOrders > 0 ? Math.max(25, Math.round(baseOrders * 0.25) + index * 12) : 48 + index * 9);
+    return products.map((item: any) => {
+      const itemRating = typeof item.rating === 'number' ? item.rating : 0;
+      const reviewCount = item.totalReviews ?? item.reviewCount ?? 0;
+      const productId = item._id || item.id;
       return {
         ...item,
-        rating: Number(derivedRating.toFixed(1)),
-        reviewCount: derivedReviews,
+        id: productId,
+        rating: Number(Number(itemRating).toFixed(1)),
+        reviewCount,
       };
     });
-  }, [products, restaurant]);
-  const restaurantReviewCount = restaurant.orders ?? 0;
-
-  const { isAuthenticated } = useSelector((state: RootState) => state.auth);
+  }, [products]);
+  const restaurantReviewCount = reviewSummary.totalReviews ?? 0;
 
   const handleAddToCart = (product: any) => {
     if (!isAuthenticated) {
-      navigation.navigate('Login', { pendingAdd: { product, restaurant } });
+      Alert.alert(
+        'Cần đăng nhập',
+        'Vui lòng đăng nhập để thêm món vào giỏ hàng.',
+        [
+          { text: 'Hủy', style: 'cancel' },
+          {
+            text: 'Đăng nhập',
+            onPress: () => navigation.navigate('Login', { pendingAdd: { product, restaurant } }),
+          },
+        ]
+      );
       return;
     }
+
     // Kiểm tra nếu giỏ hàng có món từ nhà hàng khác
-    if (items.length > 0 && currentRestaurantId !== restaurant.id) {
+    if (items.length > 0 && currentRestaurantId && currentRestaurantId !== restaurantId) {
       Alert.alert(
         'Thay đổi nhà hàng',
         `Giỏ hàng đang có món từ "${currentRestaurantName}". Món ăn hiện tại sẽ được lưu vào "Đơn tạm" trong phần đơn hàng. Bạn có muốn tiếp tục?`,
@@ -75,72 +182,73 @@ const RestaurantDetailScreen = ({ route, navigation }: any) => {
           {
             text: 'Tiếp tục',
             onPress: () => {
-                      dispatch(addToCart({
-                        ...product,
-                        restaurantId: restaurant.id,
-                        restaurantName: restaurant.name,
-                      }));
+              dispatch(addToCart({
+                id: (product._id || product.id || `${Date.now()}`).toString(),
+                name: product.name,
+                price: product.price ?? 0,
+                restaurantId,
+                restaurantName: restaurant.name,
+                image: product.image || restaurantImageUri,
+              }));
               Alert.alert('Thành công', 'Đã thêm món ăn vào giỏ hàng!');
             },
           },
         ]
       );
     } else {
-              dispatch(addToCart({
-                ...product,
-                restaurantId: restaurant.id,
-                restaurantName: restaurant.name,
-              }));
-              Alert.alert('Thành công', 'Đã thêm vào giỏ hàng!');
+      dispatch(addToCart({
+        id: (product._id || product.id || `${Date.now()}`).toString(),
+        name: product.name,
+        price: product.price ?? 0,
+        restaurantId,
+        restaurantName: restaurant.name,
+        image: product.image || restaurantImageUri,
+      }));
+      Alert.alert('Thành công', 'Đã thêm vào giỏ hàng!');
     }
   };
 
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
   const PLACEHOLDER_IMAGE = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAQCAYAAAB49l8GAAAAHUlEQVR4nGNgGAWjYBSMglEwCkbGhoYGBgYGBgAAMaQF4nKp8OAAAAAElFTkSuQmCC';
 
-  const renderProductCard = (product: any) => (
-    <TouchableOpacity
-      key={product.id}
+  const renderProductCard = (product: any) => {
+    const productId = (product.id || product._id || `${product.name}-${restaurantId}`).toString();
+    const ratingValue = Number(product.rating ?? 0);
+    const totalReviews = product.reviewCount ?? product.totalReviews ?? 0;
+    const productPrice = product.price ?? 0;
+    const fallbackImageUri = restaurantImageUri || PLACEHOLDER_IMAGE;
+    const baseImageUri = product.image || fallbackImageUri;
+    const displayImageUri = failedImages[productId] ? fallbackImageUri : baseImageUri;
+
+    return (
+      <TouchableOpacity
+        key={productId}
       style={styles.productCard}
       onPress={() => navigation.navigate('ProductDetail', { product, restaurant })}
       activeOpacity={0.9}
     >
-      {failedImages[product.id] ? (
-        // If product image failed, try to use restaurant image as fallback
-        restaurant.image && restaurant.image !== product.image ? (
-          <Image
-            source={{ uri: restaurant.image }}
-            style={styles.productImage}
-            resizeMode="cover"
-            onError={() => setFailedImages(prev => ({ ...prev, [product.id]: true }))}
-          />
-        ) : (
-          <Image
-            source={{ uri: PLACEHOLDER_IMAGE }}
-            style={styles.productImage}
-            resizeMode="cover"
-          />
-        )
-      ) : (
-        <Image
-          source={{ uri: product.image }}
-          style={styles.productImage}
-          resizeMode="cover"
-          onError={() => setFailedImages(prev => ({ ...prev, [product.id]: true }))}
-        />
-      )}
+      <Image
+        source={{ uri: displayImageUri }}
+        style={styles.productImage}
+        resizeMode="cover"
+        onError={() => {
+          if (!failedImages[productId] && displayImageUri !== PLACEHOLDER_IMAGE) {
+            setFailedImages(prev => ({ ...prev, [productId]: true }));
+          }
+        }}
+      />
       <View style={styles.productInfo}>
         <Text style={styles.productName}>{product.name}</Text>
         <View style={styles.productRatingRow}>
-          {renderStarRow(product.rating)}
-          <Text style={styles.productRatingValue}>{product.rating.toFixed(1)}</Text>
+          {renderStarRow(ratingValue)}
+          <Text style={styles.productRatingValue}>{String(ratingValue.toFixed(1))}</Text>
           <Text style={styles.productRatingCount}>
-            ({product.reviewCount.toLocaleString('vi-VN')})
+            ({String(totalReviews.toLocaleString('vi-VN'))})
           </Text>
         </View>
-        <Text style={styles.productDescription}>{product.description}</Text>
+        <Text style={styles.productDescription}>{String(product.description || '')}</Text>
         <View style={styles.productFooter}>
-          <Text style={styles.productPrice}>{product.price.toLocaleString('vi-VN')}đ</Text>
+          <Text style={styles.productPrice}>{String(productPrice.toLocaleString('vi-VN'))}đ</Text>
           <TouchableOpacity
             style={styles.addButton}
             onPress={() => handleAddToCart(product)}
@@ -149,10 +257,14 @@ const RestaurantDetailScreen = ({ route, navigation }: any) => {
           </TouchableOpacity>
         </View>
       </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   const [failedRestaurantImage, setFailedRestaurantImage] = useState(false);
+  const resolvedRestaurantHero = failedRestaurantImage
+    ? PLACEHOLDER_IMAGE
+    : restaurantImageUri || PLACEHOLDER_IMAGE;
 
   return (
     <View style={styles.container}>
@@ -175,47 +287,111 @@ const RestaurantDetailScreen = ({ route, navigation }: any) => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView 
-        style={[styles.scrollView, { overflow: 'scroll' } as any]}
-        showsVerticalScrollIndicator={true}
-        contentContainerStyle={{ paddingBottom: 20 }}
-      >
-        {/* Restaurant Header */}
-        {failedRestaurantImage || !restaurant.image ? (
-          <Image
-            source={{ uri: PLACEHOLDER_IMAGE }}
-            style={styles.restaurantImage}
-            resizeMode="cover"
-          />
-        ) : (
-          <Image
-            source={{ uri: restaurant.image }}
-            style={styles.restaurantImage}
-            resizeMode="cover"
-            onError={() => setFailedRestaurantImage(true)}
-          />
-        )}
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#EA5034" />
+          <Text style={styles.loadingText}>Đang tải menu...</Text>
+        </View>
+      ) : (
+        <ScrollView 
+          style={[styles.scrollView, { overflow: 'scroll' } as any]}
+          showsVerticalScrollIndicator={true}
+          contentContainerStyle={{ paddingBottom: 20 }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          {/* Restaurant Header */}
+        <Image
+          source={{ uri: resolvedRestaurantHero }}
+          style={styles.restaurantImage}
+          resizeMode="cover"
+          onError={() => {
+            if (!failedRestaurantImage) {
+              setFailedRestaurantImage(true);
+            }
+          }}
+        />
         <View style={styles.restaurantHeader}>
           <Text style={styles.restaurantName}>{restaurant.name}</Text>
           <Text style={styles.restaurantDescription}>{restaurant.description}</Text>
           <View style={styles.restaurantMeta}>
-            <View style={styles.restaurantRatingRow}>
-              {renderStarRow(restaurant.rating ?? 0, 16)}
-              <Text style={styles.restaurantRatingValue}>{(restaurant.rating ?? 0).toFixed(1)}</Text>
-              <Text style={styles.restaurantRatingCount}>
-                ({restaurantReviewCount.toLocaleString('vi-VN')}+ đánh giá)
-              </Text>
+            <View style={styles.restaurantMetaLeft}>
+              <View style={styles.restaurantRatingRow}>
+                {renderStarRow(reviewSummary.averageRating ?? 0, 16)}
+                <Text style={styles.restaurantRatingValue}>
+                  {(reviewSummary.averageRating ?? 0).toFixed(1)}
+                </Text>
+                <Text style={styles.restaurantRatingCount}>
+                  ({String(restaurantReviewCount.toLocaleString('vi-VN'))} đánh giá)
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.showReviewsButton}
+                onPress={() => setShowReviews((prev) => !prev)}
+              >
+                <Text style={styles.showReviewsText}>
+                  {showReviews ? 'Thu gọn đánh giá' : 'Xem thêm đánh giá'}
+                </Text>
+              </TouchableOpacity>
             </View>
-            <Text style={styles.deliveryTime}>🚁 {restaurant.deliveryTime}</Text>
+            <Text style={styles.deliveryTime}>🚁 {String(restaurant.estimatedDeliveryTime || restaurant.deliveryTime || '25-35 phút')}</Text>
           </View>
         </View>
+
+        {showReviews ? (
+        <View style={styles.reviewSection}>
+          <Text style={styles.sectionTitle}>Đánh giá gần đây</Text>
+          <View style={styles.reviewSummaryRow}>
+            <View style={styles.reviewSummaryLeft}>
+              <Text style={styles.reviewSummaryRating}>
+                {(reviewSummary.averageRating ?? 0).toFixed(1)}
+              </Text>
+              <View style={styles.reviewSummaryStars}>
+                {renderStarRow(reviewSummary.averageRating ?? 0, 14)}
+              </View>
+            </View>
+            <Text style={styles.reviewSummaryCount}>
+              {String(restaurantReviewCount.toLocaleString('vi-VN'))} lượt đánh giá
+            </Text>
+          </View>
+          {reviewLoading ? (
+            <View style={styles.reviewLoadingContainer}>
+              <ActivityIndicator size="small" color="#EA5034" />
+              <Text style={styles.reviewLoadingText}>Đang tải đánh giá...</Text>
+            </View>
+          ) : latestReviews.length === 0 ? (
+            <Text style={styles.reviewEmptyText}>Chưa có đánh giá cho nhà hàng này.</Text>
+          ) : (
+            latestReviews.map((review: any, index: number) => (
+              <View
+                key={review._id || review.id || `${index}`}
+                style={[styles.reviewItem, index === 0 && styles.reviewItemFirst]}
+              >
+                <View style={styles.reviewItemHeader}>
+                  <Text style={styles.reviewAuthor}>{review.customer?.name || 'Ẩn danh'}</Text>
+                  <View style={styles.reviewItemStars}>
+                    {renderStarRow(review.rating ?? 0, 12)}
+                    <Text style={styles.reviewItemRating}>
+                      {(review.rating ?? 0).toFixed(1)}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.reviewItemDate}>{formatReviewDate(review.createdAt)}</Text>
+                <Text style={styles.reviewItemComment}>{review.comment}</Text>
+              </View>
+            ))
+          )}
+        </View>
+        ) : null}
 
         {/* Menu */}
         <View style={styles.menuSection}>
           <Text style={styles.sectionTitle}>Thực đơn</Text>
           {enrichedProducts.map(renderProductCard)}
         </View>
-      </ScrollView>
+        </ScrollView>
+      )}
     </View>
   );
 };
@@ -298,6 +474,106 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  restaurantMetaLeft: {
+    flex: 1,
+    marginRight: 12,
+  },
+  showReviewsButton: {
+    marginTop: 4,
+  },
+  showReviewsText: {
+    fontSize: 12,
+    color: '#EA5034',
+    fontWeight: '500',
+  },
+  reviewSection: {
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#eee',
+  },
+  reviewSummaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  reviewSummaryLeft: {
+    alignItems: 'flex-start',
+  },
+  reviewSummaryRating: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#EA5034',
+  },
+  reviewSummaryStars: {
+    marginTop: 4,
+  },
+  reviewSummaryCount: {
+    fontSize: 13,
+    color: '#777',
+    fontWeight: '500',
+  },
+  reviewLoadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  reviewLoadingText: {
+    marginLeft: 10,
+    color: '#777',
+    fontSize: 13,
+  },
+  reviewEmptyText: {
+    color: '#777',
+    fontSize: 13,
+    paddingVertical: 8,
+  },
+  reviewItem: {
+    paddingTop: 12,
+    marginTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  reviewItemFirst: {
+    borderTopWidth: 0,
+    paddingTop: 0,
+    marginTop: 0,
+  },
+  reviewItemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  reviewAuthor: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  reviewItemStars: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  reviewItemRating: {
+    marginLeft: 6,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#333',
+  },
+  reviewItemDate: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#999',
+  },
+  reviewItemComment: {
+    marginTop: 8,
+    fontSize: 13,
+    color: '#444',
+    lineHeight: 18,
   },
   restaurantRatingRow: {
     flexDirection: 'row',
@@ -402,6 +678,18 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 100,
+    backgroundColor: '#fff',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#666',
   },
 });
 

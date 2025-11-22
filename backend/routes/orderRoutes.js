@@ -6,11 +6,11 @@ import {
   updateOrderStatus,
   cancelOrder,
 } from "../controllers/orderController.js";
-import { protect, restrictTo } from "../middleware/auth.js";
+import { protect, restrictTo, optionalProtect } from "../middleware/auth.js";
 
 const router = express.Router();
 
-router.post("/", protect, restrictTo("customer"), createOrder);
+router.post("/", optionalProtect, createOrder);
 router.get("/", protect, getOrders);
 router.get("/:id", protect, getOrder);
 router.put(

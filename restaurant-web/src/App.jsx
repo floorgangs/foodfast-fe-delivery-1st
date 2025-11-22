@@ -13,11 +13,15 @@ import Reviews from "./pages/Reviews/Reviews";
 import AccountSettings from "./pages/AccountSettings/AccountSettings";
 import Drones from "./pages/Drones/Drones";
 import Staff from "./pages/Staff/Staff";
+import PartnerHub from "./pages/PartnerHub/PartnerHub";
+import Onboarding from "./pages/Onboarding/Onboarding";
+import RestaurantHub from "./pages/RestaurantHub/RestaurantHub";
+import RestaurantSelection from "./pages/RestaurantSelection/RestaurantSelection";
 import "./App.css";
 
 function App() {
   const dispatch = useDispatch();
-  const { isAuthenticated } = useSelector((state) => state.auth);
+  const { isAuthenticated, restaurant } = useSelector((state) => state.auth);
 
   useEffect(() => {
     // Restore auth state from localStorage on app startup
@@ -33,15 +37,42 @@ function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      
+      {/* Sau khi login, chuyển đến trang chọn nhà hàng */}
+      <Route
+        path="/select-restaurant"
+        element={isAuthenticated ? <RestaurantSelection /> : <Navigate to="/login" />}
+      />
+      
+      <Route
+        path="/partner-hub"
+        element={isAuthenticated ? <PartnerHub /> : <Navigate to="/login" />}
+      />
+      <Route
+        path="/onboarding"
+        element={isAuthenticated ? <Onboarding /> : <Navigate to="/login" />}
+      />
+      <Route
+        path="/restaurant-hub"
+        element={isAuthenticated ? <RestaurantHub /> : <Navigate to="/login" />}
+      />
       <Route
         path="/account-settings"
         element={
           isAuthenticated ? <AccountSettings /> : <Navigate to="/login" />
         }
       />
+      
+      {/* Dashboard chỉ truy cập được khi đã chọn nhà hàng */}
       <Route
         path="/"
-        element={isAuthenticated ? <Layout /> : <Navigate to="/login" />}
+        element={
+          isAuthenticated ? (
+            restaurant ? <Layout /> : <Navigate to="/select-restaurant" />
+          ) : (
+            <Navigate to="/login" />
+          )
+        }
       >
         <Route index element={<Dashboard />} />
         <Route path="dashboard" element={<Dashboard />} />

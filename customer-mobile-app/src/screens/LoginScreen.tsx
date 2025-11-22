@@ -9,44 +9,70 @@ import {
   Platform,
   ScrollView,
   Image,
+  ActivityIndicator,
 } from 'react-native';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { useRoute } from '@react-navigation/native';
 import { addToCart } from '../store/slices/cartSlice';
 import { Alert } from 'react-native';
-import { login } from '../store/slices/authSlice';
+import { login, clearError } from '../store/slices/authSlice';
+import type { AppDispatch, RootState } from '../store';
+
+const resolveRestaurantImage = (restaurant: any) =>
+  restaurant?.image || restaurant?.coverImage || restaurant?.avatar || '';
 
 const LoginScreen = ({ navigation }: any) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
+  const { loading, error } = useSelector((state: RootState) => state.auth);
 
   const route = useRoute<any>();
 
-  const handleLogin = () => {
-    if (email && password) {
-      dispatch(login({ email, password }));
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('Lỗi', 'Vui lòng nhập email và mật khẩu');
+      return;
+    }
 
+    try {
+      await dispatch(login({ email, password })).unwrap();
+      
       // Nếu có pendingAdd từ màn hình trước, thêm món vào giỏ ngay sau khi đăng nhập
       const pending = route?.params?.pendingAdd;
       if (pending && pending.product && pending.restaurant) {
+        const restaurantImage = resolveRestaurantImage(pending.restaurant);
+        const productImageCandidates = Array.isArray(pending.product.images)
+          ? pending.product.images.filter((item: string) => typeof item === 'string' && item.trim().length > 0)
+          : [];
+        const fallbackProductImage = productImageCandidates[0]
+          || pending.product.image
+          || restaurantImage;
         dispatch(addToCart({
-          id: pending.product.id,
+          id: pending.product.id || pending.product._id || `${Date.now()}`,
           name: pending.product.name,
           price: pending.product.price ?? 0,
-          restaurantId: pending.restaurant.id,
+          restaurantId: pending.restaurant.id || pending.restaurant._id,
           restaurantName: pending.restaurant.name,
-          image: (pending.product.images && pending.product.images[0]) || pending.product.image,
+          image: fallbackProductImage,
         }));
         Alert.alert('Thành công', 'Đã thêm vào giỏ hàng');
         navigation.navigate('Cart');
         return;
       }
 
-      // Nếu không có pendingAdd, quay về màn hình trước
-      navigation.goBack();
+      // Nếu không có pendingAdd, quay về Home
+      navigation.replace('Main');
+    } catch (err: any) {
+      Alert.alert('Đăng nhập thất bại', err || 'Vui lòng kiểm tra lại thông tin');
     }
   };
+
+  React.useEffect(() => {
+    if (error) {
+      dispatch(clearError());
+    }
+  }, []);
 
   const handleClose = () => {
     navigation.goBack();
@@ -98,8 +124,16 @@ const LoginScreen = ({ navigation }: any) => {
             />
           </View>
 
-          <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-            <Text style={styles.loginButtonText}>Đăng nhập</Text>
+          <TouchableOpacity 
+            style={[styles.loginButton, loading && styles.buttonDisabled]} 
+            onPress={handleLogin}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.loginButtonText}>Đăng nhập</Text>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.registerLink} onPress={handleRegister}>
@@ -182,6 +216,9 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   registerLink: {
     marginTop: 20,

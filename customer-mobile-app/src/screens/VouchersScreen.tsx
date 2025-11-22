@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,83 +7,68 @@ import {
   ScrollView,
   StatusBar,
   Platform,
+  ActivityIndicator,
+  RefreshControl,
+  Alert,
 } from 'react-native';
+import { voucherAPI } from '../services/api';
 
 interface Voucher {
-  id: string;
+  _id: string;
   code: string;
-  title: string;
   description: string;
-  discount: string;
-  minOrder: number;
-  maxDiscount?: number;
-  expiryDate: string;
-  isUsed: boolean;
+  discountType: 'percentage' | 'fixed';
+  discountValue: number;
+  minOrderValue: number;
+  maxDiscountValue?: number;
+  validFrom: string;
+  validTo: string;
+  isActive: boolean;
+  maxUsage: number;
+  currentUsage: number;
 }
 
 const VouchersScreen = ({ navigation }: any) => {
   const [selectedTab, setSelectedTab] = useState<'available' | 'used'>('available');
+  const [vouchers, setVouchers] = useState<Voucher[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const vouchers: Voucher[] = [
-    {
-      id: '1',
-      code: 'FREESHIP50',
-      title: 'Miễn phí vận chuyển',
-      description: 'Giảm 50k phí vận chuyển cho đơn hàng từ 100k',
-      discount: '50.000đ',
-      minOrder: 100000,
-      maxDiscount: 50000,
-      expiryDate: '31/12/2025',
-      isUsed: false,
-    },
-    {
-      id: '2',
-      code: 'SALE20',
-      title: 'Giảm 20% tổng đơn',
-      description: 'Giảm 20% cho đơn hàng từ 200k',
-      discount: '20%',
-      minOrder: 200000,
-      maxDiscount: 100000,
-      expiryDate: '31/12/2025',
-      isUsed: false,
-    },
-    {
-      id: '3',
-      code: 'NEWUSER',
-      title: 'Ưu đãi người mới',
-      description: 'Giảm 100k cho đơn hàng đầu tiên từ 150k',
-      discount: '100.000đ',
-      minOrder: 150000,
-      maxDiscount: 100000,
-      expiryDate: '31/12/2025',
-      isUsed: false,
-    },
-    {
-      id: '4',
-      code: 'FASTDRONE',
-      title: 'Giao hàng siêu tốc',
-      description: 'Miễn phí phụ thu giao drone cho đơn từ 300k',
-      discount: '30.000đ',
-      minOrder: 300000,
-      maxDiscount: 30000,
-      expiryDate: '31/12/2025',
-      isUsed: false,
-    },
-    {
-      id: '5',
-      code: 'WEEKEND50',
-      title: 'Cuối tuần vui vẻ',
-      description: 'Giảm 50k cho đơn hàng cuối tuần',
-      discount: '50.000đ',
-      minOrder: 150000,
-      maxDiscount: 50000,
-      expiryDate: '15/11/2025',
-      isUsed: true,
-    },
-  ];
+  const fetchVouchers = async () => {
+    try {
+      const data = await voucherAPI.getAll();
+      setVouchers(data);
+    } catch (error: any) {
+      console.error('Fetch vouchers error:', error);
+      Alert.alert('Lỗi', error.response?.data?.message || 'Không thể tải danh sách voucher');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
-  const availableVouchers = vouchers.filter(v => !v.isUsed);
-  const usedVouchers = vouchers.filter(v => v.isUsed);
+  useEffect(() => {
+    fetchVouchers();
+  }, []);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchVouchers();
+  };
+
+  const formatDiscount = (voucher: Voucher) => {
+    if (voucher.discountType === 'percentage') {
+      return `${voucher.discountValue}%`;
+    }
+    return `${voucher.discountValue.toLocaleString('vi-VN')}đ`;
+  };
+
+  const isVoucherUsedUp = (voucher: Voucher) => {
+    return voucher.currentUsage >= voucher.maxUsage;
+  };
+
+  const availableVouchers = vouchers.filter(v => v.isActive && !isVoucherUsedUp(v));
+  const usedVouchers = vouchers.filter(v => !v.isActive || isVoucherUsedUp(v));
 
   return (
     <View style={styles.container}>
@@ -116,77 +101,98 @@ const VouchersScreen = ({ navigation }: any) => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content}>
-        {selectedTab === 'available' && availableVouchers.map((voucher) => (
-          <View key={voucher.id} style={styles.voucherCard}>
-            <View style={styles.voucherLeft}>
-              <View style={styles.discountBadge}>
-                <Text style={styles.discountText}>{voucher.discount}</Text>
-                <Text style={styles.discountLabel}>OFF</Text>
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#EA5034" />
+        </View>
+      ) : (
+        <ScrollView 
+          style={styles.content}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#EA5034']} />
+          }
+        >
+          {selectedTab === 'available' && availableVouchers.map((voucher) => (
+            <View key={voucher._id} style={styles.voucherCard}>
+              <View style={styles.voucherLeft}>
+                <View style={styles.discountBadge}>
+                  <Text style={styles.discountText}>{formatDiscount(voucher)}</Text>
+                  <Text style={styles.discountLabel}>OFF</Text>
+                </View>
               </View>
-            </View>
 
-            <View style={styles.voucherRight}>
-              <View style={styles.voucherInfo}>
-                <Text style={styles.voucherTitle}>{voucher.title}</Text>
-                <Text style={styles.voucherDescription}>{voucher.description}</Text>
-                <View style={styles.voucherDetails}>
-                  <Text style={styles.voucherDetailText}>
-                    📦 Đơn tối thiểu: {voucher.minOrder.toLocaleString('vi-VN')}đ
-                  </Text>
-                  {voucher.maxDiscount && (
+              <View style={styles.voucherRight}>
+                <View style={styles.voucherInfo}>
+                  <Text style={styles.voucherTitle}>{voucher.code}</Text>
+                  <Text style={styles.voucherDescription}>{voucher.description}</Text>
+                  <View style={styles.voucherDetails}>
                     <Text style={styles.voucherDetailText}>
-                      🎯 Giảm tối đa: {voucher.maxDiscount.toLocaleString('vi-VN')}đ
+                      📦 Đơn tối thiểu: {String((voucher.minOrderValue ?? 0).toLocaleString('vi-VN'))}đ
                     </Text>
-                  )}
-                  <Text style={styles.voucherDetailText}>
-                    ⏰ HSD: {voucher.expiryDate}
+                    {voucher.maxDiscountValue && (
+                      <Text style={styles.voucherDetailText}>
+                        🎯 Giảm tối đa: {String((voucher.maxDiscountValue ?? 0).toLocaleString('vi-VN'))}đ
+                      </Text>
+                    )}
+                    <Text style={styles.voucherDetailText}>
+                      ⏰ HSD: {new Date(voucher.validTo).toLocaleDateString('vi-VN')}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.voucherCodeSection}>
+                  <View style={styles.voucherCode}>
+                    <Text style={styles.voucherCodeText}>{voucher.code}</Text>
+                  </View>
+                  <TouchableOpacity 
+                    style={styles.useButton}
+                    onPress={() => navigation.navigate('Home')}
+                  >
+                    <Text style={styles.useButtonText}>Dùng ngay</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          ))}
+
+          {selectedTab === 'used' && usedVouchers.map((voucher) => (
+            <View key={voucher._id} style={[styles.voucherCard, styles.voucherCardUsed]}>
+              <View style={styles.voucherLeft}>
+                <View style={[styles.discountBadge, styles.discountBadgeUsed]}>
+                  <Text style={[styles.discountText, styles.discountTextUsed]}>{formatDiscount(voucher)}</Text>
+                  <Text style={[styles.discountLabel, styles.discountLabelUsed]}>OFF</Text>
+                </View>
+              </View>
+
+              <View style={styles.voucherRight}>
+                <View style={styles.voucherInfo}>
+                  <Text style={[styles.voucherTitle, styles.voucherTitleUsed]}>{voucher.code}</Text>
+                  <Text style={[styles.voucherDescription, styles.voucherDescriptionUsed]}>
+                    {voucher.description}
                   </Text>
-                </View>
-              </View>
-
-              <View style={styles.voucherCodeSection}>
-                <View style={styles.voucherCode}>
-                  <Text style={styles.voucherCodeText}>{voucher.code}</Text>
-                </View>
-                <TouchableOpacity style={styles.useButton}>
-                  <Text style={styles.useButtonText}>Dùng ngay</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        ))}
-
-        {selectedTab === 'used' && usedVouchers.map((voucher) => (
-          <View key={voucher.id} style={[styles.voucherCard, styles.voucherCardUsed]}>
-            <View style={styles.voucherLeft}>
-              <View style={[styles.discountBadge, styles.discountBadgeUsed]}>
-                <Text style={[styles.discountText, styles.discountTextUsed]}>{voucher.discount}</Text>
-                <Text style={[styles.discountLabel, styles.discountLabelUsed]}>OFF</Text>
-              </View>
-            </View>
-
-            <View style={styles.voucherRight}>
-              <View style={styles.voucherInfo}>
-                <Text style={[styles.voucherTitle, styles.voucherTitleUsed]}>{voucher.title}</Text>
-                <Text style={[styles.voucherDescription, styles.voucherDescriptionUsed]}>
-                  {voucher.description}
-                </Text>
-                <View style={styles.usedBadge}>
-                  <Text style={styles.usedBadgeText}>Đã sử dụng</Text>
+                  <View style={styles.usedBadge}>
+                    <Text style={styles.usedBadgeText}>Đã hết lượt</Text>
+                  </View>
                 </View>
               </View>
             </View>
-          </View>
-        ))}
+          ))}
 
-        {selectedTab === 'available' && availableVouchers.length === 0 && (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>🎁</Text>
-            <Text style={styles.emptyText}>Chưa có voucher khả dụng</Text>
-          </View>
-        )}
-      </ScrollView>
+          {selectedTab === 'available' && availableVouchers.length === 0 && (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyIcon}>🎁</Text>
+              <Text style={styles.emptyText}>Chưa có voucher khả dụng</Text>
+            </View>
+          )}
+
+          {selectedTab === 'used' && usedVouchers.length === 0 && (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyIcon}>📋</Text>
+              <Text style={styles.emptyText}>Chưa có voucher đã dùng</Text>
+            </View>
+          )}
+        </ScrollView>
+      )}
     </View>
   );
 };
@@ -196,6 +202,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fafafa',
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   header: {
     flexDirection: 'row',

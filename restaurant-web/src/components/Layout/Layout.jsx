@@ -23,7 +23,7 @@ function Layout() {
           </div>
           <div className="restaurant-info">
             <p className="restaurant-name">{restaurant?.name || 'Nhà hàng'}</p>
-            <button onClick={() => navigate('/restaurant-hub')} className="switch-restaurant">
+            <button onClick={() => navigate('/partner-hub')} className="switch-restaurant">
               ↻ Đổi nhà hàng
             </button>
           </div>

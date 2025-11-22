@@ -69,7 +69,8 @@ const authSlice = createSlice({
       state.restaurant = action.payload || null;
       if (action.payload) {
         localStorage.setItem("restaurant_data", JSON.stringify(action.payload));
-        localStorage.setItem("foodfastLastRestaurantId", action.payload.id);
+        const restaurantId = action.payload._id || action.payload.id || "";
+        localStorage.setItem("foodfastLastRestaurantId", restaurantId);
       } else {
         localStorage.removeItem("restaurant_data");
         localStorage.removeItem("foodfastLastRestaurantId");

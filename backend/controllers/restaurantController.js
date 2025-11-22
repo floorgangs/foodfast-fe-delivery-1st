@@ -1,4 +1,5 @@
 import Restaurant from "../models/Restaurant.js";
+import Voucher from "../models/Voucher.js";
 
 export const getRestaurants = async (req, res) => {
   try {
@@ -31,10 +32,35 @@ export const getRestaurants = async (req, res) => {
       .populate("owner", "name email phone")
       .sort(sortOption);
 
+    const now = new Date();
+    const normalizedRestaurants = await Promise.all(
+      restaurants.map(async (doc) => {
+        const obj = doc.toObject ? doc.toObject() : doc;
+        const vouchers = await Voucher.find({
+          $or: [
+            { applicableRestaurants: obj._id },
+            { applicableRestaurants: { $size: 0 } },
+          ],
+          isActive: true,
+          validFrom: { $lte: now },
+          validUntil: { $gte: now },
+        })
+          .sort({ value: -1 })
+          .limit(3)
+          .lean();
+
+        return {
+          ...obj,
+          image: obj.image || obj.coverImage || obj.avatar,
+          vouchers,
+        };
+      })
+    );
+
     res.json({
       success: true,
-      count: restaurants.length,
-      data: restaurants,
+      count: normalizedRestaurants.length,
+      data: normalizedRestaurants,
     });
   } catch (error) {
     res.status(500).json({
@@ -58,9 +84,15 @@ export const getRestaurant = async (req, res) => {
       });
     }
 
+    const obj = restaurant.toObject ? restaurant.toObject() : restaurant;
+    const normalized = {
+      ...obj,
+      image: obj.image || obj.coverImage || obj.avatar,
+    };
+
     res.json({
       success: true,
-      data: restaurant,
+      data: normalized,
     });
   } catch (error) {
     res.status(500).json({
@@ -133,18 +165,20 @@ export const updateRestaurant = async (req, res) => {
 
 export const getMyRestaurant = async (req, res) => {
   try {
-    const restaurant = await Restaurant.findOne({ owner: req.user._id });
+    // Lấy tất cả nhà hàng của user này
+    const restaurants = await Restaurant.find({ owner: req.user._id });
 
-    if (!restaurant) {
+    if (!restaurants || restaurants.length === 0) {
       return res.status(404).json({
         success: false,
         message: "Bạn chưa có nhà hàng",
       });
     }
 
+    // Nếu có nhiều nhà hàng, trả về mảng. Nếu có 1, trả về object
     res.json({
       success: true,
-      data: restaurant,
+      data: restaurants.length === 1 ? restaurants[0] : restaurants,
     });
   } catch (error) {
     res.status(500).json({
