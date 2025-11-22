@@ -31,9 +31,8 @@ export const createOrder = (orderData) => {
     status: "pending", // pending, confirmed, preparing, ready_for_delivery, delivering, completed, cancelled
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    estimatedDeliveryTime: 15, // seconds for demo
     canCancel: true,
-    cancelTimeout: Date.now() + 20 * 60 * 1000, // 20 minutes from now
+    cancelTimeout: Date.now() + 5 * 60 * 1000, // 5 minutes to cancel after creation
   };
 
   console.log("New order created:", newOrder);
@@ -45,9 +44,6 @@ export const createOrder = (orderData) => {
 
   // Trigger update event
   triggerOrderUpdate(newOrder.id, "created");
-
-  // Auto-progress order status every 15 seconds
-  startAutoProgression(newOrder.id);
 
   return newOrder;
 };
@@ -66,15 +62,27 @@ export const updateOrderStatus = (orderId, newStatus, additionalData = {}) => {
     ...additionalData,
   };
 
-  // Nếu confirm thì không cho cancel nữa
-  if (newStatus === "confirmed") {
+  // Nếu confirm hoặc preparing thì không cho cancel nữa
+  if (
+    [
+      "confirmed",
+      "preparing",
+      "ready_for_delivery",
+      "delivering",
+      "completed",
+    ].includes(newStatus)
+  ) {
     orders[orderIndex].canCancel = false;
   }
 
-  // Nếu giao hàng thì set thời gian giao
-  if (newStatus === "delivering") {
-    orders[orderIndex].deliveryStartTime = Date.now();
-    orders[orderIndex].estimatedArrival = Date.now() + 15000; // 15 seconds
+  // Nếu giao hàng thì set thời gian bắt đầu giao
+  if (newStatus === "delivering" && !orders[orderIndex].deliveryStartTime) {
+    orders[orderIndex].deliveryStartTime = new Date().toISOString();
+  }
+
+  // Nếu hoàn thành thì set thời gian hoàn thành
+  if (newStatus === "completed") {
+    orders[orderIndex].completedAt = new Date().toISOString();
   }
 
   localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
@@ -95,9 +103,6 @@ export const cancelOrder = (orderId, reason = "") => {
   if (!order.canCancel || Date.now() > order.cancelTimeout) {
     return { error: "Không thể hủy đơn hàng này" };
   }
-
-  // Stop auto-progression
-  stopAutoProgression(orderId);
 
   return updateOrderStatus(orderId, "cancelled", {
     cancelReason: reason,
@@ -218,75 +223,4 @@ export const getTimeToCancel = (order) => {
   if (!order || !order.cancelTimeout) return 0;
   const remaining = Math.max(0, order.cancelTimeout - Date.now());
   return Math.floor(remaining / 1000);
-};
-
-// Auto-progress order through statuses
-const orderProgressionTimers = new Map();
-
-const startAutoProgression = (orderId) => {
-  // Clear any existing timer for this order
-  if (orderProgressionTimers.has(orderId)) {
-    clearTimeout(orderProgressionTimers.get(orderId));
-  }
-
-  const progressOrder = () => {
-    const order = getOrderById(orderId);
-    if (!order) return;
-
-    // Don't progress if cancelled or already completed
-    if (order.status === "cancelled" || order.status === "completed") {
-      orderProgressionTimers.delete(orderId);
-      return;
-    }
-
-    // Status progression flow
-    const statusFlow = {
-      pending: "confirmed",
-      confirmed: "preparing",
-      preparing: "ready_for_delivery",
-      ready_for_delivery: "delivering",
-      delivering: "completed",
-    };
-
-    const nextStatus = statusFlow[order.status];
-
-    if (nextStatus) {
-      console.log(
-        `🔄 Auto-progressing order ${orderId}: ${order.status} → ${nextStatus}`
-      );
-      updateOrderStatus(orderId, nextStatus);
-
-      // Schedule next progression if not completed
-      if (nextStatus !== "completed") {
-        const timer = setTimeout(progressOrder, 15000); // 15 seconds
-        orderProgressionTimers.set(orderId, timer);
-      } else {
-        orderProgressionTimers.delete(orderId);
-      }
-    }
-  };
-
-  // Start first progression after 15 seconds
-  const timer = setTimeout(progressOrder, 15000);
-  orderProgressionTimers.set(orderId, timer);
-};
-
-// Stop auto-progression (e.g., when order is cancelled)
-export const stopAutoProgression = (orderId) => {
-  if (orderProgressionTimers.has(orderId)) {
-    clearTimeout(orderProgressionTimers.get(orderId));
-    orderProgressionTimers.delete(orderId);
-  }
-};
-
-// Resume auto-progression for incomplete orders (call on app load)
-export const resumeAutoProgressions = () => {
-  const orders = getAllOrders();
-  orders.forEach((order) => {
-    // Resume for orders that are not completed or cancelled
-    if (order.status !== "completed" && order.status !== "cancelled") {
-      console.log(`♻️ Resuming auto-progression for order ${order.id}`);
-      startAutoProgression(order.id);
-    }
-  });
 };

@@ -10,6 +10,7 @@ import "./Cart.css";
 
 function Cart() {
   const { items, total } = useSelector((state) => state.cart);
+  const { isAuthenticated } = useSelector((state) => state.auth);
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
@@ -20,6 +21,12 @@ function Cart() {
   };
 
   const handleCheckout = () => {
+    if (!isAuthenticated) {
+      // Lưu URL hiện tại để redirect sau khi login
+      localStorage.setItem("redirectAfterLogin", "/checkout");
+      navigate("/login");
+      return;
+    }
     navigate("/checkout");
   };
 

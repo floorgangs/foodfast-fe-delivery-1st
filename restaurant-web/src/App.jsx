@@ -24,14 +24,27 @@ function App() {
   const { isAuthenticated, restaurant } = useSelector((state) => state.auth);
 
   useEffect(() => {
-    // Restore auth state from localStorage on app startup
-    console.log("=== Restaurant App.jsx: Calling checkAuth ===");
-    console.log("localStorage keys:", Object.keys(localStorage));
-    console.log("restaurant_token:", localStorage.getItem("restaurant_token"));
-    console.log("restaurant_user:", localStorage.getItem("restaurant_user"));
-    console.log("restaurant_data:", localStorage.getItem("restaurant_data"));
+    // Clear all auth data on app startup in development mode
+    if (import.meta.env.DEV) {
+      console.log("🧹 DEV MODE: Clearing all auth data on startup...");
+      localStorage.removeItem("restaurant_token");
+      localStorage.removeItem("restaurant_user");
+      localStorage.removeItem("restaurant_data");
+      localStorage.removeItem("foodfastLastRestaurantId");
+      console.log("✅ All auth data cleared - please login");
+    } else {
+      // Restore auth state from localStorage in production
+      console.log("=== Restaurant App.jsx: Calling checkAuth ===");
+      console.log("localStorage keys:", Object.keys(localStorage));
+      console.log(
+        "restaurant_token:",
+        localStorage.getItem("restaurant_token")
+      );
+      console.log("restaurant_user:", localStorage.getItem("restaurant_user"));
+      console.log("restaurant_data:", localStorage.getItem("restaurant_data"));
 
-    dispatch(checkAuth());
+      dispatch(checkAuth());
+    }
   }, [dispatch]);
 
   return (

@@ -73,12 +73,14 @@ function OrderTracking() {
 
   // Simulate drone movement when delivering
   useEffect(() => {
-    if (order?.status === "delivering") {
-      const startTime = order.deliveryStartTime || Date.now();
-      const duration = 15000; // 15 seconds
+    if (order?.status === "delivering" && order?.deliveryStartTime) {
+      const startTime = order.deliveryStartTime;
+      // Calculate duration from estimatedDeliveryTime (e.g., "25-35 phút")
+      const estimatedMinutes = 30; // Default 30 minutes
+      const duration = estimatedMinutes * 60 * 1000; // Convert to milliseconds
 
       const interval = setInterval(() => {
-        const elapsed = Date.now() - startTime;
+        const elapsed = Date.now() - new Date(startTime).getTime();
         const progress = Math.min((elapsed / duration) * 100, 100);
         setDroneProgress(progress);
 

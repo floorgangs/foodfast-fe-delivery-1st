@@ -44,6 +44,24 @@ const authSlice = createSlice({
       console.log("User string:", userStr);
       console.log("Restaurant string:", restaurantStr);
 
+      // Check if token is mock token and clear it
+      if (
+        token === "mock-restaurant-token" ||
+        (token && token.startsWith("mock-"))
+      ) {
+        console.log("🧹 Detected old mock token, clearing localStorage...");
+        localStorage.removeItem("restaurant_token");
+        localStorage.removeItem("restaurant_user");
+        localStorage.removeItem("restaurant_data");
+        localStorage.removeItem("foodfastLastRestaurantId");
+        state.isAuthenticated = false;
+        state.token = null;
+        state.user = null;
+        state.restaurant = null;
+        console.log("✅ Old mock data cleared, please login again");
+        return;
+      }
+
       if (token && userStr && restaurantStr) {
         try {
           state.token = token;

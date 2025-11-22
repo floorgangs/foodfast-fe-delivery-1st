@@ -8,6 +8,13 @@ import Order from "../models/Order.js";
 import Drone from "../models/Drone.js";
 import Voucher from "../models/Voucher.js";
 import Notification from "../models/Notification.js";
+import Cart from "../models/Cart.js";
+import CartItem from "../models/CartItem.js";
+import Place from "../models/Place.js";
+import Delivery from "../models/Delivery.js";
+import Payment from "../models/Payment.js";
+import Location from "../models/Location.js";
+import Note from "../models/Note.js";
 
 dotenv.config();
 
@@ -16,67 +23,141 @@ const seedData = async () => {
     await mongoose.connect(process.env.MONGODB_URI);
     console.log("✅ Connected to MongoDB");
 
-    // Xóa dữ liệu cũ (nếu có quyền)
+    // Xóa dữ liệu cũ - FORCE DELETE
+    console.log("🗑️  Clearing old data...");
     try {
-      console.log("🗑️  Clearing old data...");
       await User.deleteMany({});
-      await Restaurant.deleteMany({});
-      await Product.deleteMany({});
-      await Order.deleteMany({});
-      await Drone.deleteMany({});
-      await Voucher.deleteMany({});
-      await Notification.deleteMany({});
-      console.log("✅ Old data cleared");
-    } catch (error) {
-      console.log("⚠️  Cannot clear old data (checking if data exists)...");
-      const existingUsers = await User.countDocuments();
-      if (existingUsers > 0) {
-        console.log("ℹ️  Data already exists. Skipping seed...");
-        console.log(
-          "💡 To reseed, please delete data manually in MongoDB Compass or grant write permissions."
-        );
-        process.exit(0);
-      }
+      console.log("✅ Deleted all users (including old restaurants)");
+    } catch (err) {
+      console.log("⚠️ Error deleting users:", err.message);
     }
 
-    // Tạo users
-    console.log("👥 Creating users...");
-    const hashedPassword = await bcrypt.hash("123456", 12);
+    try {
+      await Product.deleteMany({});
+      console.log("✅ Deleted all products");
+    } catch (err) {
+      console.log("⚠️ Error deleting products:", err.message);
+    }
 
-    const users = await User.create([
+    try {
+      await Order.deleteMany({});
+      console.log("✅ Deleted all orders");
+    } catch (err) {
+      console.log("⚠️ Error deleting orders:", err.message);
+    }
+
+    try {
+      await Drone.deleteMany({});
+      console.log("✅ Deleted all drones");
+    } catch (err) {
+      console.log("⚠️ Error deleting drones:", err.message);
+    }
+
+    try {
+      await Voucher.deleteMany({});
+      console.log("✅ Deleted all vouchers");
+    } catch (err) {
+      console.log("⚠️ Error deleting vouchers:", err.message);
+    }
+
+    try {
+      await Notification.deleteMany({});
+      console.log("✅ Deleted all notifications");
+    } catch (err) {
+      console.log("⚠️ Error deleting notifications:", err.message);
+    }
+
+    try {
+      await Cart.deleteMany({});
+      console.log("✅ Deleted all carts");
+    } catch (err) {
+      console.log("⚠️ Error deleting carts:", err.message);
+    }
+
+    try {
+      await CartItem.deleteMany({});
+      console.log("✅ Deleted all cart items");
+    } catch (err) {
+      console.log("⚠️ Error deleting cart items:", err.message);
+    }
+
+    try {
+      await Place.deleteMany({});
+      console.log("✅ Deleted all places");
+    } catch (err) {
+      console.log("⚠️ Error deleting places:", err.message);
+    }
+
+    try {
+      await Delivery.deleteMany({});
+      console.log("✅ Deleted all deliveries");
+    } catch (err) {
+      console.log("⚠️ Error deleting deliveries:", err.message);
+    }
+
+    try {
+      await Payment.deleteMany({});
+      console.log("✅ Deleted all payments");
+    } catch (err) {
+      console.log("⚠️ Error deleting payments:", err.message);
+    }
+
+    try {
+      await Location.deleteMany({});
+      console.log("✅ Deleted all locations");
+    } catch (err) {
+      console.log("⚠️ Error deleting locations:", err.message);
+    }
+
+    try {
+      await Note.deleteMany({});
+      console.log("✅ Deleted all notes");
+    } catch (err) {
+      console.log("⚠️ Error deleting notes:", err.message);
+    }
+
+    console.log("✅ All old data cleared");
+
+    // Tạo ALL users (admin, customers, restaurants) trong 1 collection
+    console.log("👥 Creating all users (admin, customers, restaurants)...");
+
+    const allUsers = await User.create([
+      // Admin
       {
         name: "Admin User",
         email: "admin@foodfast.com",
         phone: "0901234567",
-        password: hashedPassword,
+        password: "123456",
         role: "admin",
       },
+      // Restaurant Owners (Users with role="restaurant")
       {
-        name: "Nhà hàng Phở Việt",
-        email: "nhahang@gmail.com",
+        name: "Nguyễn Văn Phở",
+        email: "phoviet@restaurant.com",
         phone: "0902345678",
         password: hashedPassword,
         role: "restaurant",
       },
       {
-        name: "Nhà hàng Lẩu Hải Sản",
+        name: "Trần Thị Hải Sản",
         email: "lauhaisan@restaurant.com",
         phone: "0903456789",
         password: hashedPassword,
         role: "restaurant",
       },
       {
-        name: "Quán Cơm Tấm Sườn",
+        name: "Lê Văn Cơm",
         email: "comtam@restaurant.com",
         phone: "0904567890",
         password: hashedPassword,
         role: "restaurant",
       },
+      // Customers
       {
-        name: "Khách hàng 1",
+        name: "Nguyễn Văn A",
         email: "customer1@gmail.com",
         phone: "0905678901",
-        password: hashedPassword,
+        password: "123456",
         role: "customer",
         addresses: [
           {
@@ -90,10 +171,10 @@ const seedData = async () => {
         ],
       },
       {
-        name: "Khách hàng 2",
+        name: "Trần Thị B",
         email: "customer2@gmail.com",
         phone: "0906789012",
-        password: hashedPassword,
+        password: "123456",
         role: "customer",
         addresses: [
           {
@@ -106,23 +187,60 @@ const seedData = async () => {
           },
         ],
       },
+      // Restaurants (role: "restaurant")
+      {
+        name: "Phở Việt Truyền Thống",
+        email: "phoviet@restaurant.com",
+        phone: "0902345678",
+        password: "123456",
+        role: "restaurant",
+        avatar:
+          "https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=400",
+      },
+      {
+        name: "Lẩu Hải Sản Ngon",
+        email: "lauhaisan@restaurant.com",
+        phone: "0903456789",
+        password: "123456",
+        role: "restaurant",
+        avatar:
+          "https://images.unsplash.com/photo-1582270691936-82d7c86d9e38?w=400",
+        name: "Cơm Tấm Sườn Bì Chả",
+        email: "comtam@restaurant.com",
+        phone: "0904567890",
+        password: "123456",
+        role: "restaurant",
+        avatar:
+          "https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?w=400",
+      },
     ]);
 
-    console.log(`✅ Created ${users.length} users`);
+    console.log(`✅ Created ${allUsers.length} users total`);
+    console.log(
+      `   - Admin: ${allUsers.filter((u) => u.role === "admin").length}`
+    );
+    console.log(
+      `   - Customers: ${allUsers.filter((u) => u.role === "customer").length}`
+    );
+    console.log(
+      `   - Restaurants: ${
+        allUsers.filter((u) => u.role === "restaurant").length
+      }`
+    );
 
-    // Tạo restaurants
-    console.log("🏪 Creating restaurants...");
+    // Get restaurant owner users
+    const restaurantOwners = allUsers.filter((u) => u.role === "restaurant");
+
+    // Create Restaurant documents (separate from User)
+    console.log("🏪 Creating restaurant info documents...");
     const restaurants = await Restaurant.create([
       {
-        name: "Phở Việt",
-        owner: users[1]._id,
-        description:
-          "Phở bò truyền thống Hà Nội, nước dùng ngọt thanh từ xương hầm 24 giờ",
+        owner: restaurantOwners[0]._id,
+        name: "Nhà Hàng Phở Việt",
+        description: "Phở bò truyền thống Hà Nội, nước dùng ngọt thanh từ xương hầm 24 giờ",
         cuisine: ["Việt Nam", "Phở", "Món nóng"],
-        avatar:
-          "https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=800&q=80&fit=crop",
-        coverImage:
-          "https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=1200&q=80&fit=crop",
+        avatar: "https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=400",
+        coverImage: "https://images.unsplash.com/photo-1547928576-664d7b4c7f0a?w=800",
         address: {
           street: "12 Lý Quốc Sư",
           city: "Hà Nội",
@@ -130,7 +248,6 @@ const seedData = async () => {
           ward: "Phường Hàng Trống",
         },
         phone: "0902345678",
-        email: "nhahang@gmail.com",
         openingHours: {
           monday: { open: "06:00", close: "22:00", isOpen: true },
           tuesday: { open: "06:00", close: "22:00", isOpen: true },
@@ -150,15 +267,12 @@ const seedData = async () => {
         tags: ["Phổ biến", "Giao nhanh", "Đặt trước"],
       },
       {
+        owner: restaurantOwners[1]._id,
         name: "Lẩu Hải Sản Ngon",
-        owner: users[2]._id,
-        description:
-          "Lẩu hải sản tươi sống, nước lẩu đậm đà từ tôm càng, cua biển",
+        description: "Lẩu hải sản tươi sống, nước lẩu đậm đà từ tôm càng, cua biển",
         cuisine: ["Hải sản", "Lẩu", "Nhà hàng"],
-        avatar:
-          "https://images.unsplash.com/photo-1559847844-5315695dadae?w=800&q=80&fit=crop",
-        coverImage:
-          "https://images.unsplash.com/photo-1559847844-5315695dadae?w=1200&q=80&fit=crop",
+        avatar: "https://images.unsplash.com/photo-1582270691936-82d7c86d9e38?w=400",
+        coverImage: "https://images.unsplash.com/photo-1585032226651-759b368d7246?w=800",
         address: {
           street: "89 Đinh Tiên Hoàng",
           city: "Hồ Chí Minh",
@@ -166,7 +280,6 @@ const seedData = async () => {
           ward: "Phường Đa Kao",
         },
         phone: "0903456789",
-        email: "lauhaisan@restaurant.com",
         openingHours: {
           monday: { open: "10:00", close: "22:00", isOpen: true },
           tuesday: { open: "10:00", close: "22:00", isOpen: true },
@@ -186,14 +299,12 @@ const seedData = async () => {
         tags: ["Cao cấp", "Hải sản tươi"],
       },
       {
+        owner: restaurantOwners[2]._id,
         name: "Cơm Tấm Sườn Bì Chả",
-        owner: users[3]._id,
         description: "Cơm tấm sườn nướng thơm lừng, bì giòn, chả trứng mềm",
         cuisine: ["Việt Nam", "Cơm", "Đồ nướng"],
-        avatar:
-          "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=800&q=80&fit=crop",
-        coverImage:
-          "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=1200&q=80&fit=crop",
+        avatar: "https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?w=400",
+        coverImage: "https://images.unsplash.com/photo-1604329760661-e71dc83f8f26?w=800",
         address: {
           street: "234 Trần Hưng Đạo",
           city: "Hồ Chí Minh",
@@ -201,7 +312,6 @@ const seedData = async () => {
           ward: "Phường 10",
         },
         phone: "0904567890",
-        email: "comtam@restaurant.com",
         openingHours: {
           monday: { open: "06:00", close: "21:00", isOpen: true },
           tuesday: { open: "06:00", close: "21:00", isOpen: true },
@@ -221,8 +331,14 @@ const seedData = async () => {
         tags: ["Bán chạy", "Giá rẻ", "Giao nhanh"],
       },
     ]);
+    console.log(`✅ Created ${restaurants.length} restaurant info documents`);
 
-    console.log(`✅ Created ${restaurants.length} restaurants`);
+    // Link restaurant back to user
+    for (let i = 0; i < restaurantOwners.length; i++) {
+      await User.findByIdAndUpdate(restaurantOwners[i]._id, {
+        restaurant: restaurants[i]._id,
+      });
+    }
 
     // Tạo products
     console.log("🍜 Creating products...");
@@ -484,7 +600,7 @@ const seedData = async () => {
         validFrom: new Date("2024-01-01"),
         validUntil: new Date("2025-12-31"),
         isActive: true,
-        createdBy: users[0]._id,
+        createdBy: allUsers[0]._id,
       },
       {
         code: "FREEDEL",
@@ -498,7 +614,7 @@ const seedData = async () => {
         validFrom: new Date("2024-01-01"),
         validUntil: new Date("2025-12-31"),
         isActive: true,
-        createdBy: users[0]._id,
+        createdBy: allUsers[0]._id,
       },
       {
         code: "FLASH30",
@@ -510,10 +626,10 @@ const seedData = async () => {
         minOrderValue: 200000,
         maxUsage: 500,
         maxUsagePerUser: 2,
-        validFrom: new Date("2024-11-01"),
+        validFrom: new Date("2024-12-01"),
         validUntil: new Date("2024-12-31"),
         isActive: true,
-        createdBy: users[0]._id,
+        createdBy: allUsers[0]._id,
       },
       {
         code: "SAVE50K",
@@ -525,14 +641,168 @@ const seedData = async () => {
         maxUsage: 200,
         maxUsagePerUser: 1,
         applicableRestaurants: [restaurants[0]._id, restaurants[1]._id],
-        validFrom: new Date("2024-11-01"),
-        validUntil: new Date("2024-12-31"),
+        validFrom: new Date("2024-01-01"),
+        validUntil: new Date("2025-12-31"),
         isActive: true,
-        createdBy: users[0]._id,
+        createdBy: allUsers[0]._id,
       },
     ]);
 
     console.log(`✅ Created ${vouchers.length} vouchers`);
+
+    // Tạo Carts cho customers
+    console.log("🛒 Creating carts...");
+    const customers = allUsers.filter((u) => u.role === "customer");
+    const carts = await Cart.create(
+      customers.map((customer) => ({
+        userId: customer._id,
+        cartItems: [],
+        totalAmount: 0,
+      }))
+    );
+    console.log(`✅ Created ${carts.length} carts`);
+
+    // Tạo CartItems (thêm 1 món vào cart của customer 1)
+    console.log("🛍️  Creating cart items...");
+    const cartItems = await CartItem.create([
+      {
+        cartId: carts[0]._id,
+        itemId: products[0]._id, // Phở Bò Tái
+        quantity: 2,
+        note: "Ít hành",
+      },
+      {
+        cartId: carts[0]._id,
+        itemId: products[1]._id, // Phở Gà
+        quantity: 1,
+      },
+    ]);
+
+    // Update cart với cartItems
+    await Cart.findByIdAndUpdate(carts[0]._id, {
+      cartItems: cartItems.map((item) => item._id),
+      totalAmount: products[0].price * 2 + products[1].price,
+    });
+    console.log(`✅ Created ${cartItems.length} cart items`);
+
+    // Tạo Places (liên kết giữa shop, user, order)
+    console.log("📍 Creating places...");
+    const places = await Place.create([
+      {
+        shopId: restaurants[0]._id,
+        userId: customers[0]._id,
+      },
+      {
+        shopId: restaurants[1]._id,
+        userId: customers[1]._id,
+      },
+    ]);
+    console.log(`✅ Created ${places.length} places`);
+
+    // Tạo Deliveries (giao hàng cho orders)
+    console.log("🚚 Creating deliveries...");
+    const deliveries = await Delivery.create([
+      {
+        deliveryId: "DEL-001",
+        orderId: new mongoose.Types.ObjectId(), // Placeholder - sẽ update khi có order thật
+        droneId: drones[0]._id,
+        startLocation: {
+          coordinates: [105.8342, 21.0278], // Hà Nội
+          address: "12 Lý Quốc Sư, Hoàn Kiếm, Hà Nội",
+        },
+        endLocation: {
+          coordinates: [105.8412, 21.0245], // Customer location
+          address: "123 Nguyễn Huệ, Quận 1, HCM",
+        },
+        status: "delivered",
+        deliveredAt: new Date("2024-11-20T12:30:00"),
+      },
+      {
+        deliveryId: "DEL-002",
+        orderId: new mongoose.Types.ObjectId(),
+        droneId: drones[2]._id,
+        startLocation: {
+          coordinates: [106.7009, 10.7769], // HCM
+          address: "89 Đinh Tiên Hoàng, Quận 1, HCM",
+        },
+        endLocation: {
+          coordinates: [106.7089, 10.7751],
+          address: "456 Lê Lợi, Quận 1, HCM",
+        },
+        status: "in_transit",
+      },
+    ]);
+    console.log(`✅ Created ${deliveries.length} deliveries`);
+
+    // Tạo Payments
+    console.log("💳 Creating payments...");
+    const payments = await Payment.create([
+      {
+        paymentId: "PAY-001",
+        orderId: new mongoose.Types.ObjectId(),
+        contentId: "FOODFAST-ORD-001",
+        methods: "VNPay",
+        status: "completed",
+      },
+      {
+        paymentId: "PAY-002",
+        orderId: new mongoose.Types.ObjectId(),
+        contentId: "FOODFAST-ORD-002",
+        methods: "COD",
+        status: "pending",
+      },
+    ]);
+    console.log(`✅ Created ${payments.length} payments`);
+
+    // Tạo Locations (tracking drone)
+    console.log("🗺️  Creating location tracking...");
+    const locations = await Location.create([
+      {
+        locationId: "LOC-001",
+        droneId: drones[0]._id,
+        longitude: 105.8342,
+        latitude: 21.0278,
+        altitude: 50,
+        recordedAt: new Date("2024-11-20T12:00:00"),
+      },
+      {
+        locationId: "LOC-002",
+        droneId: drones[0]._id,
+        longitude: 105.8377,
+        latitude: 21.0261,
+        altitude: 45,
+        recordedAt: new Date("2024-11-20T12:15:00"),
+      },
+      {
+        locationId: "LOC-003",
+        droneId: drones[2]._id,
+        longitude: 106.7009,
+        latitude: 10.7769,
+        altitude: 60,
+        recordedAt: new Date(),
+      },
+    ]);
+    console.log(`✅ Created ${locations.length} location records`);
+
+    // Tạo Notes
+    console.log("📝 Creating notes...");
+    const notes = await Note.create([
+      {
+        content: "Giao hàng trước 12h trưa nhé",
+        userId: customers[0]._id,
+        orderId: new mongoose.Types.ObjectId(),
+      },
+      {
+        content: "Không hành, nhiều rau",
+        userId: customers[0]._id,
+        cartItemId: cartItems[0]._id,
+      },
+      {
+        content: "Khách yêu cầu đóng gói kỹ",
+        orderId: new mongoose.Types.ObjectId(),
+      },
+    ]);
+    console.log(`✅ Created ${notes.length} notes`);
 
     console.log("\n🎉 Seed data completed successfully!");
     console.log("📝 Test accounts:");
@@ -546,6 +816,13 @@ const seedData = async () => {
     console.log(
       "🎟️  Vouchers: 4 vouchers (WELCOME50, FREEDEL, FLASH30, SAVE50K)"
     );
+    console.log(`\n🛒 Carts: ${carts.length} carts`);
+    console.log(`🛍️  Cart Items: ${cartItems.length} items`);
+    console.log(`📍 Places: ${places.length} places`);
+    console.log(`🚚 Deliveries: ${deliveries.length} deliveries`);
+    console.log(`💳 Payments: ${payments.length} payments`);
+    console.log(`🗺️  Locations: ${locations.length} location records`);
+    console.log(`📝 Notes: ${notes.length} notes`);
 
     process.exit(0);
   } catch (error) {
