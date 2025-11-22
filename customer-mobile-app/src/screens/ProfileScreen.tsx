@@ -142,14 +142,14 @@ const ProfileScreen = ({ navigation }: any) => {
                 onPress={() => navigation.navigate('OrderTracking')}
               >
                 <View style={styles.orderHeader}>
-                  <Text style={styles.orderId}>#{order.id}</Text>
+                  <Text style={styles.orderId}>{`#${order.id}`}</Text>
                   <Text style={[styles.orderStatus, getStatusStyle(order.status)]}>
-                    {getStatusText(order.status)}
+                    {String(getStatusText(order.status))}
                   </Text>
                 </View>
-                <Text style={styles.orderRestaurant}>{order.restaurantName}</Text>
+                <Text style={styles.orderRestaurant}>{String(order.restaurantName)}</Text>
                 <Text style={styles.orderTotal}>
-                  {order.total.toLocaleString('vi-VN')}đ
+                  {`${order.total.toLocaleString('vi-VN')}đ`}
                 </Text>
               </TouchableOpacity>
             ))

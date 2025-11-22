@@ -42,7 +42,7 @@ const CartScreen = ({ navigation }: any) => {
       <Image source={{ uri: item.image }} style={styles.itemImage} />
       <View style={styles.itemInfo}>
         <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
-        <Text style={styles.itemPrice}>{item.price.toLocaleString('vi-VN')}đ</Text>
+        <Text style={styles.itemPrice}>{`${item.price.toLocaleString('vi-VN')}đ`}</Text>
         <View style={styles.itemFooter}>
           <View style={styles.quantityControl}>
             <TouchableOpacity
@@ -51,7 +51,7 @@ const CartScreen = ({ navigation }: any) => {
             >
               <Text style={styles.quantityButtonText}>−</Text>
             </TouchableOpacity>
-            <Text style={styles.quantity}>{item.quantity}</Text>
+            <Text style={styles.quantity}>{String(item.quantity)}</Text>
             <TouchableOpacity
               style={styles.quantityButton}
               onPress={() => handleUpdateQuantity(item.id, item.quantity + 1)}
@@ -59,7 +59,7 @@ const CartScreen = ({ navigation }: any) => {
               <Text style={styles.quantityButtonText}>+</Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.itemTotal}>{(item.price * item.quantity).toLocaleString('vi-VN')}đ</Text>
+          <Text style={styles.itemTotal}>{`${(item.price * item.quantity).toLocaleString('vi-VN')}đ`}</Text>
         </View>
       </View>
       <TouchableOpacity
@@ -82,7 +82,7 @@ const CartScreen = ({ navigation }: any) => {
           <Text style={styles.headerTitle}>Giỏ hàng</Text>
           {items.length > 0 && (
             <View style={styles.itemCountBadge}>
-              <Text style={styles.itemCountText}>{items.length}</Text>
+              <Text style={styles.itemCountText}>{String(items.length)}</Text>
             </View>
           )}
         </View>
@@ -123,7 +123,7 @@ const CartScreen = ({ navigation }: any) => {
           <View style={styles.footer}>
             <View style={styles.totalRow}>
               <Text style={styles.totalLabel}>Tổng cộng</Text>
-              <Text style={styles.totalAmount}>{total.toLocaleString('vi-VN')}đ</Text>
+              <Text style={styles.totalAmount}>{`${total.toLocaleString('vi-VN')}đ`}</Text>
             </View>
             <TouchableOpacity style={styles.checkoutButton} onPress={handleCheckout}>
               <Text style={styles.checkoutButtonText}>Tiến hành đặt hàng</Text>

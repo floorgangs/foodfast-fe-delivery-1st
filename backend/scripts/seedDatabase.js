@@ -53,7 +53,7 @@ const seedData = async () => {
       },
       {
         name: "Nhà hàng Phở Việt",
-        email: "phoviet@restaurant.com",
+        email: "nhahang@gmail.com",
         phone: "0902345678",
         password: hashedPassword,
         role: "restaurant",
@@ -120,9 +120,9 @@ const seedData = async () => {
           "Phở bò truyền thống Hà Nội, nước dùng ngọt thanh từ xương hầm 24 giờ",
         cuisine: ["Việt Nam", "Phở", "Món nóng"],
         avatar:
-          "https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=400",
+          "https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=800&q=80&fit=crop",
         coverImage:
-          "https://images.unsplash.com/photo-1547928576-664d7b4c7f0a?w=800",
+          "https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=1200&q=80&fit=crop",
         address: {
           street: "12 Lý Quốc Sư",
           city: "Hà Nội",
@@ -130,7 +130,7 @@ const seedData = async () => {
           ward: "Phường Hàng Trống",
         },
         phone: "0902345678",
-        email: "phoviet@restaurant.com",
+        email: "nhahang@gmail.com",
         openingHours: {
           monday: { open: "06:00", close: "22:00", isOpen: true },
           tuesday: { open: "06:00", close: "22:00", isOpen: true },
@@ -156,9 +156,9 @@ const seedData = async () => {
           "Lẩu hải sản tươi sống, nước lẩu đậm đà từ tôm càng, cua biển",
         cuisine: ["Hải sản", "Lẩu", "Nhà hàng"],
         avatar:
-          "https://images.unsplash.com/photo-1582270691936-82d7c86d9e38?w=400",
+          "https://images.unsplash.com/photo-1559847844-5315695dadae?w=800&q=80&fit=crop",
         coverImage:
-          "https://images.unsplash.com/photo-1585032226651-759b368d7246?w=800",
+          "https://images.unsplash.com/photo-1559847844-5315695dadae?w=1200&q=80&fit=crop",
         address: {
           street: "89 Đinh Tiên Hoàng",
           city: "Hồ Chí Minh",
@@ -191,9 +191,9 @@ const seedData = async () => {
         description: "Cơm tấm sườn nướng thơm lừng, bì giòn, chả trứng mềm",
         cuisine: ["Việt Nam", "Cơm", "Đồ nướng"],
         avatar:
-          "https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?w=400",
+          "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=800&q=80&fit=crop",
         coverImage:
-          "https://images.unsplash.com/photo-1604329760661-e71dc83f8f26?w=800",
+          "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=1200&q=80&fit=crop",
         address: {
           street: "234 Trần Hưng Đạo",
           city: "Hồ Chí Minh",
@@ -235,7 +235,7 @@ const seedData = async () => {
         category: "Phở",
         price: 55000,
         image:
-          "https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=400",
+          "https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=800&q=80&fit=crop",
         isAvailable: true,
         rating: 4.8,
         totalReviews: 45,
@@ -249,7 +249,7 @@ const seedData = async () => {
         category: "Phở",
         price: 55000,
         image:
-          "https://images.unsplash.com/photo-1547928576-664d7b4c7f0a?w=400",
+          "https://images.unsplash.com/photo-1585032226651-759b368d7246?w=800&q=80&fit=crop",
         isAvailable: true,
         rating: 4.7,
         totalReviews: 38,
@@ -262,7 +262,7 @@ const seedData = async () => {
         category: "Phở",
         price: 50000,
         image:
-          "https://images.unsplash.com/photo-1604329760661-e71dc83f8f26?w=400",
+          "https://images.unsplash.com/photo-1547928576-664d7b4c7f0a?w=800&q=80&fit=crop",
         isAvailable: true,
         rating: 4.6,
         totalReviews: 32,
@@ -276,7 +276,7 @@ const seedData = async () => {
         category: "Lẩu",
         price: 450000,
         image:
-          "https://images.unsplash.com/photo-1582270691936-82d7c86d9e38?w=400",
+          "https://images.unsplash.com/photo-1559847844-5315695dadae?w=800&q=80&fit=crop",
         isAvailable: true,
         rating: 4.9,
         totalReviews: 67,
@@ -535,9 +535,9 @@ const seedData = async () => {
     console.log(`✅ Created ${vouchers.length} vouchers`);
 
     console.log("\n🎉 Seed data completed successfully!");
-    console.log("\n📝 Test accounts:");
+    console.log("📝 Test accounts:");
     console.log("   Admin: admin@foodfast.com / 123456");
-    console.log("   Restaurant 1: phoviet@restaurant.com / 123456");
+    console.log("   Restaurant 1 (Phở Việt): nhahang@gmail.com / 123456");
     console.log("   Restaurant 2: lauhaisan@restaurant.com / 123456");
     console.log("   Restaurant 3: comtam@restaurant.com / 123456");
     console.log("   Customer 1: customer1@gmail.com / 123456");

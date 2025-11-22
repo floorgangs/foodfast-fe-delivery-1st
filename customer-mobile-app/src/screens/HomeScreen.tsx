@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,52 +11,137 @@ import {
   StatusBar,
   Platform,
   FlatList,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
-import { mockRestaurants } from '../data/mockData';
+import { restaurantAPI } from '../services/api';
 
 const { width } = Dimensions.get('window');
 const BANNER_WIDTH = width - 32; // 16px padding on each side
 
-const banners = [
-  { 
-    id: 1, 
-    title: 'GIAO DRONE - SIÊU TỐC', 
-    subtitle: 'Chỉ 15 phút có ngay',
-    image: 'https://images.unsplash.com/photo-1473163928189-364b2c4e1135?w=800&q=80',
-  },
-  { 
-    id: 2, 
-    title: 'GIẢM 50K', 
-    subtitle: 'Cho đơn hàng đầu tiên',
-    image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&q=80',
-  },
-  { 
-    id: 3, 
-    title: 'MIỄN PHÍ SHIP', 
-    subtitle: 'Áp dụng cho mọi đơn hàng',
-    image: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800&q=80',
-  },
-  { 
-    id: 4, 
-    title: 'FLASH SALE', 
-    subtitle: 'Giảm đến 30% hôm nay',
-    image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&q=80',
-  },
-  { 
-    id: 5, 
-    title: 'VOUCHER 100K', 
-    subtitle: 'Dành cho thành viên mới',
-    image: 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=800&q=80',
-  },
-  { 
-    id: 6, 
-    title: 'TÍCH ĐIỂM ĐỔI QUÀ', 
-    subtitle: 'Nhiều phần quà hấp dẫn',
-    image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&q=80',
-  },
-];
+const PLACEHOLDER_IMAGE = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAQCAYAAAB49l8GAAAAHUlEQVR4nGNgGAWjYBSMglEwCkbGhoYGBgYGBgAAMaQF4nKp8OAAAAAElFTkSuQmCC';
+
+const coerceToString = (value: any, fallback = ''): string => {
+  if (value === null || value === undefined) {
+    return fallback;
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return value.toString();
+  }
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  try {
+    const stringified = String(value);
+    return stringified === '[object Object]' ? fallback : stringified;
+  } catch (_error) {
+    return fallback;
+  }
+};
+
+const coerceToNumber = (value: any, fallback = 0): number => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const parsed = Number.parseFloat(value.replace(/[^0-9.,-]/g, '').replace(',', '.'));
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+  return fallback;
+};
+
+const getRestaurantImageCandidates = (restaurant: any) => {
+  const candidates = [
+    restaurant?.coverImage, 
+    restaurant?.image, 
+    restaurant?.avatar
+  ].filter((uri) => {
+    if (typeof uri !== 'string' || !uri.trim()) return false;
+    return uri.startsWith('http://') || uri.startsWith('https://') || uri.startsWith('data:');
+  });
+  
+  return candidates.length > 0 ? [...candidates, PLACEHOLDER_IMAGE] : [PLACEHOLDER_IMAGE];
+};
+
+const resolveRestaurantImage = (restaurant: any) => {
+  const [primary] = getRestaurantImageCandidates(restaurant);
+  return primary || '';
+};
+
+const normalizeRestaurant = (restaurant: any) => {
+  if (!restaurant || typeof restaurant !== 'object') {
+    return {
+      _id: `placeholder-${Date.now()}`,
+      name: 'Nhà hàng',
+      description: 'Giao nhanh - Chất lượng',
+      rating: 4.5,
+      orders: 0,
+      estimatedDeliveryTime: '30-45 phút',
+      deliveryTime: '30-45 phút',
+      distance: 2,
+      cuisine: [],
+      vouchers: [],
+      image: PLACEHOLDER_IMAGE,
+    };
+  }
+
+  const cuisineList = Array.isArray(restaurant.cuisine)
+    ? restaurant.cuisine
+        .map((item: any) => coerceToString(item))
+        .filter((item: string) => item.trim().length > 0)
+    : [];
+
+  const rawDistance = restaurant.distance ?? restaurant.distanceInKm ?? restaurant.distanceKm;
+  const distanceNumber = typeof rawDistance === 'number'
+    ? rawDistance
+    : coerceToNumber(rawDistance, NaN);
+
+  const ordersNumber = coerceToNumber(restaurant.orders, NaN);
+  const ratingNumber = coerceToNumber(restaurant.rating, NaN);
+
+  const imageCandidates = getRestaurantImageCandidates(restaurant);
+  const resolvedImage = imageCandidates[0] || resolveRestaurantImage(restaurant) || PLACEHOLDER_IMAGE;
+
+  return {
+    ...restaurant,
+    name: coerceToString(restaurant.name, 'Nhà hàng').trim() || 'Nhà hàng',
+    description: coerceToString(restaurant.description, 'Giao nhanh - Chất lượng'),
+    rating: Number.isFinite(ratingNumber) ? ratingNumber : 4.5,
+    orders: Number.isFinite(ordersNumber) ? ordersNumber : 0,
+    estimatedDeliveryTime: coerceToString(
+      restaurant.estimatedDeliveryTime ?? restaurant.deliveryTime,
+      '30-45 phút'
+    ),
+    deliveryTime: coerceToString(
+      restaurant.deliveryTime ?? restaurant.estimatedDeliveryTime,
+      '30-45 phút'
+    ),
+    distance: Number.isFinite(distanceNumber) ? distanceNumber : 2,
+    cuisine: cuisineList,
+    vouchers: Array.isArray(restaurant.vouchers)
+      ? restaurant.vouchers.filter(Boolean)
+      : [],
+    image: resolvedImage,
+  };
+};
+
+const generateBannerFromRestaurant = (input: any) => {
+  const restaurant = normalizeRestaurant(input);
+  const img = resolveRestaurantImage(restaurant) || PLACEHOLDER_IMAGE;
+  const title = coerceToString(restaurant.name, 'PARTNER').toUpperCase() || 'PARTNER';
+  const subtitle = coerceToString(restaurant.description, 'Giao nhanh - Chất lượng');
+  return {
+    id: coerceToString(restaurant?._id ?? restaurant?.id ?? `banner-${Date.now()}`),
+    title,
+    subtitle,
+    image: img,
+  };
+};
 
 const HomeScreen = ({ navigation }: any) => {
   const [searchText, setSearchText] = useState('');
@@ -64,37 +149,128 @@ const HomeScreen = ({ navigation }: any) => {
   const [selectedFilter, setSelectedFilter] = useState('suggest');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [restaurants, setRestaurants] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
+  const user = useSelector((state: RootState) => state.auth.user);
+  const [restaurantImageFallbacks, setRestaurantImageFallbacks] = useState<Record<string, number>>({});
+
+  // Load restaurants from API
+  useEffect(() => {
+    loadRestaurants();
+  }, []);
+
+  const loadRestaurants = async () => {
+    try {
+      setLoading(true);
+      const response = await restaurantAPI.getAll();
+      
+      const payload = Array.isArray(response)
+        ? response
+        : Array.isArray(response?.data)
+          ? response.data
+          : Array.isArray(response?.data?.data)
+            ? response.data.data
+            : [];
+
+      const normalizedList = Array.isArray(payload)
+        ? payload.map((item, index) => {
+            try {
+              return normalizeRestaurant(item);
+            } catch (err) {
+              console.error(`[HomeScreen] Failed to normalize restaurant at index ${index}:`, err);
+              return null;
+            }
+          }).filter(Boolean)
+        : [];
+
+      setRestaurants(normalizedList);
+      setRestaurantImageFallbacks({});
+      setActiveSlide(0);
+    } catch (error) {
+      console.error('[HomeScreen] Error loading restaurants:', error);
+      setRestaurants([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadRestaurants();
+    setRefreshing(false);
+  };
 
   // Filter and sort restaurants based on selected filter and category
   const getFilteredRestaurants = () => {
-    let restaurants = mockRestaurants.filter(restaurant => {
-      const matchesSearch = restaurant.name.toLowerCase().includes(searchText.toLowerCase());
-      const matchesCategory = selectedCategory === 'all' || 
-                              restaurant.category === selectedCategory ||
-                              restaurant.name.toLowerCase().includes(selectedCategory.toLowerCase());
+    const normalizedSearchText = searchText.trim().toLowerCase();
+    const normalizedCategory = selectedCategory.trim().toLowerCase();
+
+    const normalizedList = restaurants.map(normalizeRestaurant);
+
+    let filtered = normalizedList.filter((restaurant) => {
+      const nameLower = coerceToString(restaurant.name, '').toLowerCase();
+
+      const matchesSearch = normalizedSearchText.length === 0
+        ? true
+        : nameLower.includes(normalizedSearchText);
+
+      const matchesCategory = selectedCategory === 'all'
+        ? true
+        : restaurant.cuisine?.some((item: any) => coerceToString(item).toLowerCase() === normalizedCategory) ||
+          nameLower.includes(normalizedCategory);
+
       return matchesSearch && matchesCategory;
     });
 
-    // Sort based on selected filter
     if (selectedFilter === 'nearby') {
-      // Sort by distance (closest first)
-      restaurants = [...restaurants].sort((a, b) => a.distance - b.distance);
+      filtered = [...filtered].sort((a, b) => {
+        const distanceA = coerceToNumber(a.distance, Number.POSITIVE_INFINITY);
+        const distanceB = coerceToNumber(b.distance, Number.POSITIVE_INFINITY);
+        return distanceA - distanceB;
+      });
     } else if (selectedFilter === 'bestseller') {
-      // Sort by number of orders (most popular first)
-      restaurants = [...restaurants].sort((a, b) => b.orders - a.orders);
+      filtered = [...filtered].sort((a, b) => {
+        const ordersA = coerceToNumber(a.orders, 0);
+        const ordersB = coerceToNumber(b.orders, 0);
+        return ordersB - ordersA;
+      });
     } else {
-      // 'suggest' - sort by rating (highest first)
-      restaurants = [...restaurants].sort((a, b) => b.rating - a.rating);
+      filtered = [...filtered].sort((a, b) => {
+        const ratingA = coerceToNumber(a.rating, 0);
+        const ratingB = coerceToNumber(b.rating, 0);
+        return ratingB - ratingA;
+      });
     }
 
-    return restaurants;
+    return filtered;
   };
 
   const filteredRestaurants = getFilteredRestaurants();
 
+  const banners = useMemo(() => {
+    if (!Array.isArray(restaurants) || restaurants.length === 0) {
+      return [];
+    }
+    return restaurants.slice(0, 6).map((restaurant) => {
+      try {
+        return generateBannerFromRestaurant(restaurant);
+      } catch (err) {
+        console.error('[HomeScreen] Failed to generate banner:', err);
+        return {
+          id: `error-banner-${Date.now()}-${Math.random()}`,
+          title: 'PARTNER',
+          subtitle: 'Giao nhanh',
+          image: PLACEHOLDER_IMAGE,
+        };
+      }
+    }).filter(Boolean);
+  }, [restaurants]);
+
   // Auto scroll banner
   useEffect(() => {
+    if (!banners.length) return;
     const interval = setInterval(() => {
       const nextSlide = (activeSlide + 1) % banners.length;
       setActiveSlide(nextSlide);
@@ -105,7 +281,7 @@ const HomeScreen = ({ navigation }: any) => {
     }, 3000); // Auto scroll every 3 seconds
 
     return () => clearInterval(interval);
-  }, [activeSlide]);
+  }, [activeSlide, banners.length]);
 
   const handleScroll = (event: any) => {
     const slideIndex = Math.round(event.nativeEvent.contentOffset.x / (BANNER_WIDTH + 16));
@@ -143,21 +319,31 @@ const HomeScreen = ({ navigation }: any) => {
             onBlur={() => setIsSearchFocused(false)}
             underlineColorAndroid="transparent"
           />
-          {searchText.length > 0 && (
+          {searchText.length > 0 ? (
             <TouchableOpacity onPress={() => setSearchText('')} style={styles.clearButton}>
               <Text style={styles.clearIcon}>✕</Text>
             </TouchableOpacity>
-          )}
+          ) : null}
         </View>
       </View>
 
       {/* Main Content with Banner, Menu, Filter Tabs and Restaurant List */}
-      <ScrollView 
-        showsVerticalScrollIndicator={false}
-        style={{ flex: 1 }}
-        stickyHeaderIndices={[2]}
-      >
-        {/* Banner Carousel with Auto Scroll */}
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#EA5034" />
+          <Text style={styles.loadingText}>Đang tải nhà hàng...</Text>
+        </View>
+      ) : (
+        <ScrollView 
+          showsVerticalScrollIndicator={false}
+          style={{ flex: 1 }}
+          stickyHeaderIndices={[2]}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          {/* Banner Carousel with Auto Scroll */}
+        {banners && banners.length > 0 ? (
         <View style={styles.carouselContainer}>
           <ScrollView
             ref={scrollViewRef}
@@ -168,35 +354,42 @@ const HomeScreen = ({ navigation }: any) => {
             scrollEventThrottle={16}
             style={styles.carouselScroll}
           >
-            {banners.map((banner) => (
-              <View key={banner.id} style={styles.bannerSlide}>
+            {banners.map((banner) => {
+              const bannerId = coerceToString(banner?.id, `banner-${Math.random()}`);
+              const bannerTitle = coerceToString(banner?.title, 'PARTNER');
+              const bannerSubtitle = coerceToString(banner?.subtitle, 'Giao nhanh');
+              const bannerImage = coerceToString(banner?.image, PLACEHOLDER_IMAGE);
+              
+              return (
+              <View key={bannerId} style={styles.bannerSlide}>
                 <Image 
-                  source={{ uri: banner.image }} 
+                  source={{ uri: bannerImage }} 
                   style={styles.bannerImage}
                   resizeMode="cover"
                 />
                 <View style={styles.bannerOverlay}>
-                  <Text style={styles.bannerTitle}>{banner.title}</Text>
-                  <Text style={styles.bannerSubtitle}>{banner.subtitle}</Text>
+                  <Text style={styles.bannerTitle}>{bannerTitle}</Text>
+                  <Text style={styles.bannerSubtitle}>{bannerSubtitle}</Text>
                 </View>
               </View>
-            ))}
+              );
+            })}
           </ScrollView>
           
           {/* Indicator Dots */}
           <View style={styles.indicatorContainer}>
             {banners.map((_, index) => (
               <View
-                key={index}
+                key={`indicator-${index}`}
                 style={[
                   styles.indicator,
-                  activeSlide === index && styles.indicatorActive,
+                  activeSlide === index ? styles.indicatorActive : null,
                 ]}
               />
             ))}
           </View>
         </View>
-
+        ) : null}
         {/* Menu Categories - Scroll with Banner */}
         <View style={styles.menuContainer}>
           <ScrollView 
@@ -324,46 +517,99 @@ const HomeScreen = ({ navigation }: any) => {
 
         {/* Restaurant List */}
         <View style={{ backgroundColor: '#fff' }}>
-        {filteredRestaurants.map((restaurant) => (
+        {Array.isArray(filteredRestaurants) && filteredRestaurants.map((restaurant) => {
+          if (!restaurant || typeof restaurant !== 'object') {
+            return null;
+          }
+          
+          try {
+            const restaurantKey = coerceToString(
+              restaurant._id ?? restaurant.id ?? restaurant.name,
+              `key-${Date.now()}-${Math.random()}`
+            );
+            const imageCandidates = getRestaurantImageCandidates(restaurant);
+            const fallbackIndex = restaurantImageFallbacks[restaurantKey] ?? 0;
+            const displayImageUri = imageCandidates[fallbackIndex] || PLACEHOLDER_IMAGE;
+            const normalizedRestaurant = {
+              ...restaurant,
+              image: imageCandidates[0] || restaurant.image,
+            };
+            
+            const ratingNumber = coerceToNumber(restaurant.rating, 4.5);
+            const ratingValue = ratingNumber.toFixed(1);
+            
+            const deliveryTimeValue = coerceToString(
+              restaurant.estimatedDeliveryTime ?? restaurant.deliveryTime,
+              '30-45 phút'
+            );
+            
+            const distanceNumber = coerceToNumber(restaurant.distance, 2);
+            const distanceValue = `${distanceNumber.toFixed(1)} km`;
+            
+            const percentageVoucher = Array.isArray(restaurant.vouchers)
+              ? restaurant.vouchers.find((voucher: any) => voucher?.type === 'percentage')
+              : null;
+            const discountLabel = percentageVoucher && percentageVoucher.value
+              ? `-${coerceToString(percentageVoucher.value)}%`
+              : null;
+
+          return (
           <TouchableOpacity
-            key={restaurant.id}
+            key={restaurantKey}
             style={styles.restaurantCard}
-            onPress={() => navigation.navigate('RestaurantDetail', { restaurant })}
+            onPress={() => navigation.navigate('RestaurantDetail', { restaurant: normalizedRestaurant })}
           >
-            <Image source={{ uri: restaurant.image }} style={styles.restaurantImage} />
+            <Image
+              source={{ uri: displayImageUri }}
+              style={styles.restaurantImage}
+              onError={() => {
+                setRestaurantImageFallbacks((prev) => {
+                  const currentIndex = prev[restaurantKey] ?? 0;
+                  const nextIndex = Math.min(currentIndex + 1, imageCandidates.length - 1);
+                  if (nextIndex === currentIndex) {
+                    return prev;
+                  }
+                  return { ...prev, [restaurantKey]: nextIndex };
+                });
+              }}
+            />
             <View style={styles.restaurantInfo}>
               <View style={styles.restaurantHeader}>
                 <Text style={styles.restaurantName} numberOfLines={1}>
-                  {restaurant.name}
+                  {coerceToString(restaurant.name, 'Nhà hàng')}
                 </Text>
-                <View style={styles.discountBadge}>
-                  <Text style={styles.discountText}>-20%</Text>
-                </View>
+                {discountLabel ? (
+                  <View style={styles.discountBadge}>
+                    <Text style={styles.discountText}>{discountLabel}</Text>
+                  </View>
+                ) : null}
               </View>
               <View style={styles.restaurantMeta}>
                 <View style={styles.ratingContainer}>
                   <Text style={styles.ratingStar}>⭐</Text>
-                  <Text style={styles.rating}>{restaurant.rating}</Text>
+                  <Text style={styles.rating}>{ratingValue}</Text>
                 </View>
                 <Text style={styles.metaDot}>•</Text>
-                <Text style={styles.deliveryTime}>
-                  {restaurant.deliveryTime}
-                </Text>
+                <Text style={styles.deliveryTime}>{deliveryTimeValue}</Text>
                 <Text style={styles.metaDot}>•</Text>
-                <Text style={styles.distance}>{restaurant.distance}km</Text>
+                <Text style={styles.distance}>{distanceValue}</Text>
               </View>
               <View style={styles.promoContainer}>
                 <Text style={styles.promoIcon}>🚁</Text>
-                <Text style={styles.promoText}>
-                  Drone - Siêu tốc
-                </Text>
+                <Text style={styles.promoText}>Drone - Siêu tốc</Text>
               </View>
             </View>
           </TouchableOpacity>
-        ))}
+        );
+          } catch (renderError) {
+            console.error('[HomeScreen] Failed to render restaurant:', renderError);
+            return null;
+          }
+        })}
         <View style={{ height: 20 }} />
         </View>
       </ScrollView>
+      )}
     </View>
   );
 };
@@ -675,6 +921,18 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#EA5034',
     fontWeight: '500',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 100,
+    backgroundColor: '#fff',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#666',
   },
 });
 

@@ -1,10 +1,6 @@
 import { useState, useEffect } from "react";
-import {
-  getAllOrders,
-  getOrdersByRestaurant,
-  updateOrderStatus,
-  subscribeToOrderUpdates,
-} from "../../services/orderService";
+import { useSelector } from "react-redux";
+import { orderAPI } from "../../services/api";
 import "./OrderManagement.css";
 
 function OrderManagement() {
@@ -12,50 +8,48 @@ function OrderManagement() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [orders, setOrders] = useState([]);
-  const restaurantId = "2"; // ID của nhà hàng hiện tại
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  
+  const restaurant = useSelector((state) => state.auth.restaurant);
 
-  // Load orders từ localStorage
+  // Load orders từ API
   useEffect(() => {
-    loadOrders();
-  }, []);
-
-  // Subscribe to real-time order updates
-  useEffect(() => {
-    const unsubscribe = subscribeToOrderUpdates(() => {
-      console.log("Order update received in restaurant-web");
+    if (restaurant?._id) {
       loadOrders();
-    });
+      // Poll mỗi 30 giây để cập nhật đơn hàng mới
+      const interval = setInterval(loadOrders, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [restaurant]);
 
-    return unsubscribe;
-  }, []);
-
-  const loadOrders = () => {
+  const loadOrders = async () => {
     try {
-      console.log("=== Loading orders for restaurant:", restaurantId);
-
-      // Lấy orders từ shared localStorage (chỉ orders của nhà hàng này)
-      const allOrders = getOrdersByRestaurant(restaurantId);
-      console.log("Restaurant orders loaded:", allOrders);
-      console.log("Total orders found:", allOrders.length);
-
-      // Transform data sang format của OrderManagement
-      const transformedOrders = allOrders.map((order) => {
-        console.log("Transforming order:", order.id, order.status);
-        return {
-          id: order.id,
-          customer: order.customerName,
-          phone: order.customerPhone,
-          address: order.deliveryAddress,
+      setLoading(true);
+      setError("");
+      
+      // Lấy orders của nhà hàng từ API (backend tự động filter theo user)
+      const response = await orderAPI.getMyOrders();
+      
+      if (response?.success) {
+        const apiOrders = response.data || [];
+        
+        // Transform data sang format của OrderManagement
+        const transformedOrders = apiOrders.map((order) => ({
+          id: order._id,
+          customer: order.customer?.name || order.deliveryInfo?.name || "Khách hàng",
+          phone: order.customer?.phone || order.deliveryInfo?.phone || "",
+          address: order.deliveryInfo?.address || "",
           items: order.items.map((item) => ({
-            name: item.name,
+            name: item.product?.name || item.name,
             quantity: item.quantity,
             price: item.price,
           })),
-          total: order.total,
+          total: order.totalAmount,
           discount: order.discount || 0,
-          platformFee: Math.round(order.total * 0.1), // 10% platform fee
-          restaurantReceives: order.total - Math.round(order.total * 0.1),
-          distance: 2.5, // Mock distance
+          platformFee: Math.round(order.totalAmount * 0.1), // 10% platform fee
+          restaurantReceives: order.totalAmount - Math.round(order.totalAmount * 0.1),
+          distance: order.distance || 2.5,
           status: mapStatus(order.status),
           time: new Date(order.createdAt).toLocaleTimeString("vi-VN", {
             hour: "2-digit",
@@ -63,13 +57,18 @@ function OrderManagement() {
           }),
           note: order.note || "",
           paymentMethod: order.paymentMethod || "Tiền mặt",
-        };
-      });
+          droneId: order.drone?._id || null,
+        }));
 
-      console.log("Transformed orders:", transformedOrders.length);
-      setOrders(transformedOrders);
-    } catch (error) {
-      console.error("Error loading orders:", error);
+        setOrders(transformedOrders);
+      } else {
+        throw new Error(response?.message || "Không thể tải đơn hàng");
+      }
+    } catch (err) {
+      setError(err?.message || "Đã xảy ra lỗi khi tải đơn hàng");
+      console.error("Error loading orders:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -98,17 +97,16 @@ function OrderManagement() {
     return methodMap[method] || method;
   };
 
-  const updateStatus = (id, newStatus) => {
-    console.log("Updating order status:", id, newStatus);
-
-    // Update in shared localStorage via orderService
-    const updatedOrder = updateOrderStatus(id, newStatus);
-
-    if (updatedOrder) {
-      // Update local state
-      loadOrders();
-    } else {
-      console.error("Failed to update order status");
+  const updateStatus = async (id, newStatus) => {
+    try {
+      const response = await orderAPI.updateStatus(id, newStatus);
+      if (response?.success) {
+        await loadOrders(); // Reload danh sách
+      } else {
+        alert(response?.message || "Không thể cập nhật trạng thái");
+      }
+    } catch (err) {
+      alert(err?.message || "Không thể cập nhật trạng thái đơn hàng");
     }
   };
 
@@ -136,11 +134,36 @@ function OrderManagement() {
 
   const filteredOrders = getFilteredOrders();
 
+  if (loading) {
+    return (
+      <div className="order-management-page">
+        <div className="loading-state">
+          <div className="spinner"></div>
+          <p>Đang tải đơn hàng...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="order-management-page">
+        <div className="error-state">
+          <span>⚠️</span>
+          <p>{error}</p>
+          <button onClick={loadOrders} className="retry-btn">
+            Thử lại
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="order-management-page">
       <div className="page-header">
         <h1>Quản lý đơn hàng</h1>
-        <p className="subtitle">Danh sách đơn hàng chờ xử lý</p>
+        <p className="subtitle">Danh sách đơn hàng của {restaurant?.name}</p>
       </div>
 
       <div className="order-tabs">
@@ -219,7 +242,7 @@ function OrderManagement() {
               <div className="order-footer">
                 <span className="order-time">🕐 {order.time}</span>
                 <span className="order-total">
-                  {order.total.toLocaleString("vi-VN")}đ
+                  {(order.total || 0).toLocaleString("vi-VN")}đ
                 </span>
               </div>
 
@@ -354,7 +377,7 @@ function OrderManagement() {
                       <span className="item-name">{item.name}</span>
                       <span className="item-quantity">x{item.quantity}</span>
                       <span className="item-price">
-                        {(item.price * item.quantity).toLocaleString("vi-VN")}đ
+                        {((item.price || 0) * (item.quantity || 0)).toLocaleString("vi-VN")}đ
                       </span>
                     </div>
                   ))}
@@ -363,25 +386,25 @@ function OrderManagement() {
                   <div className="summary-row">
                     <span className="summary-label">Tổng tiền:</span>
                     <span className="summary-value">
-                      {selectedOrder.total.toLocaleString("vi-VN")}đ
+                      {(selectedOrder.total || 0).toLocaleString("vi-VN")}đ
                     </span>
                   </div>
                   <div className="summary-row">
                     <span className="summary-label">Giảm giá:</span>
                     <span className="summary-value discount">
-                      -{selectedOrder.discount.toLocaleString("vi-VN")}đ
+                      -{(selectedOrder.discount || 0).toLocaleString("vi-VN")}đ
                     </span>
                   </div>
                   <div className="summary-row">
                     <span className="summary-label">Chiết khấu nền tảng:</span>
                     <span className="summary-value fee">
-                      -{selectedOrder.platformFee.toLocaleString("vi-VN")}đ
+                      -{(selectedOrder.platformFee || 0).toLocaleString("vi-VN")}đ
                     </span>
                   </div>
                   <div className="total-row">
                     <span className="total-label">Quán phải thu:</span>
                     <span className="total-value">
-                      {selectedOrder.restaurantReceives.toLocaleString("vi-VN")}
+                      {(selectedOrder.restaurantReceives || 0).toLocaleString("vi-VN")}
                       đ
                     </span>
                   </div>

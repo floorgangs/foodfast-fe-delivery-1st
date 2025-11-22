@@ -5,12 +5,36 @@ import Product from "../models/Product.js";
 export const createOrder = async (req, res) => {
   try {
     const {
-      restaurantId,
+      restaurant: restaurantId,
       items,
       deliveryAddress,
       paymentMethod,
-      customerNote,
+      note: customerNote,
+      voucherCode,
+      subtotal: clientSubtotal,
+      deliveryFee: clientDeliveryFee,
+      discount: clientDiscount,
+      totalAmount: clientTotal,
+      customerInfo,
     } = req.body;
+
+    const isRegisteredCustomer = Boolean(req.user?._id);
+
+    if (!isRegisteredCustomer) {
+      if (!customerInfo?.name || !customerInfo?.phone || !customerInfo?.email) {
+        return res.status(400).json({
+          success: false,
+          message: "Vui lòng cung cấp tên, số điện thoại và email để đặt hàng",
+        });
+      }
+    }
+
+    const normalizedPaymentMethod = "dronepay";
+    if (paymentMethod && paymentMethod !== "dronepay") {
+      console.warn(
+        `[Order] Override payment method ${paymentMethod} -> dronepay để đáp ứng chính sách online`
+      );
+    }
 
     // Validate restaurant
     const restaurant = await Restaurant.findById(restaurantId);
@@ -21,17 +45,17 @@ export const createOrder = async (req, res) => {
       });
     }
 
-    // Calculate totals
+    // Calculate totals server-side for security
     let subtotal = 0;
     const orderItems = [];
 
     for (const item of items) {
-      const product = await Product.findById(item.productId);
+      const product = await Product.findById(item.product);
       if (!product) continue;
 
-      let itemPrice = product.price;
+      let itemPrice = item.price || product.price;
 
-      // Add options price
+      // Add options price if exists
       if (item.options && item.options.length > 0) {
         item.options.forEach((opt) => {
           itemPrice += opt.price || 0;
@@ -50,44 +74,78 @@ export const createOrder = async (req, res) => {
       });
     }
 
-    const deliveryFee = restaurant.deliveryFee || 15000;
-    const total = subtotal + deliveryFee;
+    const deliveryFee = clientDeliveryFee || restaurant.deliveryFee || 15000;
+    const discount = clientDiscount || 0;
+    const total = subtotal + deliveryFee - discount;
+
+    // Generate order number
+    const orderNumber = `FD${Date.now()}`;
+    const paymentSessionId = `PAY-${Date.now()}-${Math.floor(Math.random() * 9999)}`;
+    const paymentSessionExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    const paymentProvider = "DronePay Gateway";
 
     const order = await Order.create({
-      customer: req.user._id,
+      orderNumber,
+      customer: req.user?._id,
+      customerType: isRegisteredCustomer ? "registered" : "guest",
+      guestCustomer: isRegisteredCustomer
+        ? undefined
+        : {
+            name: customerInfo.name,
+            phone: customerInfo.phone,
+            email: customerInfo.email,
+          },
       restaurant: restaurantId,
       items: orderItems,
       subtotal,
       deliveryFee,
+      discount,
       total,
       deliveryAddress,
-      paymentMethod,
+      paymentMethod: normalizedPaymentMethod,
+      paymentProvider,
+      paymentSessionId,
+      paymentSessionExpiresAt,
       customerNote,
+      voucherCode,
+      status: "pending",
       timeline: [
         {
           status: "pending",
           note: "Đơn hàng đã được tạo",
+          timestamp: new Date(),
         },
       ],
     });
 
-    const populatedOrder = await Order.findById(order._id)
-      .populate("customer", "name phone")
+    let orderQuery = Order.findById(order._id)
       .populate("restaurant", "name phone address")
       .populate("items.product", "name image");
 
-    // Emit socket event (sẽ thêm sau)
-    if (req.app.get("io")) {
-      req.app
-        .get("io")
-        .to(`restaurant_${restaurantId}`)
-        .emit("new_order", populatedOrder);
-      req.app.get("io").to("admin").emit("new_order", populatedOrder);
+    if (order.customer) {
+      orderQuery = orderQuery.populate("customer", "name phone");
+    }
+
+    const populatedOrder = await orderQuery;
+
+    // Emit socket event to restaurant and admin
+    if (req.io) {
+      req.io.to(`restaurant_${restaurantId}`).emit("new_order", populatedOrder);
+      req.io.to("admin").emit("new_order", populatedOrder);
     }
 
     res.status(201).json({
       success: true,
       data: populatedOrder,
+      paymentSession: {
+        sessionId: paymentSessionId,
+        providerName: paymentProvider,
+        amount: total,
+        expiresAt: paymentSessionExpiresAt,
+        redirectUrl:
+          process.env.THIRD_PARTY_PAYMENT_URL ||
+          `https://dronepay.foodfast.dev/session/${paymentSessionId}`,
+      },
     });
   } catch (error) {
     res.status(500).json({
@@ -240,16 +298,12 @@ export const updateOrderStatus = async (req, res) => {
       .populate("items.product", "name image");
 
     // Emit socket event
-    if (req.app.get("io")) {
-      req.app
-        .get("io")
-        .to(`customer_${order.customer}`)
-        .emit("order_updated", populatedOrder);
-      req.app
-        .get("io")
-        .to(`restaurant_${order.restaurant}`)
-        .emit("order_updated", populatedOrder);
-      req.app.get("io").to("admin").emit("order_updated", populatedOrder);
+    if (req.io) {
+      if (order.customer) {
+        req.io.to(`customer_${order.customer}`).emit("order_updated", populatedOrder);
+      }
+      req.io.to(`restaurant_${order.restaurant}`).emit("order_updated", populatedOrder);
+      req.io.to("admin").emit("order_updated", populatedOrder);
     }
 
     res.json({
@@ -294,12 +348,12 @@ export const cancelOrder = async (req, res) => {
     await order.save();
 
     // Emit socket event
-    if (req.app.get("io")) {
-      req.app
-        .get("io")
-        .to(`restaurant_${order.restaurant}`)
-        .emit("order_cancelled", order);
-      req.app.get("io").to("admin").emit("order_cancelled", order);
+    if (req.io) {
+      if (order.customer) {
+        req.io.to(`customer_${order.customer}`).emit("order_cancelled", order);
+      }
+      req.io.to(`restaurant_${order.restaurant}`).emit("order_cancelled", order);
+      req.io.to("admin").emit("order_cancelled", order);
     }
 
     res.json({

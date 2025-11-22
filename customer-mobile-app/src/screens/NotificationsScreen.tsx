@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,85 +8,72 @@ import {
   Image,
   StatusBar,
   Platform,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 
 interface Notification {
-  id: string;
+  _id: string;
+  user: string;
   type: 'order' | 'promo' | 'system';
   title: string;
   message: string;
-  time: string;
+  relatedOrder?: string;
   isRead: boolean;
-  icon: string;
+  createdAt: string;
 }
 
-const mockNotifications: Notification[] = [
-  {
-    id: '1',
-    type: 'order',
-    title: 'Đơn hàng đang giao',
-    message: 'Drone đang trên đường giao hàng đến bạn. Dự kiến 10 phút nữa.',
-    time: '5 phút trước',
-    isRead: false,
-    icon: '🚁',
-  },
-  {
-    id: '2',
-    type: 'promo',
-    title: 'Giảm 50K cho đơn đầu tiên',
-    message: 'Mã giảm giá WELCOME50 đã được thêm vào tài khoản của bạn.',
-    time: '1 giờ trước',
-    isRead: false,
-    icon: '🎁',
-  },
-  {
-    id: '3',
-    type: 'order',
-    title: 'Giao hàng thành công',
-    message: 'Đơn hàng #12345 đã được giao thành công. Cảm ơn bạn đã sử dụng dịch vụ!',
-    time: '2 giờ trước',
-    isRead: true,
-    icon: '✅',
-  },
-  {
-    id: '4',
-    type: 'promo',
-    title: 'Flash Sale - Giảm 30%',
-    message: 'Flash Sale đang diễn ra! Giảm giá 30% cho tất cả món ăn từ 10:00 - 14:00.',
-    time: '3 giờ trước',
-    isRead: true,
-    icon: '🔥',
-  },
-  {
-    id: '5',
-    type: 'system',
-    title: 'Cập nhật hệ thống',
-    message: 'FoodFast đã cập nhật tính năng mới: Theo dõi drone realtime.',
-    time: '1 ngày trước',
-    isRead: true,
-    icon: '📱',
-  },
-  {
-    id: '6',
-    type: 'order',
-    title: 'Nhà hàng đã xác nhận',
-    message: 'Đơn hàng của bạn đã được nhà hàng xác nhận và đang chuẩn bị.',
-    time: '1 ngày trước',
-    isRead: true,
-    icon: '👨‍🍳',
-  },
-  {
-    id: '7',
-    type: 'promo',
-    title: 'Tích điểm đổi quà',
-    message: 'Bạn đã tích đủ 100 điểm! Đổi ngay quà tặng hấp dẫn.',
-    time: '2 ngày trước',
-    isRead: true,
-    icon: '💝',
-  },
-];
+// TODO: Implement notification API
+// Current: Using empty array until backend notification API is implemented
+// Backend already has Notification model, need to add routes/controllers
 
 const NotificationsScreen = () => {
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Placeholder - will fetch from API when notification routes are implemented
+  const fetchNotifications = async () => {
+    try {
+      setLoading(false);
+      setRefreshing(false);
+      // await notificationAPI.getMyNotifications();
+    } catch (error) {
+      console.error('Fetch notifications error:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchNotifications();
+  };
+
+  const getIcon = (type: string) => {
+    switch (type) {
+      case 'order': return '🚁';
+      case 'promo': return '🎁';
+      case 'system': return '📱';
+      default: return '📬';
+    }
+  };
+
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 60) return `${minutes} phút trước`;
+    if (hours < 24) return `${hours} giờ trước`;
+    return `${days} ngày trước`;
+  };
+
   const getNotificationStyle = (type: string) => {
     switch (type) {
       case 'order':
@@ -110,34 +97,52 @@ const NotificationsScreen = () => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {mockNotifications.map((notification) => (
-          <TouchableOpacity
-            key={notification.id}
-            style={[
-              styles.notificationCard,
-              !notification.isRead && styles.unreadCard,
-            ]}
-          >
-            <View style={[styles.iconContainer, getNotificationStyle(notification.type)]}>
-              <Text style={styles.icon}>{notification.icon}</Text>
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#EA5034" />
+        </View>
+      ) : (
+        <ScrollView 
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#EA5034']} />
+          }
+        >
+          {notifications.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyIcon}>🔔</Text>
+              <Text style={styles.emptyText}>Chưa có thông báo</Text>
             </View>
-            <View style={styles.contentContainer}>
-              <View style={styles.titleRow}>
-                <Text style={styles.title}>{notification.title}</Text>
-                {!notification.isRead && <View style={styles.unreadDot} />}
-              </View>
-              <Text style={styles.message} numberOfLines={2}>
-                {notification.message}
-              </Text>
-              <Text style={styles.time}>{notification.time}</Text>
-            </View>
-          </TouchableOpacity>
-        ))}
-
-        {/* Empty space at bottom */}
-        <View style={{ height: 20 }} />
-      </ScrollView>
+          ) : (
+            <>
+              {notifications.map((notification) => (
+                <TouchableOpacity
+                  key={notification._id}
+                  style={[
+                    styles.notificationCard,
+                    !notification.isRead && styles.unreadCard,
+                  ]}
+                >
+                  <View style={[styles.iconContainer, getNotificationStyle(notification.type)]}>
+                    <Text style={styles.icon}>{getIcon(notification.type)}</Text>
+                  </View>
+                  <View style={styles.contentContainer}>
+                    <View style={styles.titleRow}>
+                      <Text style={styles.title}>{notification.title}</Text>
+                      {!notification.isRead && <View style={styles.unreadDot} />}
+                    </View>
+                    <Text style={styles.message} numberOfLines={2}>
+                      {notification.message}
+                    </Text>
+                    <Text style={styles.time}>{formatTime(notification.createdAt)}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+              <View style={{ height: 20 }} />
+            </>
+          )}
+        </ScrollView>
+      )}
     </View>
   );
 };
@@ -147,6 +152,25 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 100,
+  },
+  emptyIcon: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#999',
   },
   header: {
     backgroundColor: '#fff',

@@ -10,7 +10,16 @@ const orderSchema = new mongoose.Schema(
     customer: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+    },
+    customerType: {
+      type: String,
+      enum: ["registered", "guest"],
+      default: "registered",
+    },
+    guestCustomer: {
+      name: String,
+      phone: String,
+      email: String,
     },
     restaurant: {
       type: mongoose.Schema.Types.ObjectId,
@@ -76,9 +85,16 @@ const orderSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ["cash", "momo", "zalopay", "card", "banking"],
+      enum: ["momo", "zalopay", "card", "banking", "dronepay"],
       required: true,
     },
+    paymentProvider: {
+      type: String,
+    },
+    paymentSessionId: {
+      type: String,
+    },
+    paymentSessionExpiresAt: Date,
     paymentStatus: {
       type: String,
       enum: ["pending", "paid", "failed", "refunded"],
@@ -125,6 +141,20 @@ const orderSchema = new mongoose.Schema(
         note: String,
       },
     ],
+    isReviewed: {
+      type: Boolean,
+      default: false,
+    },
+    customerReview: {
+      rating: Number,
+      comment: String,
+      product: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Product",
+      },
+      images: [String],
+      reviewedAt: Date,
+    },
   },
   {
     timestamps: true,

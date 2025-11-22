@@ -523,8 +523,8 @@ const OrderTrackingScreen = ({ navigation }: any) => {
                     )}
                   </View>
                   <View style={styles.timelineContent}>
-                    <Text style={[styles.timelineTitle, reached && styles.timelineTitleActive]}>{step.label}</Text>
-                    <Text style={styles.timelineDescription}>{step.description}</Text>
+                    <Text style={[styles.timelineTitle, reached && styles.timelineTitleActive]}>{String(step.label)}</Text>
+                    <Text style={styles.timelineDescription}>{String(step.description)}</Text>
                   </View>
                 </View>
               );
@@ -536,19 +536,19 @@ const OrderTrackingScreen = ({ navigation }: any) => {
             {activeOrder.items.slice(0, 3).map((item: any, index: number) => (
               <View key={`${item.id}-${index}`} style={styles.orderRow}>
                 <Text style={styles.orderRowText}>
-                  {item.quantity}x {item.name}
+                  {`${item.quantity}x ${item.name}`}
                 </Text>
                 <Text style={styles.orderRowPrice}>
-                  {(item.price * item.quantity).toLocaleString('vi-VN')}đ
+                  {`${(item.price * item.quantity).toLocaleString('vi-VN')}đ`}
                 </Text>
               </View>
             ))}
             {activeOrder.items.length > 3 && (
-              <Text style={styles.moreItemsText}>và {activeOrder.items.length - 3} món khác</Text>
+              <Text style={styles.moreItemsText}>{`và ${activeOrder.items.length - 3} món khác`}</Text>
             )}
             <View style={styles.totalRow}>
               <Text style={styles.totalLabel}>Tổng cộng</Text>
-              <Text style={styles.totalValue}>{activeOrder.total.toLocaleString('vi-VN')}đ</Text>
+              <Text style={styles.totalValue}>{`${activeOrder.total.toLocaleString('vi-VN')}đ`}</Text>
             </View>
           </View>
 
@@ -576,7 +576,7 @@ const OrderTrackingScreen = ({ navigation }: any) => {
                 {acknowledged ? 'Đã xác nhận' : 'Tôi đã nhận hàng'}
               </Text>
             </TouchableOpacity>
-            <Text style={styles.pinNote}>Mã PIN: {activeOrder.unlockPin ?? '****'}</Text>
+            <Text style={styles.pinNote}>{`Mã PIN: ${activeOrder.unlockPin ?? '****'}`}</Text>
           </View>
         </ScrollView>
       </View>

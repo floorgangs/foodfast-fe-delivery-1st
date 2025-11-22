@@ -1,63 +1,57 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useSelector } from 'react-redux'
+import { useSelector, useDispatch } from 'react-redux'
+import { restaurantAPI } from '../../services/api'
+import { setRestaurant } from '../../store/slices/authSlice'
 import './RestaurantHub.css'
 
 function RestaurantHub() {
   const navigate = useNavigate()
+  const dispatch = useDispatch()
   const user = useSelector((state) => state.auth.user)
   const [restaurants, setRestaurants] = useState([])
   const [showRegisterForm, setShowRegisterForm] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    // Load danh sách nhà hàng từ localStorage
-    const stored = window.localStorage.getItem('foodfastRestaurants')
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored)
-        setRestaurants(parsed)
-      } catch (error) {
-        setRestaurants([])
-      }
-    } else {
-      // Tạo nhà hàng mẫu để demo
-      const demoRestaurants = [
-        {
-          id: 'demo-restaurant-001',
-          name: 'Bún Bò Huế Mỹ Tho',
-          location: '123 Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP.HCM',
-          ownerName: 'Nguyễn Văn A',
-          email: 'bunbohuemytho@gmail.com',
-          phone: '0901234567',
-          taxCode: '0123456789',
-          taxRate: '4.5',
-          cuisine: 'Ẩm thực Việt',
-          approved: true,
-          createdAt: '2024-01-15T08:30:00.000Z',
-        },
-        {
-          id: 'demo-restaurant-002',
-          name: 'Phở Hà Nội 24h',
-          location: '456 Lê Lợi, Phường Bến Thành, Quận 1, TP.HCM',
-          ownerName: 'Trần Thị B',
-          email: 'phohanoi24h@gmail.com',
-          phone: '0912345678',
-          taxCode: '0987654321',
-          taxRate: '4.5',
-          cuisine: 'Ẩm thực Việt',
-          approved: false,
-          createdAt: '2024-11-10T14:20:00.000Z',
-        },
-      ]
-      setRestaurants(demoRestaurants)
-      window.localStorage.setItem('foodfastRestaurants', JSON.stringify(demoRestaurants))
-    }
+    loadRestaurants()
   }, [])
 
-  const handleSelectRestaurant = (restaurantId) => {
-    // Lưu nhà hàng được chọn
-    window.localStorage.setItem('selectedRestaurantId', restaurantId)
-    navigate('/dashboard')
+  const loadRestaurants = async () => {
+    try {
+      setLoading(true)
+      setError('')
+      // Lấy tất cả nhà hàng của user hiện tại (owner)
+      const response = await restaurantAPI.getAll({ owner: user?._id || user?.id })
+      if (response.success) {
+        setRestaurants(response.data || [])
+      }
+    } catch (err) {
+      console.error('Error loading restaurants:', err)
+      setError('Không thể tải danh sách nhà hàng')
+      setRestaurants([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSelectRestaurant = async (restaurantId) => {
+    try {
+      // Lấy thông tin chi tiết nhà hàng
+      const response = await restaurantAPI.getById(restaurantId)
+      if (response.success) {
+        // Lưu vào Redux store
+        dispatch(setRestaurant(response.data))
+        // Lưu ID vào localStorage để nhớ lần sau
+        localStorage.setItem('foodfastLastRestaurantId', restaurantId)
+        // Chuyển đến dashboard
+        navigate('/dashboard')
+      }
+    } catch (err) {
+      console.error('Error selecting restaurant:', err)
+      alert('Không thể chọn nhà hàng này')
+    }
   }
 
   return (
@@ -83,51 +77,76 @@ function RestaurantHub() {
           <p>Chọn nhà hàng để quản lý hoặc đăng ký nhà hàng mới để tham gia FoodFast</p>
         </section>
 
-        <div className="hub-grid">
-          {/* Card đăng ký nhà hàng mới */}
-          <button
-            type="button"
-            className="hub-card hub-card-register"
-            onClick={() => setShowRegisterForm(true)}
-          >
-            <div className="hub-card-icon">
-              <span>➕</span>
-            </div>
-            <h3>Đăng ký nhà hàng mới</h3>
-            <p>Mở rộng kinh doanh với FoodFast</p>
-          </button>
-
-          {/* Danh sách nhà hàng đã đăng ký */}
-          {restaurants.map((restaurant) => (
-            <button
-              key={restaurant.id}
-              type="button"
-              className="hub-card hub-card-restaurant"
-              onClick={() => handleSelectRestaurant(restaurant.id)}
-            >
-              <div className="hub-card-status">
-                {restaurant.approved ? (
-                  <span className="status-badge status-approved">✓ Đã duyệt</span>
-                ) : (
-                  <span className="status-badge status-pending">⏳ Chờ duyệt</span>
-                )}
-              </div>
-              <h3>{restaurant.name}</h3>
-              <p className="restaurant-address">{restaurant.location}</p>
-              <div className="restaurant-meta">
-                <span>📞 {restaurant.phone}</span>
-                <span>🍽️ {restaurant.cuisine || 'Ẩm thực'}</span>
-              </div>
-            </button>
-          ))}
-        </div>
-
-        {restaurants.length === 0 && !showRegisterForm && (
-          <div className="hub-empty">
-            <span className="empty-icon">🏪</span>
-            <h3>Chưa có nhà hàng nào</h3>
-            <p>Hãy đăng ký nhà hàng đầu tiên của bạn để bắt đầu</p>
+        {loading ? (
+          <div className="hub-loading">
+            <div className="spinner"></div>
+            <p>Đang tải danh sách nhà hàng...</p>
           </div>
+        ) : error ? (
+          <div className="hub-error">
+            <span className="error-icon">⚠️</span>
+            <h3>{error}</h3>
+            <button onClick={loadRestaurants} className="btn-retry">Thử lại</button>
+          </div>
+        ) : (
+          <>
+            <div className="hub-grid">
+              {/* Card đăng ký nhà hàng mới */}
+              <button
+                type="button"
+                className="hub-card hub-card-register"
+                onClick={() => setShowRegisterForm(true)}
+              >
+                <div className="hub-card-icon">
+                  <span>➕</span>
+                </div>
+                <h3>Đăng ký nhà hàng mới</h3>
+                <p>Mở rộng kinh doanh với FoodFast</p>
+              </button>
+
+              {/* Danh sách nhà hàng đã đăng ký */}
+              {restaurants.map((restaurant) => {
+                const restaurantId = restaurant._id || restaurant.id
+                const addressParts = []
+                if (restaurant.address?.street) addressParts.push(restaurant.address.street)
+                if (restaurant.address?.ward) addressParts.push(restaurant.address.ward)
+                if (restaurant.address?.district) addressParts.push(restaurant.address.district)
+                if (restaurant.address?.city) addressParts.push(restaurant.address.city)
+                const fullAddress = addressParts.join(', ') || 'Chưa có địa chỉ'
+                
+                return (
+                  <button
+                    key={restaurantId}
+                    type="button"
+                    className="hub-card hub-card-restaurant"
+                    onClick={() => handleSelectRestaurant(restaurantId)}
+                  >
+                    <div className="hub-card-status">
+                      {restaurant.isApproved ? (
+                        <span className="status-badge status-approved">✓ Đã duyệt</span>
+                      ) : (
+                        <span className="status-badge status-pending">⏳ Chờ duyệt</span>
+                      )}
+                    </div>
+                    <h3>{restaurant.name}</h3>
+                    <p className="restaurant-address">{fullAddress}</p>
+                    <div className="restaurant-meta">
+                      <span>📞 {restaurant.phone}</span>
+                      <span>🍽️ {restaurant.cuisine?.[0] || 'Ẩm thực'}</span>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+
+            {restaurants.length === 0 && !showRegisterForm && (
+              <div className="hub-empty">
+                <span className="empty-icon">🏪</span>
+                <h3>Chưa có nhà hàng nào</h3>
+                <p>Hãy đăng ký nhà hàng đầu tiên của bạn để bắt đầu</p>
+              </div>
+            )}
+          </>
         )}
       </main>
 
@@ -185,37 +204,53 @@ function RegisterRestaurantModal({ onClose, onSuccess }) {
     setFormData((prev) => ({ ...prev, relatedDocuments: files }))
   }
 
-  const handleSubmit = (e) => {
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
+
+  const handleSubmit = async (e) => {
     e.preventDefault()
+    setSubmitting(true)
+    setSubmitError('')
 
-    // Tạo object nhà hàng mới
-    const newRestaurant = {
-      id: `restaurant-${Date.now()}`,
-      name: formData.name,
-      location: formData.location,
-      ownerName: formData.ownerName,
-      email: formData.email,
-      phone: formData.phone,
-      taxCode: formData.taxCode,
-      taxRate: formData.taxRate,
-      approved: false,
-      createdAt: new Date().toISOString(),
-    }
-
-    // Lưu vào localStorage
-    const stored = window.localStorage.getItem('foodfastRestaurants')
-    let restaurants = []
-    if (stored) {
-      try {
-        restaurants = JSON.parse(stored)
-      } catch (error) {
-        restaurants = []
+    try {
+      // Tạo object nhà hàng mới theo schema backend
+      const restaurantData = {
+        name: formData.name,
+        description: `Nhà hàng ${formData.name}`,
+        cuisine: ['Ẩm thực Việt'], // Có thể thêm field chọn cuisine sau
+        address: {
+          street: formData.location,
+          city: 'TP.HCM', // Có thể thêm field chọn thành phố sau
+          district: '', // Có thể parse từ location
+          ward: '',
+        },
+        phone: formData.phone,
+        email: formData.email,
+        // Thông tin banking
+        bankInfo: {
+          bankName: formData.bankName,
+          accountNumber: formData.bankAccountNumber,
+          accountName: formData.bankAccountName,
+          branch: formData.bankBranch,
+        },
+        // Note: File uploads cần xử lý riêng (upload lên cloud storage)
+        // Tạm thời gửi thông tin text trước
+        taxCode: formData.taxCode,
+        isApproved: false, // Mặc định chờ admin duyệt
       }
-    }
-    restaurants.push(newRestaurant)
-    window.localStorage.setItem('foodfastRestaurants', JSON.stringify(restaurants))
 
-    onSuccess(newRestaurant)
+      const response = await restaurantAPI.create(restaurantData)
+      
+      if (response.success) {
+        alert('Đăng ký nhà hàng thành công! Vui lòng chờ admin phê duyệt.')
+        onSuccess(response.data)
+      }
+    } catch (err) {
+      console.error('Error creating restaurant:', err)
+      setSubmitError(err.message || 'Không thể đăng ký nhà hàng. Vui lòng thử lại.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -444,12 +479,18 @@ function RegisterRestaurantModal({ onClose, onSuccess }) {
             </label>
           </div>
 
+          {submitError && (
+            <div className="form-error">
+              <span>⚠️ {submitError}</span>
+            </div>
+          )}
+
           <div className="form-actions">
-            <button type="button" onClick={onClose} className="btn-cancel">
+            <button type="button" onClick={onClose} className="btn-cancel" disabled={submitting}>
               Hủy
             </button>
-            <button type="submit" className="btn-submit">
-              Gửi đăng ký
+            <button type="submit" className="btn-submit" disabled={submitting}>
+              {submitting ? 'Đang gửi...' : 'Gửi đăng ký'}
             </button>
           </div>
         </form>
