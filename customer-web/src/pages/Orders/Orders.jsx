@@ -1,10 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
-import axios from "axios";
+import { orderAPI } from "../../services/api";
 import "./Orders.css";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 function Orders() {
   const navigate = useNavigate();
@@ -24,14 +22,9 @@ function Orders() {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("token");
-      const response = await axios.get(`${API_URL}/orders`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-
-      if (response.data.success) {
-        setOrders(response.data.data);
-      }
+      const response = await orderAPI.getMyOrders();
+      const data = response?.data ?? response;
+      setOrders(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error fetching orders:", error);
     } finally {

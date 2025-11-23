@@ -11,7 +11,9 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useSelector } from 'react-redux';
+import { RootState } from '../store';
 import { notificationAPI } from '../services/api';
 
 interface Notification {
@@ -31,11 +33,20 @@ interface Notification {
 }
 
 const NotificationsScreen = () => {
+  const navigation = useNavigation<any>();
+  const { isAuthenticated } = useSelector((state: RootState) => state.auth);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchNotifications = async () => {
+    // Skip if not authenticated
+    if (!isAuthenticated) {
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
     try {
       const response = await notificationAPI.getAll();
       if (response?.data) {
@@ -43,6 +54,7 @@ const NotificationsScreen = () => {
       }
     } catch (error) {
       console.error('Fetch notifications error:', error);
+      // Don't show error if it's just authentication issue
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -94,6 +106,27 @@ const NotificationsScreen = () => {
         return { backgroundColor: '#F5F5F5' };
     }
   };
+
+  // Show login prompt if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Thông báo</Text>
+        </View>
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyIcon}>🔔</Text>
+          <Text style={styles.emptyText}>Vui lòng đăng nhập để xem thông báo</Text>
+          <TouchableOpacity 
+            style={styles.loginButton}
+            onPress={() => navigation.navigate('Login')}
+          >
+            <Text style={styles.loginButtonText}>Đăng nhập</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -186,6 +219,19 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     color: '#999',
+    marginBottom: 20,
+  },
+  loginButton: {
+    backgroundColor: '#EA5034',
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  loginButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   header: {
     backgroundColor: '#fff',

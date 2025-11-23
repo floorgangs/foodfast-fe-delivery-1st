@@ -1,9 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import axios from "axios";
+import { restaurantAPI } from "../../services/api";
 import "./Home.css";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 function Home() {
   const [restaurantList, setRestaurantList] = useState([]);
@@ -25,10 +23,9 @@ function Home() {
     try {
       setLoading(true);
       setError(null);
-      const response = await axios.get(`${API_URL}/restaurants`);
-      if (response.data.success) {
-        setRestaurantList(response.data.data);
-      }
+      const response = await restaurantAPI.getAll();
+      const data = response?.data ?? response;
+      setRestaurantList(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Error fetching restaurants:", err);
       setError("Không thể tải danh sách nhà hàng. Vui lòng thử lại sau.");
@@ -47,8 +44,16 @@ function Home() {
       restaurant.description?.toLowerCase().includes(searchLower) ||
       (restaurant.cuisine &&
         restaurant.cuisine.some((c) => c.toLowerCase().includes(searchLower)));
+    
+    // Normalize category matching giống mobile app
+    const normalizedCategory = category.trim().toLowerCase();
     const matchesCategory =
-      category === "all" || restaurant.cuisine?.includes(category);
+      category === "all" ||
+      (restaurant.cuisine?.some((item) =>
+        String(item).toLowerCase() === normalizedCategory
+      )) ||
+      restaurant.name.toLowerCase().includes(normalizedCategory);
+    
     const matchesRating = restaurant.rating >= minRating;
     const matchesPrice =
       maxPrice === 500000 ||
@@ -212,31 +217,64 @@ function Home() {
             className={category === "all" ? "active" : ""}
             onClick={() => setCategory("all")}
           >
-            Tất cả
+            <span className="category-icon">🍽️</span>
+            <span className="category-label">Tất cả</span>
           </button>
           <button
-            className={category === "vietnamese" ? "active" : ""}
-            onClick={() => setCategory("vietnamese")}
+            className={category === "pizza" ? "active" : ""}
+            onClick={() => setCategory("pizza")}
           >
-            Món Việt
+            <span className="category-icon">🍕</span>
+            <span className="category-label">Pizza</span>
           </button>
           <button
-            className={category === "fastfood" ? "active" : ""}
-            onClick={() => setCategory("fastfood")}
+            className={category === "burger" ? "active" : ""}
+            onClick={() => setCategory("burger")}
           >
-            Fastfood
+            <span className="category-icon">🍔</span>
+            <span className="category-label">Burger</span>
           </button>
           <button
-            className={category === "asian" ? "active" : ""}
-            onClick={() => setCategory("asian")}
+            className={category === "phở" ? "active" : ""}
+            onClick={() => setCategory("phở")}
           >
-            Món Á
+            <span className="category-icon">🍜</span>
+            <span className="category-label">Phở</span>
           </button>
           <button
-            className={category === "drink" ? "active" : ""}
-            onClick={() => setCategory("drink")}
+            className={category === "cơm" ? "active" : ""}
+            onClick={() => setCategory("cơm")}
           >
-            Đồ uống
+            <span className="category-icon">🍱</span>
+            <span className="category-label">Cơm</span>
+          </button>
+          <button
+            className={category === "bánh" ? "active" : ""}
+            onClick={() => setCategory("bánh")}
+          >
+            <span className="category-icon">🍰</span>
+            <span className="category-label">Bánh</span>
+          </button>
+          <button
+            className={category === "Đồ uống" ? "active" : ""}
+            onClick={() => setCategory("Đồ uống")}
+          >
+            <span className="category-icon">☕</span>
+            <span className="category-label">Đồ uống</span>
+          </button>
+          <button
+            className={category === "gà" ? "active" : ""}
+            onClick={() => setCategory("gà")}
+          >
+            <span className="category-icon">🍗</span>
+            <span className="category-label">Gà rán</span>
+          </button>
+          <button
+            className={category === "salad" ? "active" : ""}
+            onClick={() => setCategory("salad")}
+          >
+            <span className="category-icon">🥗</span>
+            <span className="category-label">Salad</span>
           </button>
         </div>
 
@@ -266,11 +304,6 @@ function Home() {
               </div>
               <div className="restaurant-info">
                 <h3>{restaurant.name}</h3>
-                <p className="cuisine">
-                  {Array.isArray(restaurant.cuisine)
-                    ? restaurant.cuisine.join(", ")
-                    : restaurant.cuisine}
-                </p>
                 <div className="restaurant-meta">
                   <span className="rating">
                     ⭐ {restaurant.rating.toFixed(1)}
@@ -285,12 +318,12 @@ function Home() {
                 </p>
                 <div className="restaurant-footer">
                   <span className="min-order">
-                    Tối thiểu: {restaurant.minOrder?.toLocaleString()}đ
+                    {restaurant.minOrder?.toLocaleString()}đ
                   </span>
                   <span className="delivery-fee">
                     {restaurant.deliveryFee === 0
-                      ? "🚀 Miễn phí ship"
-                      : `Phí ship: ${restaurant.deliveryFee?.toLocaleString()}đ`}
+                      ? "🚀 Free"
+                      : `${restaurant.deliveryFee?.toLocaleString()}đ`}
                   </span>
                 </div>
               </div>

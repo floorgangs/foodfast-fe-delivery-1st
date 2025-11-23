@@ -16,24 +16,36 @@
 }
 
 .header .container {
-  max-width: 100%;
-  margin: 0 auto;
-  padding: 0.4rem 24px;
+  width: 100%;
+  padding: 0.75rem 16px;
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
+@media (min-width: 768px) {
+  .header .container {
+    padding: 0.75rem 40px;
+  }
+}
+
 .logo {
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   font-weight: 700;
   color: #ea5034;
   text-decoration: none;
   display: flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.3rem;
   transition: all 0.2s ease;
   letter-spacing: -0.3px;
+}
+
+@media (min-width: 768px) {
+  .logo {
+    font-size: 1.25rem;
+    gap: 0.35rem;
+  }
 }
 
 .logo:hover {
@@ -42,21 +54,45 @@
 
 .nav {
   display: flex;
-  gap: 1.5rem;
+  gap: 0.75rem;
   align-items: center;
+}
+
+@media (min-width: 768px) {
+  .nav {
+    gap: 1.5rem;
+  }
 }
 
 .nav a {
   color: #333;
   text-decoration: none;
   font-weight: 500;
-  padding: 0.3rem 0;
+  padding: 0.4rem;
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
   gap: 0.3rem;
-  font-size: 0.8125rem;
+  font-size: 1.1rem;
   position: relative;
+}
+
+@media (min-width: 768px) {
+  .nav a {
+    padding: 0.3rem 0;
+    font-size: 0.8125rem;
+  }
+}
+
+/* Hide text on mobile, keep icons */
+.nav a span {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .nav a span {
+    display: inline;
+  }
 }
 
 .nav a:hover {
@@ -98,14 +134,30 @@
 
 .logout-btn {
   background: transparent;
-  border: 1px solid #e0e0e0;
+  border: none;
   color: #333;
-  padding: 0.35rem 0.875rem;
+  padding: 0.4rem;
   border-radius: 6px;
   cursor: pointer;
   font-weight: 500;
-  font-size: 0.75rem;
+  font-size: 1.1rem;
   transition: all 0.2s ease;
+}
+
+.logout-btn span {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .logout-btn {
+    border: 1px solid #e0e0e0;
+    padding: 0.35rem 0.875rem;
+    font-size: 0.75rem;
+  }
+  
+  .logout-btn span {
+    display: inline;
+  }
 }
 
 .logout-btn:hover {
@@ -115,10 +167,18 @@
 }
 
 .auth-link {
-  padding: 0.35rem 0.875rem !important;
-  border: 1px solid #e0e0e0;
+  padding: 0.4rem !important;
+  border: none;
   border-radius: 6px;
-  font-size: 0.75rem !important;
+  font-size: 1.1rem !important;
+}
+
+@media (min-width: 768px) {
+  .auth-link {
+    padding: 0.35rem 0.875rem !important;
+    border: 1px solid #e0e0e0;
+    font-size: 0.75rem !important;
+  }
 }
 
 .auth-link:hover {
@@ -132,59 +192,67 @@
 
 .main {
   flex: 1;
-  padding: 2.5rem 0;
+  padding: 1.5rem 0;
   background: #f8f9fa;
+}
+
+@media (min-width: 768px) {
+  .main {
+    padding: 2.5rem 0;
+  }
 }
 
 /* Add space when active order banner is shown */
 .layout.has-active-banner .main {
-  padding-top: calc(2.5rem + 80px); /* Original padding + banner height */
+  padding-top: calc(1.5rem + 80px);
+}
+
+@media (min-width: 768px) {
+  .layout.has-active-banner .main {
+    padding-top: calc(2.5rem + 80px);
+  }
 }
 
 .footer {
   background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
   color: white;
-  padding: 2.5rem 0;
+  padding: 1.5rem 0;
   text-align: center;
   margin-top: auto;
 }
 
+@media (min-width: 768px) {
+  .footer {
+    padding: 2.5rem 0;
+  }
+}
+
 .footer .container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 20px;
+  width: 100%;
+  padding: 0 16px;
+}
+
+@media (min-width: 768px) {
+  .footer .container {
+    padding: 0 40px;
+  }
+}
+
+@media (min-width: 1440px) {
+  .footer .container {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
 }
 
 .footer p {
   margin: 0;
   opacity: 0.9;
+  font-size: 0.875rem;
 }
 
-@media (max-width: 768px) {
-  .header .container {
-    padding: 0.35rem 16px;
-  }
-
-  .nav {
-    gap: 0.5rem;
-  }
-
-  .nav a {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.75rem;
-  }
-
-  .logo {
-    font-size: 1.1rem;
-  }
-
-  .cart-link {
+@media (min-width: 768px) {
+  .footer p {
     font-size: 1rem;
-    padding: 0.25rem 0.5rem;
-  }
-
-  .logout-btn {
-    padding: 0.3rem 0.75rem;
-    font-size: 0.7rem;
   }
 }

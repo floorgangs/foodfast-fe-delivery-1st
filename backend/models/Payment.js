@@ -6,25 +6,45 @@ const paymentSchema = new mongoose.Schema(
       type: String,
       required: true,
       unique: true,
+      trim: true,
     },
-    orderId: {
+    order: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Order",
       required: true,
     },
-    contentId: {
-      type: String,
+    customer: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
     },
-    methods: {
+    amount: {
+      type: Number,
+      default: 0,
+    },
+    currency: {
       type: String,
-      enum: ["COD", "VNPay"],
+      default: "VND",
+    },
+    method: {
+      type: String,
+      enum: ["cod", "cash", "momo", "vnpay", "zalopay", "card", "banking", "dronepay"],
       required: true,
+    },
+    provider: {
+      type: String,
     },
     status: {
       type: String,
       enum: ["pending", "processing", "completed", "failed", "refunded"],
       default: "pending",
     },
+    transactionId: {
+      type: String,
+    },
+    paidAt: {
+      type: Date,
+    },
+    rawData: mongoose.Schema.Types.Mixed,
   },
   {
     timestamps: true,

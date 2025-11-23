@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import PropTypes from "prop-types";
+import "./DroneMap.css";
 
 const HANOI_CENTER = { lat: 21.0285, lng: 105.8542 };
+const HCM_CENTER = { lat: 10.7769, lng: 106.7009 };
 
 function DroneMap({ order, deliveryInfo }) {
   const mapRef = useRef(null);
@@ -10,23 +12,44 @@ function DroneMap({ order, deliveryInfo }) {
   const [restaurantMarker, setRestaurantMarker] = useState(null);
   const [customerMarker, setCustomerMarker] = useState(null);
   const [path, setPath] = useState(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
 
   // Initialize Google Maps
   useEffect(() => {
-    if (!window.google || !mapRef.current) return;
+    if (!window.google || !mapRef.current) {
+      setMapLoaded(false);
+      return;
+    }
+
+    const defaultCenter = order?.restaurant?.address?.city?.toLowerCase().includes('hà nội') 
+      ? HANOI_CENTER 
+      : HCM_CENTER;
 
     const mapInstance = new window.google.maps.Map(mapRef.current, {
-      center: HANOI_CENTER,
-      zoom: 13,
+      center: defaultCenter,
+      zoom: 14,
       disableDefaultUI: false,
       zoomControl: true,
       mapTypeControl: false,
       streetViewControl: false,
-      fullscreenControl: true,
+      fullscreenControl: false,
+      styles: [
+        {
+          featureType: "poi",
+          elementType: "labels",
+          stylers: [{ visibility: "off" }],
+        },
+        {
+          featureType: "transit",
+          elementType: "labels",
+          stylers: [{ visibility: "off" }],
+        },
+      ],
     });
 
     setMap(mapInstance);
-  }, []);
+    setMapLoaded(true);
+  }, [order]);
 
   // Add markers and path when map is ready
   useEffect(() => {

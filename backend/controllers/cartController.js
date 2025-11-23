@@ -83,7 +83,7 @@ const buildResponsePayload = (cartDoc) => {
 
 export const getCart = async (req, res, next) => {
   try {
-    const cart = await Cart.findOne({ user: req.user._id });
+    const cart = await Cart.findOne({ userId: req.user._id });
     return res.json({ success: true, data: buildResponsePayload(cart) });
   } catch (error) {
     return next(error);
@@ -105,7 +105,7 @@ export const upsertCart = async (req, res, next) => {
       normalizedItems[0]?.restaurantName ?? toStringOrNull(req.body?.currentRestaurantName);
 
     const payload = {
-      user: req.user._id,
+      userId: req.user._id,
       items: normalizedItems,
       total,
       currentRestaurantId,
@@ -117,7 +117,7 @@ export const upsertCart = async (req, res, next) => {
     };
 
     const cart = await Cart.findOneAndUpdate(
-      { user: req.user._id },
+      { userId: req.user._id },
       payload,
       { new: true, upsert: true, setDefaultsOnInsert: true }
     );
@@ -130,7 +130,7 @@ export const upsertCart = async (req, res, next) => {
 
 export const clearCart = async (req, res, next) => {
   try {
-    const cart = await Cart.findOne({ user: req.user._id });
+    const cart = await Cart.findOne({ userId: req.user._id });
 
     if (!cart) {
       return res.json({ success: true, data: buildResponsePayload(null) });
