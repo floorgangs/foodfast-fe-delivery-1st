@@ -1,7 +1,8 @@
 import { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { checkAuth } from "./store/slices/authSlice";
+import { loadUser, setUser } from "./store/slices/authSlice";
+import { fetchCart } from "./store/slices/cartSlice";
 import PrivateRoute from "./components/PrivateRoute";
 import Layout from "./components/Layout/Layout";
 import Login from "./pages/Login/Login";
@@ -17,6 +18,8 @@ import Profile from "./pages/Profile/Profile";
 import Review from "./pages/Review/Review";
 import EditProfile from "./pages/EditProfile/EditProfile";
 import Orders from "./pages/Orders/Orders";
+import Notifications from "./pages/Notifications/Notifications";
+import Vouchers from "./pages/Vouchers/Vouchers";
 import "./App.css";
 
 function App() {
@@ -27,8 +30,30 @@ function App() {
     console.log("🚀 App mounted, isAuthenticated:", isAuthenticated);
 
     // Restore auth state from localStorage on app startup
-    dispatch(checkAuth());
-  }, [dispatch, isAuthenticated]);
+    const initializeApp = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const userStr = localStorage.getItem('user');
+        
+        if (token && userStr) {
+          const user = JSON.parse(userStr);
+          dispatch(setUser(user));
+          
+          // Load fresh user data and cart from server
+          try {
+            await dispatch(loadUser()).unwrap();
+            await dispatch(fetchCart()).unwrap();
+          } catch (error) {
+            console.error('Failed to load user data:', error);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to initialize app:', error);
+      }
+    };
+
+    initializeApp();
+  }, [dispatch]);
 
   console.log("🎨 App rendering, isAuthenticated:", isAuthenticated);
 
@@ -107,6 +132,22 @@ function App() {
           element={
             <PrivateRoute>
               <EditProfile />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="notifications"
+          element={
+            <PrivateRoute>
+              <Notifications />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="vouchers"
+          element={
+            <PrivateRoute>
+              <Vouchers />
             </PrivateRoute>
           }
         />

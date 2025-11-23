@@ -307,12 +307,21 @@ export const synchronizeCart = (): AppThunk<Promise<NormalizedCartPayload | void
   };
 
 export const addToCart = (payload: AddToCartPayload): AppThunk<Promise<void>> =>
-  async (dispatch) => {
+  async (dispatch, getState) => {
     dispatch(addItem(payload));
+    
+    const state = getState();
+    if (!state.auth?.isAuthenticated) {
+      // Nếu chưa đăng nhập, chỉ cập nhật local state
+      return;
+    }
+    
     try {
       await dispatch(synchronizeCart());
-    } catch (error) {
-      throw error;
+    } catch (error: any) {
+      console.error('Cart sync failed:', error);
+      // Vẫn giữ item trong local state mặc dù sync thất bại
+      throw new Error(error?.message || 'Không thể đồng bộ giỏ hàng với server');
     }
   };
 

@@ -2,19 +2,17 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { clearCart } from "../../store/slices/cartSlice";
-import { checkAuth } from "../../store/slices/authSlice";
+import { loadUser } from "../../store/slices/authSlice";
 import { vietnamLocations } from "../../data/vietnamLocations";
-import { createOrder } from "../../services/orderService";
-import axios from "axios";
+import { orderAPI, voucherAPI, restaurantAPI } from "../../services/api";
+import api from "../../services/api";
 import "./Checkout.css";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 function Checkout() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { user, isAuthenticated } = useSelector((state) => state.auth);
-  const { items, restaurantId: cartRestaurantId } = useSelector(
+  const { items, currentRestaurantId: cartRestaurantId } = useSelector(
     (state) => state.cart
   );
 
@@ -133,10 +131,9 @@ function Checkout() {
     const fetchVouchers = async () => {
       try {
         setLoadingVouchers(true);
-        const response = await axios.get(`${API_URL}/vouchers`);
-        if (response.data.success) {
-          setAvailableVouchers(response.data.data);
-        }
+        const response = await voucherAPI.getAll();
+        const data = response?.data ?? response;
+        setAvailableVouchers(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error("Error fetching vouchers:", error);
       } finally {
@@ -153,8 +150,8 @@ function Checkout() {
       navigate("/login");
       return;
     }
-    // Restore auth from localStorage
-    dispatch(checkAuth());
+    // Load user data
+    dispatch(loadUser());
   }, [dispatch, navigate]);
 
   useEffect(() => {
@@ -241,11 +238,10 @@ function Checkout() {
     let restaurantAddress = "";
 
     try {
-      const res = await axios.get(`${API_URL}/restaurants/${restaurantId}`);
-      if (res.data.success) {
-        restaurantName = res.data.data.name;
-        restaurantAddress = `${res.data.data.address?.street}, ${res.data.data.address?.district}, ${res.data.data.address?.city}`;
-      }
+      const res = await restaurantAPI.getById(restaurantId);
+      const restaurantData = res?.data ?? res;
+      restaurantName = restaurantData.name;
+      restaurantAddress = `${restaurantData.address?.street}, ${restaurantData.address?.district}, ${restaurantData.address?.city}`;
     } catch (error) {
       console.error("Error fetching restaurant:", error);
     }
@@ -257,7 +253,7 @@ function Checkout() {
       const orderPayload = {
         restaurant: restaurantId,
         items: items.map((item) => ({
-          product: item._id || item.id,
+          product: item.productId || item._id || item.id,
           name: item.name,
           price: item.price,
           quantity: item.quantity,
@@ -276,8 +272,8 @@ function Checkout() {
       };
 
       // Add customer if authenticated
-      if (user?.id) {
-        orderPayload.customer = user.id;
+      if (user?.id || user?._id) {
+        orderPayload.customer = user.id || user._id;
       } else {
         // Guest order
         orderPayload.customerInfo = {
@@ -289,74 +285,55 @@ function Checkout() {
 
       console.log("📦 Creating order:", orderPayload);
 
-      const token = localStorage.getItem("token");
-      const orderResponse = await axios.post(
-        `${API_URL}/orders`,
-        orderPayload,
-        {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        }
-      );
-
-      if (!orderResponse.data.success) {
-        throw new Error(orderResponse.data.message || "Không thể tạo đơn hàng");
+      const orderResponse = await orderAPI.create(orderPayload);
+      const createdOrder = orderResponse?.data ?? orderResponse;
+      
+      if (!createdOrder) {
+        throw new Error("Không thể tạo đơn hàng");
       }
 
-      const createdOrder = orderResponse.data.data;
       console.log("✅ Order created:", createdOrder);
 
       // Handle payment based on method
       if (paymentMethod === "vnpay") {
         // Create VNPay payment
-        const paymentResponse = await axios.post(
-          `${API_URL}/payments/vnpay/create`,
-          {
-            orderId: createdOrder._id,
-            amount: total,
-            orderInfo: `Thanh toán đơn hàng ${createdOrder.orderNumber}`,
-          },
-          {
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-          }
-        );
+        const paymentResponse = await api.post('/payments/vnpay/create', {
+          orderId: createdOrder._id || createdOrder.id,
+          amount: total,
+          orderInfo: `Thanh toán đơn hàng ${createdOrder.orderNumber}`,
+        });
 
-        if (paymentResponse.data.success) {
+        const paymentData = paymentResponse?.data ?? paymentResponse;
+        if (paymentData?.paymentUrl) {
           // Redirect to VNPay
-          window.location.href = paymentResponse.data.data.paymentUrl;
+          window.location.href = paymentData.paymentUrl;
         } else {
           throw new Error("Không thể tạo thanh toán VNPay");
         }
       } else if (paymentMethod === "momo") {
         // Create MoMo payment
-        const paymentResponse = await axios.post(
-          `${API_URL}/payments/momo/create`,
-          {
-            orderId: createdOrder._id,
-            amount: total,
-            orderInfo: `Thanh toán đơn hàng ${createdOrder.orderNumber}`,
-          },
-          {
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-          }
-        );
+        const paymentResponse = await api.post('/payments/momo/create', {
+          orderId: createdOrder._id || createdOrder.id,
+          amount: total,
+          orderInfo: `Thanh toán đơn hàng ${createdOrder.orderNumber}`,
+        });
 
-        if (paymentResponse.data.success) {
+        const paymentData = paymentResponse?.data ?? paymentResponse;
+        if (paymentData?.paymentUrl) {
           // Redirect to MoMo
-          window.location.href = paymentResponse.data.data.paymentUrl;
+          window.location.href = paymentData.paymentUrl;
         } else {
           throw new Error("Không thể tạo thanh toán MoMo");
         }
       } else {
         // COD: Navigate to order tracking immediately
-        dispatch(clearCart());
-        navigate(`/order-tracking/${createdOrder._id}`);
+        await dispatch(clearCart());
+        navigate(`/order-tracking/${createdOrder._id || createdOrder.id}`);
       }
     } catch (error) {
       console.error("❌ Error creating order:", error);
-      console.error("❌ Backend response:", error.response?.data);
       alert(
-        error.response?.data?.message ||
-          error.message ||
+        error.message ||
           "Có lỗi xảy ra khi đặt hàng"
       );
     }

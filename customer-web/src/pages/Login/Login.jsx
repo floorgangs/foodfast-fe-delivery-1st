@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { loginUser, clearError } from "../../store/slices/authSlice";
-import socketService from "../../services/socket";
+import { login, clearError } from "../../store/slices/authSlice";
+import { fetchCart } from "../../store/slices/cartSlice";
+import { initSocket, joinCustomerRoom } from "../../services/socket";
 import "./Login.css";
 
 function Login() {
@@ -32,18 +33,22 @@ function Login() {
 
     try {
       const result = await dispatch(
-        loginUser({
+        login({
           email,
           password,
-          role: "customer", // Chỉ định role customer
         })
       ).unwrap();
 
-      // Kết nối Socket.io sau khi đăng nhập thành công
-      socketService.connect({
-        id: result.user.id,
-        role: result.user.role,
-      });
+      // Initialize socket and join customer room
+      initSocket();
+      joinCustomerRoom(result.data.id || result.data._id);
+
+      // Fetch cart from server
+      try {
+        await dispatch(fetchCart()).unwrap();
+      } catch (error) {
+        console.error('Failed to fetch cart:', error);
+      }
 
       // Redirect về trang trước đó (nếu có) hoặc về home
       const redirectPath = localStorage.getItem("redirectAfterLogin");

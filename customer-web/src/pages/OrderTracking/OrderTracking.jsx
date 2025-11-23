@@ -1,195 +1,291 @@
-import { useState, useEffect } from "react";
-import { useNavigate, useLocation, useParams } from "react-router-dom";
-import axios from "axios";
-import DroneMap from "../../components/DroneMap/DroneMap";
-import {
-  cancelOrder,
-  confirmReceived,
-  subscribeToOrderUpdates,
-  canCancelOrder,
-  getTimeToCancel,
-} from "../../services/orderService";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { orderAPI } from "../../services/api";
 import "./OrderTracking.css";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const STATUS_STEPS = [
+  { key: 'pending', label: 'Chờ xác nhận', icon: '⏳', description: 'Đơn hàng đang chờ nhà hàng xác nhận' },
+  { key: 'confirmed', label: 'Đã xác nhận', icon: '✅', description: 'Nhà hàng đã tiếp nhận và chuẩn bị đơn' },
+  { key: 'preparing', label: 'Chuẩn bị', icon: '👨‍🍳', description: 'Nhà hàng đang chuẩn bị món ăn' },
+  { key: 'ready', label: 'Sẵn sàng', icon: '📦', description: 'Đơn đã đóng gói, chờ drone tiếp nhận' },
+  { key: 'delivering', label: 'Đang giao', icon: '🚁', description: 'Drone đang trên đường bay tới vị trí của bạn' },
+  { key: 'delivered', label: 'Hoàn thành', icon: '🎉', description: 'Bạn đã nhận được đơn hàng' },
+];
+
+const STATUS_SEQUENCE = STATUS_STEPS.map(step => step.key);
+const HCM_CENTER = { lat: 10.7769, lng: 106.7009 };
 
 function OrderTracking() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const { orderId: paramOrderId } = useParams();
+  const { orderId } = useParams();
 
-  const orderId = paramOrderId || location.state?.orderId;
-
-  const [order, setOrder] = useState(null);
-  const [deliveryInfo, setDeliveryInfo] = useState(null);
+  const [trackingData, setTrackingData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [droneProgress, setDroneProgress] = useState(0);
-  const [timeRemaining, setTimeRemaining] = useState(0);
-  const [showCancelModal, setShowCancelModal] = useState(false);
-  const [cancelReason, setCancelReason] = useState("");
+  const [error, setError] = useState(null);
+  const [acknowledged, setAcknowledged] = useState(false);
+  
+  const mapRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const markersRef = useRef({
+    pickup: null,
+    delivery: null,
+    drone: null,
+    polyline: null,
+    progressPolyline: null
+  });
 
-  // Load order data
+  // Fetch tracking data
   useEffect(() => {
     if (!orderId) {
-      console.log("No orderId found");
+      setError('Không tìm thấy mã đơn hàng');
       setLoading(false);
       return;
     }
 
-    console.log("Loading order with ID:", orderId);
-
-    const loadOrder = async () => {
+    const fetchTracking = async () => {
       try {
-        setLoading(true);
-        const token = localStorage.getItem("token");
-        const response = await axios.get(`${API_URL}/orders/${orderId}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-
-        console.log("Order data loaded:", response.data);
-        if (response.data.success) {
-          setOrder(response.data.data);
-
-          // Load delivery info if order is delivering
-          if (["delivering", "picked_up"].includes(response.data.data.status)) {
-            loadDeliveryInfo();
-          }
+        const response = await orderAPI.track(orderId);
+        if (response?.data) {
+          setTrackingData(response.data);
+          setError(null);
         } else {
-          console.error("Order not found");
-          alert("Không tìm thấy đơn hàng");
+          setError('Không nhận được dữ liệu theo dõi');
         }
-      } catch (error) {
-        console.error("Error loading order:", error);
-        alert("Không thể tải thông tin đơn hàng");
+      } catch (err) {
+        console.error('[OrderTracking] fetch error:', err);
+        setError(err.message || 'Không thể tải dữ liệu theo dõi');
       } finally {
         setLoading(false);
       }
     };
 
-    const loadDeliveryInfo = async () => {
-      try {
-        const response = await axios.get(
-          `${API_URL}/deliveries/tracking/${orderId}`
-        );
-        if (response.data.success) {
-          setDeliveryInfo(response.data.data);
+    fetchTracking();
+    const interval = setInterval(fetchTracking, 10000);
+    return () => clearInterval(interval);
+  }, [orderId]);
+
+  // Reset acknowledged when status changes
+  useEffect(() => {
+    const normalizedStatus = normalizeStatus(trackingData?.order?.status);
+    if (normalizedStatus !== 'delivered') {
+      setAcknowledged(false);
+    }
+  }, [trackingData?.order?.status]);
+
+  const handleConfirm = () => {
+    setAcknowledged(true);
+    alert('Cảm ơn bạn! Đơn hàng đã được xác nhận.');
+  };
+
+  const normalizeStatus = (status) => {
+    if (!status) return 'pending';
+    if (status === 'completed') return 'delivered';
+    if (status === 'ready_for_delivery') return 'ready';
+    return status;
+  };
+
+  const formatTimestamp = (timestamp) => {
+    if (!timestamp) return null;
+    const date = new Date(timestamp);
+    if (isNaN(date.getTime())) return null;
+    return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+  };
+
+  // Initialize Google Maps
+  useEffect(() => {
+    const normalizedStatus = normalizeStatus(trackingData?.order?.status);
+    if (normalizedStatus !== 'delivering' || !window.google) return;
+
+    const mapContainer = document.getElementById('tracking-map');
+    if (!mapContainer || mapInstanceRef.current) return;
+
+    // Create map
+    const map = new window.google.maps.Map(mapContainer, {
+      center: HCM_CENTER,
+      zoom: 14,
+      disableDefaultUI: false,
+      zoomControl: true,
+      mapTypeControl: false,
+      streetViewControl: false,
+      fullscreenControl: false,
+      styles: [
+        {
+          featureType: 'poi',
+          elementType: 'labels',
+          stylers: [{ visibility: 'off' }]
+        },
+        {
+          featureType: 'transit',
+          elementType: 'labels',
+          stylers: [{ visibility: 'off' }]
         }
-      } catch (error) {
-        // 404 is expected for orders without delivery/drone assignment yet
-        if (error.response?.status !== 404) {
-          console.error("Error loading delivery info:", error);
-        }
-      }
-    };
+      ]
+    });
 
-    loadOrder();
+    mapInstanceRef.current = map;
+    mapRef.current = mapContainer;
+  }, [trackingData?.order?.status]);
 
-    // Poll delivery info every 5 seconds when delivering
-    const deliveryInterval = setInterval(() => {
-      if (order?.status === "delivering" || order?.status === "picked_up") {
-        loadDeliveryInfo();
-      }
-    }, 5000);
+  // Update map markers and route
+  useEffect(() => {
+    if (!mapInstanceRef.current || !trackingData?.tracking) return;
 
-    // Subscribe to order updates
-    const unsubscribe = subscribeToOrderUpdates((update) => {
-      if (update.orderId === orderId) {
-        loadOrder();
+    const map = mapInstanceRef.current;
+    const tracking = trackingData.tracking;
+
+    // Clear old markers
+    Object.values(markersRef.current).forEach(marker => {
+      if (marker) marker.setMap(null);
+    });
+
+    // Get coordinates
+    const pickupCoords = tracking.pickupLocation?.coordinates;
+    const deliveryCoords = tracking.deliveryLocation?.coordinates;
+    const droneCoords = tracking.droneLocation;
+
+    const pickupPos = pickupCoords ? { lat: pickupCoords.lat, lng: pickupCoords.lng } : HCM_CENTER;
+    const deliveryPos = deliveryCoords ? { lat: deliveryCoords.lat, lng: deliveryCoords.lng } : { lat: HCM_CENTER.lat + 0.02, lng: HCM_CENTER.lng + 0.02 };
+
+    // Create pickup marker (restaurant)
+    markersRef.current.pickup = new window.google.maps.Marker({
+      position: pickupPos,
+      map: map,
+      title: tracking.pickupLocation?.name || 'Nhà hàng',
+      icon: {
+        url: "data:image/svg+xml;charset=UTF-8," +
+          encodeURIComponent(`
+            <svg width="40" height="40" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="20" cy="20" r="15" fill="#EA5034" stroke="white" stroke-width="3"/>
+              <text x="20" y="27" font-size="18" text-anchor="middle" fill="white">🏪</text>
+            </svg>
+          `)
       }
     });
 
+    // Create delivery marker (home)
+    markersRef.current.delivery = new window.google.maps.Marker({
+      position: deliveryPos,
+      map: map,
+      title: 'Điểm giao hàng',
+      icon: {
+        url: "data:image/svg+xml;charset=UTF-8," +
+          encodeURIComponent(`
+            <svg width="40" height="40" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="20" cy="20" r="15" fill="#27AE60" stroke="white" stroke-width="3"/>
+              <text x="20" y="27" font-size="18" text-anchor="middle" fill="white">🏠</text>
+            </svg>
+          `)
+      }
+    });
+
+    // Build route coordinates (30 points for smooth line)
+    const routeCoordinates = [];
+    const steps = 30;
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      routeCoordinates.push({
+        lat: pickupPos.lat + (deliveryPos.lat - pickupPos.lat) * t,
+        lng: pickupPos.lng + (deliveryPos.lng - pickupPos.lng) * t
+      });
+    }
+
+    // Create full route polyline (gray)
+    markersRef.current.polyline = new window.google.maps.Polyline({
+      path: routeCoordinates,
+      geodesic: true,
+      strokeColor: '#1B2945',
+      strokeOpacity: 0.3,
+      strokeWeight: 4,
+      map: map
+    });
+
+    // Create drone marker if available
+    const flightProgress = tracking.flightProgress || 0;
+    let dronePos = pickupPos;
+    
+    if (droneCoords) {
+      dronePos = { lat: droneCoords.lat, lng: droneCoords.lng };
+    } else if (flightProgress > 0) {
+      // Calculate position based on progress
+      dronePos = {
+        lat: pickupPos.lat + (deliveryPos.lat - pickupPos.lat) * flightProgress,
+        lng: pickupPos.lng + (deliveryPos.lng - pickupPos.lng) * flightProgress
+      };
+    }
+
+    markersRef.current.drone = new window.google.maps.Marker({
+      position: dronePos,
+      map: map,
+      title: `Drone ${tracking.drone?.droneId || ''}`,
+      icon: {
+        url: "data:image/svg+xml;charset=UTF-8," +
+          encodeURIComponent(`
+            <svg width="50" height="50" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="25" cy="25" r="18" fill="#EA5034" stroke="white" stroke-width="3"/>
+              <text x="25" y="32" font-size="22" text-anchor="middle" fill="white">🚁</text>
+            </svg>
+          `)
+      },
+      animation: window.google.maps.Animation.BOUNCE
+    });
+
+    // Stop bouncing after 2 seconds
+    setTimeout(() => {
+      if (markersRef.current.drone) {
+        markersRef.current.drone.setAnimation(null);
+      }
+    }, 2000);
+
+    // Create progress polyline (red, showing completed path)
+    const progressIndex = Math.floor(flightProgress * routeCoordinates.length);
+    const progressPath = routeCoordinates.slice(0, Math.max(progressIndex, 1));
+    
+    if (progressPath.length > 1) {
+      markersRef.current.progressPolyline = new window.google.maps.Polyline({
+        path: progressPath,
+        geodesic: true,
+        strokeColor: '#EA5034',
+        strokeOpacity: 1,
+        strokeWeight: 6,
+        map: map
+      });
+    }
+
+    // Fit bounds to show all markers
+    const bounds = new window.google.maps.LatLngBounds();
+    bounds.extend(pickupPos);
+    bounds.extend(deliveryPos);
+    if (dronePos) bounds.extend(dronePos);
+    
+    map.fitBounds(bounds);
+    
+    // Adjust zoom after fitting bounds
+    const listener = window.google.maps.event.addListenerOnce(map, 'bounds_changed', () => {
+      if (map.getZoom() > 15) map.setZoom(15);
+    });
+
+  }, [trackingData?.tracking]);
+
+  // Cleanup on unmount
+  useEffect(() => {
     return () => {
-      unsubscribe();
-      clearInterval(deliveryInterval);
+      Object.values(markersRef.current).forEach(marker => {
+        if (marker) marker.setMap(null);
+      });
+      mapInstanceRef.current = null;
     };
-  }, [orderId, navigate]);
+  }, []);
 
-  // Update cancel timer
-  useEffect(() => {
-    if (!order || order.status !== "pending") return;
-
-    const interval = setInterval(() => {
-      const remaining = getTimeToCancel(order);
-      setTimeRemaining(remaining);
-
-      if (remaining <= 0) {
-        clearInterval(interval);
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [order]);
-
-  // Simulate drone movement when delivering
-  useEffect(() => {
-    if (order?.status === "delivering" && order?.deliveryStartTime) {
-      const startTime = order.deliveryStartTime;
-      // Calculate duration from estimatedDeliveryTime (e.g., "25-35 phút")
-      const estimatedMinutes = 30; // Default 30 minutes
-      const duration = estimatedMinutes * 60 * 1000; // Convert to milliseconds
-
-      const interval = setInterval(() => {
-        const elapsed = Date.now() - new Date(startTime).getTime();
-        const progress = Math.min((elapsed / duration) * 100, 100);
-        setDroneProgress(progress);
-
-        if (progress >= 100) {
-          clearInterval(interval);
-        }
-      }, 100);
-
-      return () => clearInterval(interval);
-    }
-  }, [order?.status, order?.deliveryStartTime]);
-
-  const handleCancelOrder = () => {
-    const result = cancelOrder(orderId, cancelReason);
-    if (result.error) {
-      alert(result.error);
-    } else {
-      setShowCancelModal(false);
-      setOrder(result);
-    }
-  };
-
-  const handleConfirmReceived = async () => {
-    try {
-      const response = await axios.patch(
-        `${API_URL}/orders/${orderId}/complete`
-      );
-      if (response.data.success) {
-        setOrder(response.data.data);
-        // Navigate to review page after 1 second
-        setTimeout(() => {
-          navigate(`/review/${orderId}`);
-        }, 1000);
-      }
-    } catch (error) {
-      console.error("Error confirming received:", error);
-      alert("Có lỗi xảy ra khi xác nhận đã nhận hàng");
-    }
-  };
-
-  if (loading) {
+  if (!orderId) {
     return (
       <div className="order-tracking-page">
-        <div className="container">
-          <div style={{ textAlign: "center", padding: "3rem" }}>
-            <h2>Đang tải thông tin đơn hàng...</h2>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!order) {
-    return (
-      <div className="order-tracking-page">
-        <div className="container">
-          <div style={{ textAlign: "center", padding: "3rem" }}>
-            <h2>Không tìm thấy đơn hàng</h2>
-            <button onClick={() => navigate("/")} className="btn-primary">
-              Về trang chủ
+        <div className="tracking-container">
+          <div className="centered-state">
+            <div className="error-icon">⚠️</div>
+            <h2>Không tìm thấy thông tin đơn hàng</h2>
+            <p>Vui lòng quay lại danh sách đơn hàng và chọn đơn cần theo dõi.</p>
+            <button onClick={() => navigate("/orders")} className="retry-btn">
+              Quay lại
             </button>
           </div>
         </div>
@@ -197,317 +293,214 @@ function OrderTracking() {
     );
   }
 
-  const getStatusDisplay = () => {
-    const statusMap = {
-      pending: {
-        title: "Chờ xác nhận",
-        icon: "⏳",
-        desc: "Đơn hàng đang chờ nhà hàng xác nhận",
-        color: "#FFA500",
-      },
-      confirmed: {
-        title: "Đã xác nhận",
-        icon: "✅",
-        desc: "Nhà hàng đã xác nhận đơn hàng",
-        color: "#4CAF50",
-      },
-      preparing: {
-        title: "Đang chuẩn bị",
-        icon: "👨‍🍳",
-        desc: "Nhà hàng đang chuẩn bị món ăn",
-        color: "#2196F3",
-      },
-      ready_for_delivery: {
-        title: "Sẵn sàng giao hàng",
-        icon: "📦",
-        desc: "Món ăn đã sẵn sàng, chờ drone",
-        color: "#9C27B0",
-      },
-      delivering: {
-        title: "Đang giao hàng",
-        icon: "🚁",
-        desc: "Drone đang giao hàng đến bạn",
-        color: "#FF5722",
-      },
-      completed: {
-        title: "Đã giao",
-        icon: "🎉",
-        desc: "Đơn hàng đã được giao thành công",
-        color: "#4CAF50",
-      },
-      cancelled: {
-        title: "Đã hủy",
-        icon: "❌",
-        desc: order.cancelReason || "Đơn hàng đã bị hủy",
-        color: "#F44336",
-      },
-    };
+  if (loading && !trackingData) {
+    return (
+      <div className="order-tracking-page">
+        <div className="tracking-container">
+          <div className="centered-state">
+            <div className="loading-spinner"></div>
+            <h2>Đang tải dữ liệu theo dõi...</h2>
+            <p>Vui lòng chờ trong giây lát.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-    return statusMap[order.status] || statusMap.pending;
-  };
+  const normalizedStatus = normalizeStatus(trackingData?.order?.status);
+  const statusIndex = STATUS_SEQUENCE.indexOf(normalizedStatus);
+  const timelineMap = new Map();
+  (trackingData?.order?.timeline || []).forEach((entry) => {
+    if (entry?.status) {
+      timelineMap.set(entry.status, entry);
+    }
+  });
+  const timelineStatuses = new Set(timelineMap.keys());
 
-  const status = getStatusDisplay();
-  const canCancel = canCancelOrder(order);
-
-  // Calculate progress for timeline
-  const statusOrder = [
-    "pending",
-    "confirmed",
-    "preparing",
-    "ready_for_delivery",
-    "delivering",
-    "completed",
-  ];
-  const currentIndex = statusOrder.indexOf(order.status);
-  const progressPercent = (currentIndex / (statusOrder.length - 1)) * 100;
+  const orderNumber = trackingData?.order?.orderNumber || trackingData?.order?.id || '---';
+  const restaurantName = trackingData?.tracking?.pickupLocation?.name || 'Nhà hàng FoodFast';
+  const restaurantAddress = trackingData?.tracking?.pickupLocation?.address;
+  const deliveryAddress = trackingData?.tracking?.deliveryLocation?.address || 'Đang cập nhật địa chỉ giao hàng';
+  const droneInfo = trackingData?.tracking?.drone;
+  const droneCode = droneInfo?.droneId || droneInfo?.name || orderNumber.slice(0, 6).toUpperCase();
+  const items = trackingData?.order?.items || [];
+  const totalAmount = items.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0);
+  const canConfirm = normalizedStatus === 'delivered';
+  const timelineUpdatedAt = formatTimestamp(trackingData?.order?.updatedAt);
+  const etaValue = trackingData?.tracking?.estimatedArrival ? new Date(trackingData.tracking.estimatedArrival) : null;
+  let etaText = '--:--';
+  if (etaValue && !isNaN(etaValue.getTime())) {
+    const now = new Date();
+    const diffSeconds = Math.max(0, Math.floor((etaValue.getTime() - now.getTime()) / 1000));
+    const minutes = Math.floor(diffSeconds / 60);
+    const seconds = diffSeconds % 60;
+    etaText = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  }
 
   return (
     <div className="order-tracking-page">
-      <div className="container">
-        <div className="tracking-header">
-          <button className="back-btn" onClick={() => navigate("/")}>
-            ← Về trang chủ
+      {/* Header */}
+      <div className="tracking-header">
+        <button className="back-btn" onClick={() => navigate("/orders")}>
+          <span>←</span>
+        </button>
+        <h1>Theo dõi đơn hàng</h1>
+        <div style={{ width: 22 }}></div>
+      </div>
+
+      {/* Error Banner */}
+      {error && (
+        <div className="error-banner">
+          <span className="error-icon">⚠️</span>
+          <span className="error-text">{error}</span>
+          <button onClick={() => window.location.reload()} className="retry-link">
+            Thử lại
           </button>
-          <h1>Theo dõi đơn hàng</h1>
-          <p className="order-id">Mã đơn: #{order.id}</p>
+        </div>
+      )}
+
+      {/* Status Banner */}
+      <div className="status-banner">
+        <div className="banner-left">
+          <div className="banner-label">Mã đơn: #{orderNumber}</div>
+          <div className="banner-text">
+            🚁
+            {normalizedStatus === 'delivering' 
+              ? ' Đang giao hàng' 
+              : ' Drone đang sẵn sàng'}
+          </div>
+          <div className="banner-desc">
+            {normalizedStatus === 'delivering' 
+              ? 'Drone đang giao hàng đến bạn' 
+              : 'Đơn hàng của bạn đang được xử lý'}
+          </div>
+        </div>
+      </div>
+
+      {/* Status Steps */}
+      <div className="status-steps">
+        {STATUS_STEPS.map((step) => {
+          const reached = timelineStatuses.has(step.key) || STATUS_SEQUENCE.indexOf(step.key) <= statusIndex;
+          return (
+            <div key={step.key} className={`status-step ${reached ? 'active' : ''}`}>
+              <div className="step-icon">{step.icon}</div>
+              <div className="step-label">{step.label}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Map Section */}
+      {normalizedStatus === 'delivering' && (
+        <div className="map-section">
+          <h3 className="map-title">🚁 Theo dõi drone giao hàng</h3>
+          <div className="map-container" id="tracking-map"></div>
+        </div>
+      )}
+
+      {/* Main Content */}
+      <div className="tracking-content">
+        {/* Timeline */}
+        <div className="timeline-section">
+          {STATUS_STEPS.map((step, index) => {
+            const reached = timelineStatuses.has(step.key) || index <= statusIndex;
+            const nextReached = index < statusIndex;
+            const event = timelineMap.get(step.key);
+            const timestamp = formatTimestamp(event?.timestamp);
+            
+            return (
+              <div key={step.key} className="timeline-row">
+                <div className="timeline-rail">
+                  <div className={`timeline-dot ${reached ? 'active' : ''}`}>
+                    {reached ? <span>✓</span> : <span className="dot-empty">○</span>}
+                  </div>
+                  {index < STATUS_STEPS.length - 1 && (
+                    <div className={`timeline-connector ${nextReached ? 'active' : ''}`}></div>
+                  )}
+                </div>
+                <div className="timeline-content">
+                  <div className={`timeline-title ${reached ? 'active' : ''}`}>
+                    <span className="timeline-icon">{step.icon}</span>
+                    {step.label}
+                  </div>
+                  <div className="timeline-description">{step.description}</div>
+                  {timestamp && <div className="timeline-timestamp">{timestamp}</div>}
+                  {event?.note && <div className="timeline-note">{event.note}</div>}
+                </div>
+              </div>
+            );
+          })}
         </div>
 
-        <div className="tracking-card">
-          {/* Status Header */}
-          <div className="status-header" style={{ borderColor: status.color }}>
-            <div className="status-icon" style={{ background: status.color }}>
-              {status.icon}
-            </div>
-            <div className="status-info">
-              <h2>{status.title}</h2>
-              <p>{status.desc}</p>
-            </div>
-          </div>
-
-          {/* Cancel Timer */}
-          {order.status === "pending" && canCancel && (
-            <div className="cancel-timer">
-              <p>
-                Bạn có thể hủy đơn trong:{" "}
-                <strong>
-                  {Math.floor(timeRemaining / 60)}:
-                  {(timeRemaining % 60).toString().padStart(2, "0")}
-                </strong>
-              </p>
-            </div>
-          )}
-
-          {/* Progress Timeline */}
-          <div
-            className="status-timeline"
-            style={{
-              "--progress-width": `${progressPercent}%`,
-              "--progress-color": "#4A90E2",
-            }}
-          >
-            {[
-              { key: "pending", label: "Chờ xác nhận", icon: "⏳" },
-              { key: "confirmed", label: "Đã xác nhận", icon: "✅" },
-              { key: "preparing", label: "Chuẩn bị", icon: "👨‍🍳" },
-              { key: "ready_for_delivery", label: "Sẵn sàng", icon: "📦" },
-              { key: "delivering", label: "Đang giao", icon: "🚁" },
-              { key: "completed", label: "Hoàn thành", icon: "🎉" },
-            ].map((step) => {
-              const statusOrder = [
-                "pending",
-                "confirmed",
-                "preparing",
-                "ready_for_delivery",
-                "delivering",
-                "completed",
-              ];
-              const currentIndex = statusOrder.indexOf(order.status);
-              const stepIndex = statusOrder.indexOf(step.key);
-              const isActive = stepIndex <= currentIndex;
-
-              return (
-                <div
-                  key={step.key}
-                  className={`status-step ${isActive ? "active" : ""}`}
-                >
-                  <div className="step-icon">{step.icon}</div>
-                  <div className="step-label">{step.label}</div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Real-time Drone Tracking Map */}
-          {(order.status === "delivering" || order.status === "picked_up") && (
-            <div className="drone-tracking-map">
-              <h3>🚁 Theo dõi drone giao hàng</h3>
-              <div className="map-container">
-                <DroneMap order={order} deliveryInfo={deliveryInfo} />
-              </div>
-              {deliveryInfo && (
-                <div className="delivery-stats">
-                  <div className="stat">
-                    <span className="stat-label">Drone:</span>
-                    <span className="stat-value">
-                      {deliveryInfo.drone?.model || "N/A"}
-                    </span>
-                  </div>
-                  <div className="stat">
-                    <span className="stat-label">Pin:</span>
-                    <span className="stat-value">
-                      {deliveryInfo.drone?.batteryLevel || 0}%
-                    </span>
-                  </div>
-                  <div className="stat">
-                    <span className="stat-label">Trạng thái:</span>
-                    <span className="stat-value">
-                      {deliveryInfo.status === "picked_up"
-                        ? "Đã lấy hàng"
-                        : deliveryInfo.status === "assigned"
-                        ? "Đã được giao nhiệm vụ"
-                        : "Đang giao hàng"}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Order Details */}
-          <div className="order-details">
-            <h3>Chi tiết đơn hàng</h3>
-
-            <div className="restaurant-info">
-              <h4>{order.restaurantName}</h4>
-              <p>{order.restaurantAddress}</p>
-            </div>
-
-            <div className="items-list">
-              {order.items.map((item, index) => (
-                <div key={index} className="item-row">
-                  <span className="item-name">
-                    {item.name} x{item.quantity}
+        {/* Order Details Card */}
+        <div className="order-card">
+          <h3 className="section-heading">Chi tiết đơn hàng</h3>
+          {items.length === 0 ? (
+            <p className="empty-order-text">Đang cập nhật danh sách món.</p>
+          ) : (
+            <>
+              {items.slice(0, 10).map((item, index) => (
+                <div key={item.id || item.product || index} className="order-row">
+                  <span className="order-row-text">
+                    {item.name || 'Món ăn'} x{item.quantity}
                   </span>
-                  <span className="item-price">
-                    {(item.price * item.quantity).toLocaleString("vi-VN")}đ
+                  <span className="order-row-price">
+                    {((item.price || 0) * item.quantity).toLocaleString('vi-VN')}đ
                   </span>
                 </div>
               ))}
-            </div>
-
-            <div className="order-summary">
-              <div className="summary-row">
-                <span>Tạm tính:</span>
-                <span>{order.subtotal?.toLocaleString("vi-VN")}đ</span>
-              </div>
-              <div className="summary-row">
-                <span>Phí giao hàng:</span>
-                <span>{order.shippingFee?.toLocaleString("vi-VN")}đ</span>
-              </div>
-              {order.discount > 0 && (
-                <div className="summary-row discount">
-                  <span>Giảm giá:</span>
-                  <span>-{order.discount?.toLocaleString("vi-VN")}đ</span>
+              <div className="order-summary">
+                <div className="summary-row">
+                  <span className="summary-label">Tạm tính:</span>
+                  <span className="summary-value">{totalAmount.toLocaleString('vi-VN')}đ</span>
                 </div>
-              )}
-              <div className="summary-row total">
-                <span>Tổng cộng:</span>
-                <span>{order.total?.toLocaleString("vi-VN")}đ</span>
+                <div className="summary-row">
+                  <span className="summary-label">Phí giao hàng:</span>
+                  <span className="summary-value">
+                    {(trackingData?.order?.shippingFee || 15000).toLocaleString('vi-VN')}đ
+                  </span>
+                </div>
+                <div className="summary-row total">
+                  <span className="summary-label">Tổng cộng:</span>
+                  <span className="summary-value">
+                    {(totalAmount + (trackingData?.order?.shippingFee || 15000)).toLocaleString('vi-VN')}đ
+                  </span>
+                </div>
               </div>
-            </div>
-
-            <div className="delivery-info">
-              <div className="info-row">
-                <span className="label">📍 Địa chỉ giao:</span>
-                <span className="value">
-                  {typeof order.deliveryAddress === "string"
-                    ? order.deliveryAddress
-                    : order.deliveryAddress?.address || "Chưa có địa chỉ"}
-                </span>
-              </div>
-              <div className="info-row">
-                <span className="label">📞 Số điện thoại:</span>
-                <span className="value">
-                  {order.deliveryAddress?.phone || "Chưa có SĐT"}
-                </span>
-              </div>
-              <div className="info-row">
-                <span className="label">💳 Thanh toán:</span>
-                <span className="value">
-                  {order.paymentMethod === "dronepay"
-                    ? "Thanh toán online"
-                    : order.paymentMethod === "cod"
-                    ? "Tiền mặt"
-                    : order.paymentMethod}
-                </span>
-              </div>
-              <div className="info-row">
-                <span className="label">🕐 Thời gian đặt:</span>
-                <span className="value">
-                  {new Date(order.createdAt).toLocaleString("vi-VN")}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="action-buttons">
-            {canCancel && order.status === "pending" && (
-              <button
-                className="btn-cancel"
-                onClick={() => setShowCancelModal(true)}
-              >
-                Hủy đơn hàng
-              </button>
-            )}
-
-            {(order.status === "delivering" && droneProgress >= 100) ||
-            order.status === "delivered" ? (
-              <button className="btn-confirm" onClick={handleConfirmReceived}>
-                ✓ Đã nhận được đơn hàng
-              </button>
-            ) : null}
-
-            {order.status === "completed" && !order.review && (
-              <button
-                className="btn-review"
-                onClick={() => navigate(`/review/${orderId}`)}
-              >
-                ⭐ Đánh giá đơn hàng
-              </button>
-            )}
-          </div>
+            </>
+          )}
         </div>
 
-        {/* Cancel Modal */}
-        {showCancelModal && (
-          <div
-            className="modal-overlay"
-            onClick={() => setShowCancelModal(false)}
-          >
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-              <h3>Hủy đơn hàng</h3>
-              <p>Bạn có chắc chắn muốn hủy đơn hàng này?</p>
-              <textarea
-                placeholder="Lý do hủy (tùy chọn)"
-                value={cancelReason}
-                onChange={(e) => setCancelReason(e.target.value)}
-                rows="3"
-              />
-              <div className="modal-actions">
-                <button
-                  className="btn-secondary"
-                  onClick={() => setShowCancelModal(false)}
-                >
-                  Đóng
-                </button>
-                <button className="btn-danger" onClick={handleCancelOrder}>
-                  Xác nhận hủy
-                </button>
-              </div>
-            </div>
+        {/* Delivery Info */}
+        <div className="delivery-info-section">
+          <div className="info-row">
+            <span className="info-label">📍 Địa chỉ giao:</span>
+            <span className="info-value">{deliveryAddress}</span>
           </div>
-        )}
+          <div className="info-row">
+            <span className="info-label">📞 Số điện thoại:</span>
+            <span className="info-value">{trackingData?.tracking?.deliveryLocation?.phone || '---'}</span>
+          </div>
+          <div className="info-row">
+            <span className="info-label">💳 Thanh toán:</span>
+            <span className="info-value">
+              {trackingData?.order?.paymentMethod === 'cod' ? 'Tiền mặt' : 'Thanh toán online'}
+            </span>
+          </div>
+          <div className="info-row">
+            <span className="info-label">🕐 Thời gian đặt:</span>
+            <span className="info-value">
+              {trackingData?.order?.createdAt ? 
+                new Date(trackingData.order.createdAt).toLocaleString('vi-VN') : 
+                '---'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="tracking-footer">
+        © 2025 FoodFast - Giao hàng bằng Drone
       </div>
     </div>
   );

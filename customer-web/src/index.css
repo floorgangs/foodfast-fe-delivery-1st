@@ -44,12 +44,25 @@ body {
   flex-direction: column;
 }
 
-/* Container mặc định */
+/* Container responsive - fullscreen */
 .container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 20px;
   width: 100%;
+  padding: 0 16px;
+}
+
+/* Desktop: padding lớn hơn */
+@media (min-width: 1024px) {
+  .container {
+    padding: 0 40px;
+  }
+}
+
+/* Large desktop: max-width để dễ đọc */
+@media (min-width: 1440px) {
+  .container {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
 }
 
 h1 {

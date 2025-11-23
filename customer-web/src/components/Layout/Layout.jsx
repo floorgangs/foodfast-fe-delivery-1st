@@ -42,25 +42,41 @@ function Layout() {
             🚁 FoodFast
           </Link>
           <nav className="nav">
-            <Link to="/">Trang chủ</Link>
+            <Link to="/">
+              🏠<span> Trang chủ</span>
+            </Link>
+            {isAuthenticated && (
+              <>
+                <Link to="/notifications">
+                  🔔<span> Thông báo</span>
+                </Link>
+                <Link to="/vouchers">
+                  🎫<span> Voucher</span>
+                </Link>
+              </>
+            )}
             <Link to="/cart" className="cart-link">
-              🛒 Giỏ hàng ({items.length})
+              🛒<span> Giỏ hàng ({items.length})</span>
             </Link>
             {isAuthenticated ? (
               <>
-                <Link to="/orders">📦 Đơn hàng</Link>
-                <Link to="/profile">👤 {user?.name || "Tài khoản"}</Link>
+                <Link to="/orders">
+                  📦<span> Đơn hàng</span>
+                </Link>
+                <Link to="/profile">
+                  👤<span> {user?.name || "Tài khoản"}</span>
+                </Link>
                 <button onClick={handleLogout} className="logout-btn">
-                  Đăng xuất
+                  <span>Đăng xuất</span>
                 </button>
               </>
             ) : (
               <>
                 <Link to="/register" className="auth-link">
-                  Đăng ký
+                  ✍️<span> Đăng ký</span>
                 </Link>
                 <Link to="/login" className="auth-link">
-                  Đăng nhập
+                  🔑<span> Đăng nhập</span>
                 </Link>
               </>
             )}

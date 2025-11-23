@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
-import { fetchUserProfile } from "../../store/slices/authSlice";
-import { authAPI } from "../../services/api";
+import { updateProfile, loadUser } from "../../store/slices/authSlice";
 import "./EditProfile.css";
 
 function EditProfile() {
@@ -76,10 +75,10 @@ function EditProfile() {
     setLoading(true);
     try {
       // Call API to update profile
-      await authAPI.updateProfile(formData);
+      await dispatch(updateProfile(formData)).unwrap();
 
       // Refresh user data from server
-      await dispatch(fetchUserProfile()).unwrap();
+      await dispatch(loadUser()).unwrap();
 
       alert("Cập nhật thông tin thành công!");
       navigate("/profile");

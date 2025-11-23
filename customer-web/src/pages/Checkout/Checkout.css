@@ -5,9 +5,21 @@
 }
 
 .checkout-page .container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 20px;
+  width: 100%;
+  padding: 0 16px;
+}
+
+@media (min-width: 768px) {
+  .checkout-page .container {
+    padding: 0 40px;
+  }
+}
+
+@media (min-width: 1440px) {
+  .checkout-page .container {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
 }
 
 .page-title {

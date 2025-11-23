@@ -9,14 +9,26 @@ import { createOrder } from "../../store/slices/orderSlice";
 import "./Cart.css";
 
 function Cart() {
-  const { items, total } = useSelector((state) => state.cart);
+  const { items, total, currentRestaurantName } = useSelector((state) => state.cart);
   const { isAuthenticated } = useSelector((state) => state.auth);
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  const handleUpdateQuantity = (productId, newQuantity) => {
+  const handleUpdateQuantity = async (itemId, newQuantity) => {
     if (newQuantity >= 1) {
-      dispatch(updateQuantity({ productId, quantity: newQuantity }));
+      try {
+        await dispatch(updateQuantity({ id: itemId, quantity: newQuantity }));
+      } catch (error) {
+        console.error('Failed to update quantity:', error);
+      }
+    }
+  };
+
+  const handleRemove = async (itemId) => {
+    try {
+      await dispatch(removeFromCart(itemId));
+    } catch (error) {
+      console.error('Failed to remove item:', error);
     }
   };
 
@@ -37,10 +49,11 @@ function Cart() {
       <div className="cart-page empty">
         <div className="container">
           <div className="empty-cart">
-            <h2>🛒</h2>
-            <p>Giỏ hàng của bạn đang trống</p>
+            <div className="empty-icon">🛒</div>
+            <h2>Giỏ hàng trống</h2>
+            <p>Hãy thêm món ăn yêu thích vào giỏ hàng</p>
             <button onClick={() => navigate("/")} className="browse-btn">
-              Khám phá ngay
+              Khám phá món ăn
             </button>
           </div>
         </div>
@@ -52,13 +65,22 @@ function Cart() {
     <div className="cart-page">
       <div className="container">
         <h1>Giỏ hàng của bạn</h1>
+        {currentRestaurantName && (
+          <p className="cart-restaurant">Nhà hàng: {currentRestaurantName}</p>
+        )}
 
         <div className="cart-content">
           <div className="cart-left">
             <div className="cart-header">
               <h3>Sản phẩm ({items.length})</h3>
               <button
-                onClick={() => dispatch(clearCart())}
+                onClick={async () => {
+                  try {
+                    await dispatch(clearCart());
+                  } catch (error) {
+                    console.error('Failed to clear cart:', error);
+                  }
+                }}
                 className="clear-all-btn"
               >
                 🗑️ Xóa tất cả
@@ -67,14 +89,12 @@ function Cart() {
 
             <div className="cart-items">
               {items.map((item) => (
-                <div key={item._id || item.id} className="cart-item">
-                  <img src={item.image} alt={item.name} />
+                <div key={item.id} className="cart-item">
+                  <img src={item.image || '/placeholder.png'} alt={item.name} />
                   <div className="item-details">
                     <h3>{item.name}</h3>
                     <p className="item-restaurant">
-                      {typeof item.restaurant === "object"
-                        ? item.restaurant?.name
-                        : item.restaurant || "Nhà hàng"}
+                      {item.restaurantName || "Nhà hàng"}
                     </p>
                     <p className="item-price">
                       {item.price.toLocaleString("vi-VN")} đ
@@ -84,10 +104,7 @@ function Cart() {
                     <div className="quantity-controls">
                       <button
                         onClick={() =>
-                          handleUpdateQuantity(
-                            item._id || item.id,
-                            item.quantity - 1
-                          )
+                          handleUpdateQuantity(item.id, item.quantity - 1)
                         }
                         className="qty-btn"
                         disabled={item.quantity <= 1}
@@ -97,10 +114,7 @@ function Cart() {
                       <span className="quantity">{item.quantity}</span>
                       <button
                         onClick={() =>
-                          handleUpdateQuantity(
-                            item._id || item.id,
-                            item.quantity + 1
-                          )
+                          handleUpdateQuantity(item.id, item.quantity + 1)
                         }
                         className="qty-btn"
                       >
@@ -108,9 +122,7 @@ function Cart() {
                       </button>
                     </div>
                     <button
-                      onClick={() =>
-                        dispatch(removeFromCart(item._id || item.id))
-                      }
+                      onClick={() => handleRemove(item.id)}
                       className="remove-btn"
                       title="Xóa sản phẩm"
                     >
@@ -146,10 +158,6 @@ function Cart() {
 
             <button onClick={handleCheckout} className="checkout-btn">
               🛒 Tiến hành đặt hàng
-            </button>
-
-            <button onClick={() => navigate("/")} className="continue-btn">
-              Tiếp tục mua hàng
             </button>
           </div>
         </div>

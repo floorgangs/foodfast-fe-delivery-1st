@@ -6,20 +6,29 @@ const cartSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
+      unique: true,
     },
-    cartItems: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "CartItem",
-      },
-    ],
-    totalAmount: {
+    items: {
+      type: [mongoose.Schema.Types.Mixed],
+      default: [],
+    },
+    total: {
       type: Number,
       default: 0,
     },
+    currentRestaurantId: {
+      type: String,
+      default: null,
+    },
+    currentRestaurantName: {
+      type: String,
+      default: null,
+    },
+    metadata: mongoose.Schema.Types.Mixed,
   },
   {
     timestamps: true,
+    strict: false,
   }
 );
 

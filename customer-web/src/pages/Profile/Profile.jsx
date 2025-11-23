@@ -59,37 +59,58 @@ function Profile() {
   return (
     <div className="profile-page">
       <div className="container">
-        <h1>Tài khoản của tôi</h1>
-
-        <div className="profile-content">
-          <div className="profile-card">
-            <div className="avatar">👤</div>
-            <h2>{user?.name}</h2>
-            <p>{user?.email}</p>
-
-            <div className="profile-info">
-              <div className="info-item">
-                <span className="label">Số điện thoại:</span>
-                <span className="value">{user?.phone}</span>
+        <div className="profile-layout">
+          <aside className="profile-sidebar">
+            <div className="profile-card">
+              <div className="avatar">
+                {user?.name?.charAt(0).toUpperCase() || "U"}
               </div>
-              <div className="info-item">
-                <span className="label">Địa chỉ:</span>
-                <span className="value">{user?.address}</span>
-              </div>
+              <h2>{user?.name}</h2>
+              <p className="user-email">{user?.email}</p>
             </div>
 
-            <button
-              className="edit-btn"
-              onClick={() => navigate("/edit-profile")}
-            >
-              Chỉnh sửa thông tin
-            </button>
-          </div>
+            <nav className="profile-menu">
+              <button
+                className="menu-item"
+                onClick={() => navigate("/edit-profile")}
+              >
+                <span className="menu-icon">👤</span>
+                <span className="menu-text">Thông tin cá nhân</span>
+              </button>
+              <button
+                className="menu-item"
+                onClick={() => navigate("/notifications")}
+              >
+                <span className="menu-icon">🔔</span>
+                <span className="menu-text">Thông báo</span>
+              </button>
+              <button
+                className="menu-item"
+                onClick={() => navigate("/vouchers")}
+              >
+                <span className="menu-icon">🎫</span>
+                <span className="menu-text">Voucher</span>
+              </button>
+            </nav>
 
-          <div className="orders-section">
-            <div className="orders-header">
-              <h2>Đơn hàng của tôi</h2>
-              <div className="order-tabs">
+            <div className="profile-info-card">
+              <h3>Liên hệ</h3>
+              <div className="info-item">
+                <span className="label">Số điện thoại</span>
+                <span className="value">{user?.phone || "Chưa cập nhật"}</span>
+              </div>
+              <div className="info-item">
+                <span className="label">Địa chỉ</span>
+                <span className="value">{user?.address || "Chưa cập nhật"}</span>
+              </div>
+            </div>
+          </aside>
+
+          <main className="profile-main">
+            <div className="orders-section">
+              <div className="orders-header">
+                <h2>Đơn hàng của tôi</h2>
+                <div className="order-tabs">
                 <button
                   className={`tab-btn ${
                     activeTab === "current" ? "active" : ""
@@ -181,7 +202,8 @@ function Profile() {
                 ))}
               </div>
             )}
-          </div>
+            </div>
+          </main>
         </div>
       </div>
     </div>

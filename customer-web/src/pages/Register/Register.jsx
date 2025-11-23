@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { registerUser, clearError } from "../../store/slices/authSlice";
-import socketService from "../../services/socket";
+import { register, clearError } from "../../store/slices/authSlice";
+import { fetchCart } from "../../store/slices/cartSlice";
+import { initSocket, joinCustomerRoom } from "../../services/socket";
 import "./Register.css";
 
 function Register() {
@@ -52,7 +53,7 @@ function Register() {
 
     try {
       const result = await dispatch(
-        registerUser({
+        register({
           name,
           email,
           phone,
@@ -61,11 +62,16 @@ function Register() {
         })
       ).unwrap();
 
-      // Kết nối Socket.io sau khi đăng ký thành công
-      socketService.connect({
-        id: result.user.id,
-        role: result.user.role,
-      });
+      // Initialize socket and join customer room
+      initSocket();
+      joinCustomerRoom(result.data.id || result.data._id);
+
+      // Fetch cart from server
+      try {
+        await dispatch(fetchCart()).unwrap();
+      } catch (error) {
+        console.error('Failed to fetch cart:', error);
+      }
 
       navigate("/");
     } catch (err) {
