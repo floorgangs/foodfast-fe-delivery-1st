@@ -45,7 +45,12 @@ const normalizeAddresses = (addresses, fallbackPhone) => {
         "";
 
       const contactName = (entry.contactName ?? "").toString().trim();
-      const contactPhone = (entry.contactPhone ?? entry.phone ?? fallbackPhone ?? "")
+      const contactPhone = (
+        entry.contactPhone ??
+        entry.phone ??
+        fallbackPhone ??
+        ""
+      )
         .toString()
         .trim();
 
@@ -287,6 +292,82 @@ export const updateProfile = async (req, res) => {
       new: true,
       runValidators: true,
     });
+
+    res.json({
+      success: true,
+      data: user,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Get all users (admin only)
+export const getAllUsers = async (req, res) => {
+  try {
+    const { role } = req.query;
+    const filter = role ? { role } : {};
+
+    const users = await User.find(filter)
+      .select("-password")
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      data: users,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Get user by ID (admin only)
+export const getUserById = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select("-password");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy người dùng",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: user,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Update user status (admin only)
+export const updateUserStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { status },
+      { new: true, runValidators: true }
+    ).select("-password");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy người dùng",
+      });
+    }
 
     res.json({
       success: true,

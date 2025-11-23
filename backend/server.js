@@ -81,6 +81,10 @@ const restaurantWebOrigins = parseOrigins(process.env.RESTAURANT_WEB_URL, [
 
 const adminWebOrigins = parseOrigins(process.env.ADMIN_WEB_URL, [
   "http://localhost:5175",
+  "http://localhost:3004",
+  "http://localhost:3003",
+  "http://localhost:3005",
+  "http://localhost:3006",
 ]);
 
 const additionalOrigins = parseOrigins(
