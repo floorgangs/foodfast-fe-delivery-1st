@@ -31,7 +31,13 @@ function Login() {
     e.preventDefault();
 
     try {
-      const result = await dispatch(loginUser({ email, password })).unwrap();
+      const result = await dispatch(
+        loginUser({
+          email,
+          password,
+          role: "customer", // Chỉ định role customer
+        })
+      ).unwrap();
 
       // Kết nối Socket.io sau khi đăng nhập thành công
       socketService.connect({
@@ -39,7 +45,14 @@ function Login() {
         role: result.user.role,
       });
 
-      navigate("/");
+      // Redirect về trang trước đó (nếu có) hoặc về home
+      const redirectPath = localStorage.getItem("redirectAfterLogin");
+      if (redirectPath) {
+        localStorage.removeItem("redirectAfterLogin");
+        navigate(redirectPath);
+      } else {
+        navigate("/");
+      }
     } catch (err) {
       console.error("Login failed:", err);
     }

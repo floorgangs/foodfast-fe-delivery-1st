@@ -28,8 +28,13 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["customer", "restaurant", "admin"],
+      enum: ["customer", "admin", "restaurant"],
       default: "customer",
+    },
+    // Restaurant user sẽ có reference đến restaurant info
+    restaurant: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Restaurant",
     },
     avatar: {
       type: String,
@@ -52,6 +57,7 @@ const userSchema = new mongoose.Schema(
         },
       },
     ],
+    // Customer-specific fields
     favoriteRestaurants: [
       {
         type: mongoose.Schema.Types.ObjectId,

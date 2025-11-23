@@ -122,6 +122,8 @@ app.use(
   cors({
     origin: corsOrigins,
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
@@ -196,7 +198,11 @@ connectDB().then(() => {
       });
     });
 
-    console.log(`🚀 Server running on http://${HOST === "0.0.0.0" ? "localhost" : HOST}:${PORT}`);
+    console.log(
+      `🚀 Server running on http://${
+        HOST === "0.0.0.0" ? "localhost" : HOST
+      }:${PORT}`
+    );
     if (addresses.length) {
       console.log(`🌐 Accessible on: ${addresses.join(", ")}`);
     }

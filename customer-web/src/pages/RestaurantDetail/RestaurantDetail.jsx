@@ -2,8 +2,10 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { addToCart } from "../../store/slices/cartSlice";
-import { restaurants, products, mockReviews } from "../../data/mockData";
+import axios from "axios";
 import "./RestaurantDetail.css";
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 function RestaurantDetail() {
   const { id } = useParams();
@@ -12,28 +14,41 @@ function RestaurantDetail() {
   const [restaurant, setRestaurant] = useState(null);
   const [menu, setMenu] = useState([]);
   const [reviews, setReviews] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const foundRestaurant = restaurants.find((r) => r.id === id);
-    setRestaurant(foundRestaurant);
-    setMenu(products[id] || []);
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        // Fetch restaurant
+        const restaurantRes = await axios.get(`${API_URL}/restaurants/${id}`);
+        if (restaurantRes.data.success) {
+          setRestaurant(restaurantRes.data.data);
+        }
 
-    // Load reviews - merge mock reviews with real reviews from localStorage
-    const mockRestaurantReviews = mockReviews[id] || [];
-    const storedReviews = JSON.parse(
-      localStorage.getItem("foodfast_reviews") || "[]"
-    );
-    const realRestaurantReviews = storedReviews.filter(
-      (r) => r.restaurantId === id
-    );
+        // Fetch products
+        const productsRes = await axios.get(`${API_URL}/products`, {
+          params: { restaurant: id },
+        });
+        if (productsRes.data.success) {
+          setMenu(productsRes.data.data);
+        }
 
-    // Combine and sort by date (newest first)
-    const allReviews = [
-      ...mockRestaurantReviews,
-      ...realRestaurantReviews,
-    ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        // Fetch reviews
+        const reviewsRes = await axios.get(`${API_URL}/reviews`, {
+          params: { restaurant: id },
+        });
+        if (reviewsRes.data.success) {
+          setReviews(reviewsRes.data.data);
+        }
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    setReviews(allReviews);
+    fetchData();
   }, [id]);
 
   const handleAddToCart = (product) => {
@@ -76,18 +91,45 @@ function RestaurantDetail() {
         </button>
 
         <div className="restaurant-header">
-          <img src={restaurant.image} alt={restaurant.name} />
+          <img
+            src={restaurant.image || restaurant.avatar}
+            alt={restaurant.name}
+          />
           <div className="restaurant-header-info">
             <h1>{restaurant.name}</h1>
-            <p className="cuisine">{restaurant.cuisine}</p>
+            <p className="cuisine">
+              {Array.isArray(restaurant.cuisine)
+                ? restaurant.cuisine.join(", ")
+                : restaurant.cuisine || restaurant.description}
+            </p>
             <div className="meta-info">
-              <span>⭐ {restaurant.rating}</span>
-              <span>🚁 {restaurant.deliveryTime}</span>
-              <span>💰 {restaurant.priceRange}</span>
+              <span>⭐ {restaurant.rating || 0}</span>
+              <span>🚁 {restaurant.estimatedDeliveryTime || "30-45 phút"}</span>
+              <span>
+                💰 Phí ship:{" "}
+                {(restaurant.deliveryFee || 0).toLocaleString("vi-VN")}đ
+              </span>
             </div>
-            <p className="address">📍 {restaurant.address}</p>
-            {!restaurant.isOpen && (
+            <p className="address">
+              📍{" "}
+              {typeof restaurant.address === "string"
+                ? restaurant.address
+                : `${restaurant.address?.street || ""}, ${
+                    restaurant.address?.ward || ""
+                  }, ${restaurant.address?.district || ""}, ${
+                    restaurant.address?.city || ""
+                  }`}
+            </p>
+            {restaurant.isActive === false && (
               <div className="closed-notice">Nhà hàng hiện đã đóng cửa</div>
+            )}
+            {restaurant.isBusy && (
+              <div
+                className="closed-notice"
+                style={{ backgroundColor: "#ff9800" }}
+              >
+                Nhà hàng hiện đang bận, thời gian chờ có thể lâu hơn
+              </div>
             )}
           </div>
         </div>
@@ -96,7 +138,7 @@ function RestaurantDetail() {
           <h2>Thực đơn</h2>
           <div className="menu-grid">
             {menu.map((product) => (
-              <div key={product.id} className="menu-item">
+              <div key={product._id} className="menu-item">
                 <img src={product.image} alt={product.name} />
                 <div className="menu-item-info">
                   <h3>{product.name}</h3>
@@ -107,7 +149,7 @@ function RestaurantDetail() {
                     </span>
                     <button
                       onClick={() => handleAddToCart(product)}
-                      disabled={!restaurant.isOpen}
+                      disabled={!restaurant.isActive}
                       className="add-btn"
                     >
                       Thêm
@@ -143,7 +185,10 @@ function RestaurantDetail() {
           {reviews.length > 0 ? (
             <div className="reviews-list">
               {reviews.map((review, index) => (
-                <div key={review.id || index} className="review-item">
+                <div
+                  key={review._id || review.id || index}
+                  className="review-item"
+                >
                   <div className="review-header-item">
                     <div className="review-user">
                       <div className="user-avatar">

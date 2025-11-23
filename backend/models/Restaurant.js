@@ -2,15 +2,15 @@ import mongoose from "mongoose";
 
 const restaurantSchema = new mongoose.Schema(
   {
-    name: {
-      type: String,
-      required: [true, "Vui lòng nhập tên nhà hàng"],
-      trim: true,
-    },
     owner: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
+    },
+    name: {
+      type: String,
+      required: [true, "Vui lòng nhập tên nhà hàng"],
+      trim: true,
     },
     description: {
       type: String,
@@ -44,7 +44,6 @@ const restaurantSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    email: String,
     openingHours: {
       monday: { open: String, close: String, isOpen: Boolean },
       tuesday: { open: String, close: String, isOpen: Boolean },

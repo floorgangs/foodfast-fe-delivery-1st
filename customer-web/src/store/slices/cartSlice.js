@@ -46,7 +46,10 @@ const cartSlice = createSlice({
       }
 
       state.restaurantId = restaurantId;
-      const existingItem = state.items.find((item) => item.id === product.id);
+      const productId = product._id || product.id;
+      const existingItem = state.items.find(
+        (item) => (item._id || item.id) === productId
+      );
 
       if (existingItem) {
         existingItem.quantity += 1;
@@ -61,7 +64,9 @@ const cartSlice = createSlice({
       saveCartToStorage(state);
     },
     removeFromCart: (state, action) => {
-      state.items = state.items.filter((item) => item.id !== action.payload);
+      state.items = state.items.filter(
+        (item) => (item._id || item.id) !== action.payload
+      );
       state.total = state.items.reduce(
         (sum, item) => sum + item.price * item.quantity,
         0
@@ -74,7 +79,9 @@ const cartSlice = createSlice({
     },
     updateQuantity: (state, action) => {
       const { productId, quantity } = action.payload;
-      const item = state.items.find((item) => item.id === productId);
+      const item = state.items.find(
+        (item) => (item._id || item.id) === productId
+      );
 
       if (item) {
         item.quantity = quantity;

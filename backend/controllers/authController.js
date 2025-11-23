@@ -1,4 +1,5 @@
 import User from "../models/User.js";
+import Restaurant from "../models/Restaurant.js";
 import jwt from "jsonwebtoken";
 
 const generateToken = (id) => {
@@ -11,7 +12,9 @@ export const register = async (req, res) => {
   try {
     const { name, email, phone, password, role } = req.body;
 
+    // Check in users collection only
     const userExists = await User.findOne({ email });
+
     if (userExists) {
       return res.status(400).json({
         success: false,
@@ -53,7 +56,7 @@ export const register = async (req, res) => {
 
 export const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, role } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({
@@ -62,12 +65,25 @@ export const login = async (req, res) => {
       });
     }
 
+    console.log("🔐 Login attempt:", { email, role });
+
+    // Tìm user trong users collection
     const user = await User.findOne({ email }).select("+password");
+    console.log("👤 User found:", !!user);
+    console.log("🔑 Has password:", !!user?.password);
 
     if (!user || !(await user.comparePassword(password))) {
       return res.status(401).json({
         success: false,
         message: "Email hoặc mật khẩu không đúng",
+      });
+    }
+
+    // Kiểm tra role nếu được cung cấp
+    if (role && user.role !== role) {
+      return res.status(403).json({
+        success: false,
+        message: `Tài khoản này không phải là ${role}`,
       });
     }
 
@@ -80,22 +96,70 @@ export const login = async (req, res) => {
 
     const token = generateToken(user._id);
 
+    const responseData = {
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        avatar: user.avatar,
+      },
+      token,
+    };
+
+    // Nếu là restaurant user, lấy thông tin restaurant
+    if (user.role === "restaurant") {
+      const restaurant = await Restaurant.findOne({ owner: user._id });
+
+      if (!restaurant) {
+        console.log("⚠️ No restaurant found for user, but allowing login");
+        // Tạm thời cho phép login mà không có restaurant data
+        // User cần tạo restaurant sau khi login
+        responseData.restaurant = null;
+      } else {
+        if (!restaurant.isApproved) {
+          return res.status(403).json({
+            success: false,
+            message: "Nhà hàng chưa được phê duyệt",
+          });
+        }
+
+        responseData.restaurant = {
+          id: restaurant._id,
+          name: restaurant.name,
+          phone: restaurant.phone,
+          avatar: restaurant.avatar,
+          coverImage: restaurant.coverImage,
+          description: restaurant.description,
+          cuisine: restaurant.cuisine,
+          address: restaurant.address,
+          openingHours: restaurant.openingHours,
+          rating: restaurant.rating,
+          totalReviews: restaurant.totalReviews,
+          deliveryFee: restaurant.deliveryFee,
+          minOrder: restaurant.minOrder,
+          estimatedDeliveryTime: restaurant.estimatedDeliveryTime,
+          isApproved: restaurant.isApproved,
+          isBusy: restaurant.isBusy,
+          tags: restaurant.tags,
+        };
+
+        console.log("✅ Restaurant login successful");
+      }
+    } else if (user.role === "customer") {
+      responseData.user.addresses = user.addresses;
+      console.log("✅ Customer login successful");
+    } else {
+      console.log("✅ Admin login successful");
+    }
+
     res.json({
       success: true,
-      data: {
-        user: {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          phone: user.phone,
-          role: user.role,
-          avatar: user.avatar,
-          addresses: user.addresses,
-        },
-        token,
-      },
+      data: responseData,
     });
   } catch (error) {
+    console.error("❌ Login error:", error);
     res.status(500).json({
       success: false,
       message: error.message,
