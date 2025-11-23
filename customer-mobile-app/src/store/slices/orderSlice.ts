@@ -17,7 +17,7 @@ export interface Order {
   restaurantName: string;
   items: OrderItem[];
   total: number;
-  status: 'confirmed' | 'preparing' | 'delivering' | 'delivered';
+  status: 'pending' | 'confirmed' | 'ready' | 'delivering' | 'delivered' | 'cancelled';
   createdAt: string;
   deliveryAddress: string;
   pickupCoordinate?: Coordinate;
@@ -49,7 +49,7 @@ const orderSlice = createSlice({
       const newOrder: Order = {
         ...action.payload,
         id: `ORD${Date.now()}`,
-        status: 'confirmed',
+        status: 'pending',
         createdAt: new Date().toISOString(),
         isReviewed: false,
         rating: null,

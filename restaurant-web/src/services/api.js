@@ -60,22 +60,32 @@ api.interceptors.response.use(
     console.error('🔴 API Error:', {
       url: error.config?.url,
       baseURL: error.config?.baseURL,
+      fullURL: error.config ? `${error.config.baseURL}${error.config.url}` : 'N/A',
       method: error.config?.method,
       status: error.response?.status,
+      statusText: error.response?.statusText,
       message: error.message,
       data: error.response?.data,
       isNetworkError: error.message === 'Network Error',
+      code: error.code,
     });
 
     if (error.response?.status === 401) {
+      console.warn('⚠️ 401 Unauthorized - redirecting to login');
       // Token hết hạn, xóa và chuyển về login
       localStorage.removeItem('restaurant_token');
       localStorage.removeItem('restaurant_user');
       localStorage.removeItem('restaurant_data');
       window.location.href = '/login';
+      return Promise.reject({ message: 'Unauthorized' });
+    }
+
+    if (error.message === 'Network Error') {
+      console.error('❌ Network Error - Backend may be down or CORS issue');
+      return Promise.reject({ message: 'Không thể kết nối đến server. Vui lòng kiểm tra lại.' });
     }
     
-    return Promise.reject(error.response?.data || { message: error.message });
+    return Promise.reject(error.response?.data || { message: error.message || 'Đã xảy ra lỗi' });
   }
 );
 

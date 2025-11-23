@@ -112,7 +112,6 @@ const orderSchema = new mongoose.Schema(
       enum: [
         "pending",
         "confirmed",
-        "preparing",
         "ready",
         "delivering",
         "delivered",
@@ -130,6 +129,10 @@ const orderSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Drone",
     },
+    assignedDrone: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Drone",
+    },
     droneDeliveryDetails: {
       assignedAt: Date,
       launchedAt: Date,
@@ -138,6 +141,12 @@ const orderSchema = new mongoose.Schema(
       flightDistance: Number, // km
       flightDuration: Number, // phút
       batteryUsed: Number, // %
+      currentLocation: {
+        lat: Number,
+        lng: Number,
+        heading: Number,
+        updatedAt: Date,
+      },
     },
     timeline: [
       {

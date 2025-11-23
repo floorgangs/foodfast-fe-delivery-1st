@@ -38,6 +38,8 @@ const userSchema = new mongoose.Schema(
     addresses: [
       {
         label: String,
+        contactName: String,
+        contactPhone: String,
         address: String,
         city: String,
         district: String,

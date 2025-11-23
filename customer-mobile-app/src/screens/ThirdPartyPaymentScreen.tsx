@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, SafeAreaView } from 'react-native';
+import React, { useMemo, useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useDispatch } from 'react-redux';
 import { clearCart } from '../store/slices/cartSlice';
 import type { AppDispatch } from '../store';
@@ -19,6 +20,35 @@ const ThirdPartyPaymentScreen = ({ route, navigation }: any) => {
   const dispatch = useDispatch<AppDispatch>();
   const [processing, setProcessing] = useState<'success' | 'failed' | null>(null);
   const [error, setError] = useState('');
+
+  // Debug logging and validation
+  useEffect(() => {
+    console.log('[ThirdPartyPayment] Screen params:', {
+      orderId,
+      orderNumber,
+      amount,
+      sessionId,
+      paymentMethod,
+      restaurantName,
+    });
+    
+    // Validate required parameters
+    if (!orderId || !sessionId) {
+      console.error('[ThirdPartyPayment] Missing required params:', { orderId, sessionId });
+      const errorMsg = 'Thông tin thanh toán không đầy đủ. Vui lòng thử lại.';
+      setError(errorMsg);
+      Alert.alert(
+        'Lỗi thanh toán',
+        errorMsg,
+        [
+          {
+            text: 'Quay lại',
+            onPress: () => navigation.goBack(),
+          },
+        ]
+      );
+    }
+  }, [orderId, sessionId, orderNumber, amount, paymentMethod, restaurantName, navigation]);
 
   const formattedAmount = useMemo(() => {
     return `${Number(amount || 0).toLocaleString('vi-VN')}đ`;
@@ -61,14 +91,33 @@ const ThirdPartyPaymentScreen = ({ route, navigation }: any) => {
 
   const handlePayment = async (status: 'success' | 'failed') => {
     if (processing) {
+      console.log('[ThirdPartyPayment] Already processing, ignoring click');
       return;
     }
+
+    // Validate before processing
+    if (!orderId || !sessionId) {
+      console.error('[ThirdPartyPayment] Cannot process payment - missing orderId or sessionId');
+      setError('Thông tin thanh toán không hợp lệ');
+      return;
+    }
+
+    console.log('[ThirdPartyPayment] Processing payment:', { orderId, sessionId, status });
     setProcessing(status);
     setError('');
+    
     try {
-      await paymentAPI.confirmThirdParty({ orderId, sessionId, status });
+      console.log('[ThirdPartyPayment] Calling confirmThirdParty API...');
+      const response = await paymentAPI.confirmThirdParty({ orderId, sessionId, status });
+      console.log('[ThirdPartyPayment] API response:', response);
+      
       if (status === 'success') {
-        dispatch(clearCart());
+        console.log('[ThirdPartyPayment] Payment success - clearing cart and navigating');
+        try {
+          await dispatch(clearCart());
+        } catch (cartError) {
+          console.warn('[ThirdPartyPayment] Failed to clear cart:', cartError);
+        }
         // Navigate to Home tab first, then to Orders tab
         navigation.reset({
           index: 0,
@@ -78,10 +127,12 @@ const ThirdPartyPaymentScreen = ({ route, navigation }: any) => {
           navigation.navigate('Orders');
         }, 100);
       } else {
+        console.log('[ThirdPartyPayment] Payment cancelled - going back');
         // Don't clear cart on cancel - user can try again
         navigation.goBack();
       }
     } catch (err: any) {
+      console.error('[ThirdPartyPayment] Payment confirmation error:', err);
       setError(err.message || 'Không thể xác nhận thanh toán');
     } finally {
       setProcessing(null);
@@ -126,7 +177,11 @@ const ThirdPartyPaymentScreen = ({ route, navigation }: any) => {
           )}
         </View>
 
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        {error ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>⚠️ {error}</Text>
+          </View>
+        ) : null}
 
         {/* Action Buttons */}
         <TouchableOpacity
@@ -274,12 +329,20 @@ const styles = StyleSheet.create({
     color: '#92400E',
     textAlign: 'center',
   },
+  errorContainer: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 16,
+    backgroundColor: '#FEE2E2',
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#DC2626',
+  },
   errorText: {
     color: '#DC2626',
-    marginHorizontal: 16,
-    marginTop: 12,
     textAlign: 'center',
     fontSize: 14,
+    fontWeight: '500',
   },
   payButton: {
     marginHorizontal: 16,

@@ -1,8 +1,18 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import { cartAPI } from '../../services/api';
+import type { AppThunk, RootState } from '../index';
+import { logout } from './authSlice';
 
-interface CartItem {
+const createTempId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+const ensurePositiveQuantity = (value?: number) => {
+  const numeric = Number(value ?? 1);
+  return Number.isFinite(numeric) && numeric > 0 ? Math.floor(numeric) : 1;
+};
+
+export interface CartItem {
   id: string;
+  productId: string;
   name: string;
   price: number;
   quantity: number;
@@ -11,134 +21,329 @@ interface CartItem {
   image?: string;
 }
 
-interface SavedCart {
-  items: CartItem[];
-  total: number;
-  restaurantId: string;
-  restaurantName: string;
-  savedAt: number;
-}
-
 interface CartState {
   items: CartItem[];
   total: number;
   currentRestaurantId: string | null;
   currentRestaurantName: string | null;
-  savedCarts: SavedCart[];
+  isLoading: boolean;
+  isSyncing: boolean;
+  error: string | null;
+  lastSyncedAt: number | null;
 }
+
+interface CartSyncItemPayload {
+  id?: string;
+  productId: string;
+  name: string;
+  price: number;
+  quantity: number;
+  restaurantId: string;
+  restaurantName: string;
+  image?: string;
+}
+
+export interface CartSyncPayload {
+  items: CartSyncItemPayload[];
+  total?: number;
+  currentRestaurantId: string | null;
+  currentRestaurantName: string | null;
+}
+
+export interface NormalizedCartPayload {
+  items: CartItem[];
+  total: number;
+  currentRestaurantId: string | null;
+  currentRestaurantName: string | null;
+}
+
+export interface AddToCartPayload {
+  id: string;
+  productId?: string;
+  name: string;
+  price: number;
+  restaurantId: string;
+  restaurantName: string;
+  image?: string;
+}
+
+const calculateTotal = (items: CartItem[] = []) =>
+  items.reduce((sum, item) => sum + Number(item.price || 0) * ensurePositiveQuantity(item.quantity), 0);
+
+const cloneItems = (items: CartItem[] = []): CartItem[] =>
+  items.map((item) => ({ ...item, quantity: ensurePositiveQuantity(item.quantity) }));
+
+const emptyNormalizedCart = (): NormalizedCartPayload => ({
+  items: [],
+  total: 0,
+  currentRestaurantId: null,
+  currentRestaurantName: null,
+});
+
+const normalizeCartItemFromServer = (raw: any): CartItem => {
+  const productId = String(raw?.productId ?? raw?.product ?? raw?.id ?? raw?._id ?? createTempId('product'));
+  return {
+    id: String(raw?._id ?? raw?.id ?? createTempId('item')),
+    productId,
+    name: String(raw?.name ?? ''),
+    price: Number(raw?.price ?? 0),
+    quantity: ensurePositiveQuantity(raw?.quantity),
+    restaurantId: raw?.restaurantId ? String(raw.restaurantId) : '',
+    restaurantName: String(raw?.restaurantName ?? ''),
+    image: raw?.image ?? undefined,
+  };
+};
+
+const normalizeCartResponse = (payload: any): NormalizedCartPayload => {
+  if (!payload) {
+    return emptyNormalizedCart();
+  }
+
+  const rawData = payload?.data ?? payload;
+  const items = Array.isArray(rawData?.items)
+    ? rawData.items.map((item: any) => normalizeCartItemFromServer(item))
+    : [];
+
+  return {
+    items,
+    total: typeof rawData?.total === 'number' ? rawData.total : calculateTotal(items),
+    currentRestaurantId: rawData?.currentRestaurantId ?? null,
+    currentRestaurantName: rawData?.currentRestaurantName ?? null,
+  };
+};
+
+const serializeCartForServer = (cart: CartState): CartSyncPayload => ({
+  items: cart.items.map((item) => ({
+    id: item.id,
+    productId: item.productId,
+    name: item.name,
+    price: item.price,
+    quantity: ensurePositiveQuantity(item.quantity),
+    restaurantId: item.restaurantId,
+    restaurantName: item.restaurantName,
+    image: item.image,
+  })),
+  total: cart.total,
+  currentRestaurantId: cart.currentRestaurantId,
+  currentRestaurantName: cart.currentRestaurantName,
+});
+
+const applyNormalizedCartState = (state: CartState, normalized: NormalizedCartPayload) => {
+  state.items = cloneItems(normalized.items);
+  state.total = normalized.total;
+  state.currentRestaurantId = normalized.currentRestaurantId;
+  state.currentRestaurantName = normalized.currentRestaurantName;
+};
+
+export const fetchCart = createAsyncThunk<NormalizedCartPayload, void, { state: RootState }>(
+  'cart/fetchCart',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await cartAPI.get();
+      return normalizeCartResponse(response);
+    } catch (error: any) {
+      return rejectWithValue(error?.message || 'Không thể tải giỏ hàng');
+    }
+  }
+);
+
+export const persistCart = createAsyncThunk<NormalizedCartPayload, CartSyncPayload>(
+  'cart/persistCart',
+  async (payload, { rejectWithValue }) => {
+    try {
+      const response = await cartAPI.upsert(payload);
+      return normalizeCartResponse(response);
+    } catch (error: any) {
+      return rejectWithValue(error?.message || 'Không thể lưu giỏ hàng');
+    }
+  }
+);
 
 const initialState: CartState = {
   items: [],
   total: 0,
   currentRestaurantId: null,
   currentRestaurantName: null,
-  savedCarts: [],
+  isLoading: false,
+  isSyncing: false,
+  error: null,
+  lastSyncedAt: null,
 };
 
 const cartSlice = createSlice({
   name: 'cart',
   initialState,
   reducers: {
-    addToCart: (state, action: PayloadAction<Omit<CartItem, 'quantity'>>) => {
-      const { restaurantId, restaurantName } = action.payload;
-      
-      // Nếu giỏ hàng trống, đặt nhà hàng hiện tại
+    addItem: (state, action: PayloadAction<AddToCartPayload>) => {
+      const productId = String(action.payload.productId ?? action.payload.id);
+      const restaurantId = String(action.payload.restaurantId);
+      const restaurantName = String(action.payload.restaurantName ?? '');
+
+      if (!restaurantId) {
+        return;
+      }
+
+      const normalizedItem: CartItem = {
+        id: createTempId('item'),
+        productId,
+        name: action.payload.name,
+        price: Number(action.payload.price ?? 0),
+        quantity: 1,
+        restaurantId,
+        restaurantName,
+        image: action.payload.image,
+      };
+
       if (state.items.length === 0) {
+        state.items.push(normalizedItem);
         state.currentRestaurantId = restaurantId;
         state.currentRestaurantName = restaurantName;
-        state.items.push({ ...action.payload, quantity: 1 });
-      } 
-      // Nếu cùng nhà hàng, thêm vào giỏ
-      else if (state.currentRestaurantId === restaurantId) {
-        const existingItem = state.items.find(item => item.id === action.payload.id);
+      } else if (state.currentRestaurantId === restaurantId) {
+        const existingItem = state.items.find((item) => item.productId === productId);
         if (existingItem) {
           existingItem.quantity += 1;
         } else {
-          state.items.push({ ...action.payload, quantity: 1 });
+          state.items.push(normalizedItem);
         }
-      } 
-      // Nếu khác nhà hàng, lưu giỏ hiện tại vào savedCarts và tạo giỏ mới
-      else {
-        // Lưu giỏ hiện tại vào savedCarts
-        state.savedCarts.push({
-          items: [...state.items],
-          total: state.total,
-          restaurantId: state.currentRestaurantId!,
-          restaurantName: state.currentRestaurantName!,
-          savedAt: Date.now(),
-        });
-        
-        // Tạo giỏ mới với món từ nhà hàng khác
-        state.items = [{ ...action.payload, quantity: 1 }];
+      } else {
+        // Khi đổi nhà hàng, clear giỏ cũ (logic lưu đơn tạm sẽ implement riêng sau)
+        state.items = [normalizedItem];
         state.currentRestaurantId = restaurantId;
         state.currentRestaurantName = restaurantName;
       }
-      
-      state.total = state.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-      AsyncStorage.setItem('cart', JSON.stringify(state));
+
+      state.total = calculateTotal(state.items);
     },
-    removeFromCart: (state, action: PayloadAction<string>) => {
-      state.items = state.items.filter(item => item.id !== action.payload);
-      state.total = state.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-      AsyncStorage.setItem('cart', JSON.stringify(state));
-    },
-    updateQuantity: (state, action: PayloadAction<{ id: string; quantity: number }>) => {
-      const item = state.items.find(item => item.id === action.payload.id);
-      if (item) {
-        item.quantity = action.payload.quantity;
-        if (item.quantity <= 0) {
-          state.items = state.items.filter(i => i.id !== action.payload.id);
-        }
+    removeItem: (state, action: PayloadAction<string>) => {
+      state.items = state.items.filter((item) => item.id !== action.payload);
+      state.total = calculateTotal(state.items);
+      if (state.items.length === 0) {
+        state.currentRestaurantId = null;
+        state.currentRestaurantName = null;
       }
-      state.total = state.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-      AsyncStorage.setItem('cart', JSON.stringify(state));
     },
-    clearCart: (state) => {
+    updateItemQuantity: (state, action: PayloadAction<{ id: string; quantity: number }>) => {
+      const target = state.items.find((item) => item.id === action.payload.id);
+      if (!target) {
+        return;
+      }
+
+      const numericQuantity = Number.isFinite(action.payload.quantity)
+        ? Math.floor(action.payload.quantity)
+        : 1;
+
+      if (numericQuantity <= 0) {
+        state.items = state.items.filter((item) => item.id !== action.payload.id);
+      } else {
+        target.quantity = numericQuantity;
+      }
+
+      state.total = calculateTotal(state.items);
+      if (state.items.length === 0) {
+        state.currentRestaurantId = null;
+        state.currentRestaurantName = null;
+      }
+    },
+    clearCartState: (state) => {
       state.items = [];
       state.total = 0;
       state.currentRestaurantId = null;
       state.currentRestaurantName = null;
-      AsyncStorage.setItem('cart', JSON.stringify(state));
     },
-    restoreSavedCart: (state, action: PayloadAction<number>) => {
-      const index = action.payload;
-      if (index >= 0 && index < state.savedCarts.length) {
-        // Lưu giỏ hiện tại nếu có món
-        if (state.items.length > 0) {
-          state.savedCarts.push({
-            items: [...state.items],
-            total: state.total,
-            restaurantId: state.currentRestaurantId!,
-            restaurantName: state.currentRestaurantName!,
-            savedAt: Date.now(),
-          });
-        }
-        
-        // Khôi phục giỏ đã lưu
-        const savedCart = state.savedCarts[index];
-        state.items = savedCart.items;
-        state.total = savedCart.total;
-        state.currentRestaurantId = savedCart.restaurantId;
-        state.currentRestaurantName = savedCart.restaurantName;
-        
-        // Xóa khỏi savedCarts
-        state.savedCarts.splice(index, 1);
-        AsyncStorage.setItem('cart', JSON.stringify(state));
-      }
+    applyCartSnapshot: (state, action: PayloadAction<NormalizedCartPayload>) => {
+      applyNormalizedCartState(state, action.payload);
     },
-    deleteSavedCart: (state, action: PayloadAction<number>) => {
-      state.savedCarts.splice(action.payload, 1);
-      AsyncStorage.setItem('cart', JSON.stringify(state));
-    },
-    setCart: (state, action: PayloadAction<CartState>) => {
-      // Normalize incoming cart: ensure each item has a quantity
-      state.items = (action.payload.items || []).map(item => ({ ...item, quantity: (item as any).quantity ?? 1 }));
-      state.total = action.payload.total ?? state.items.reduce((sum, i) => sum + (i.price * (i.quantity ?? 1)), 0);
-      state.currentRestaurantId = action.payload.currentRestaurantId ?? state.currentRestaurantId;
-      state.currentRestaurantName = action.payload.currentRestaurantName ?? state.currentRestaurantName;
-    },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(fetchCart.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchCart.fulfilled, (state, action) => {
+        state.isLoading = false;
+        applyNormalizedCartState(state, action.payload);
+        state.lastSyncedAt = Date.now();
+      })
+      .addCase(fetchCart.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = (action.payload as string) || action.error.message || 'Không thể tải giỏ hàng';
+      })
+      .addCase(persistCart.pending, (state) => {
+        state.isSyncing = true;
+        state.error = null;
+      })
+      .addCase(persistCart.fulfilled, (state, action) => {
+        state.isSyncing = false;
+        applyNormalizedCartState(state, action.payload);
+        state.lastSyncedAt = Date.now();
+      })
+      .addCase(persistCart.rejected, (state, action) => {
+        state.isSyncing = false;
+        state.error = (action.payload as string) || action.error.message || 'Không thể lưu giỏ hàng';
+      })
+      .addCase(logout.fulfilled, () => ({ ...initialState }));
   },
 });
 
-export const { addToCart, removeFromCart, updateQuantity, clearCart, setCart, restoreSavedCart, deleteSavedCart } = cartSlice.actions;
+const {
+  addItem,
+  removeItem,
+  updateItemQuantity,
+  clearCartState,
+} = cartSlice.actions;
+
+export const selectCartState = (state: RootState) => state.cart;
+
+export const synchronizeCart = (): AppThunk<Promise<NormalizedCartPayload | void>> =>
+  async (dispatch, getState) => {
+    const state = getState();
+    if (!state.auth?.isAuthenticated) {
+      return undefined;
+    }
+
+    const payload = serializeCartForServer(state.cart);
+    return dispatch(persistCart(payload)).unwrap();
+  };
+
+export const addToCart = (payload: AddToCartPayload): AppThunk<Promise<void>> =>
+  async (dispatch) => {
+    dispatch(addItem(payload));
+    try {
+      await dispatch(synchronizeCart());
+    } catch (error) {
+      throw error;
+    }
+  };
+
+export const removeFromCart = (id: string): AppThunk<Promise<void>> =>
+  async (dispatch) => {
+    dispatch(removeItem(id));
+    try {
+      await dispatch(synchronizeCart());
+    } catch (error) {
+      throw error;
+    }
+  };
+
+export const updateQuantity = (payload: { id: string; quantity: number }): AppThunk<Promise<void>> =>
+  async (dispatch) => {
+    dispatch(updateItemQuantity(payload));
+    try {
+      await dispatch(synchronizeCart());
+    } catch (error) {
+      throw error;
+    }
+  };
+
+export const clearCart = (): AppThunk<Promise<void>> =>
+  async (dispatch) => {
+    dispatch(clearCartState());
+    try {
+      await dispatch(synchronizeCart());
+    } catch (error) {
+      throw error;
+    }
+  };
+
 export default cartSlice.reducer;

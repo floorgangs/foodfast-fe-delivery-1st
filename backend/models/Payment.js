@@ -2,6 +2,11 @@ import mongoose from "mongoose";
 
 const paymentSchema = new mongoose.Schema(
   {
+    paymentId: {
+      type: String,
+      unique: true,
+      default: () => `PAYMENT-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`,
+    },
     order: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Order",

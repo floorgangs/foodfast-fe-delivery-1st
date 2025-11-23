@@ -80,7 +80,7 @@ function OrderManagement() {
     const statusMap = {
       pending: "pending",
       confirmed: "confirmed",
-      preparing: "preparing",
+
       ready: "ready",
       delivering: "delivering",
       delivered: "delivered",
@@ -128,7 +128,7 @@ function OrderManagement() {
         return orders.filter((order) => order.status === "pending");
       case "confirmed":
         return orders.filter((order) =>
-          ["confirmed", "preparing", "ready", "delivering"].includes(order.status)
+          ["confirmed", "ready", "delivering"].includes(order.status)
         );
       case "history":
         return orders.filter((order) =>
@@ -191,7 +191,7 @@ function OrderManagement() {
           <span className="tab-count">
             {
               orders.filter((o) =>
-                ["confirmed", "preparing", "ready", "delivering"].includes(o.status)
+                ["confirmed", "ready", "delivering"].includes(o.status)
               ).length
             }
           </span>
@@ -231,7 +231,7 @@ function OrderManagement() {
                 <span className={`status-badge ${order.status}`}>
                   {order.status === "pending" && "Chờ xác nhận"}
                   {order.status === "confirmed" && "Đã xác nhận"}
-                  {order.status === "preparing" && "Đang chuẩn bị"}
+
                   {order.status === "ready" && "Sẵn sàng giao"}
                   {order.status === "delivering" && "Đang giao"}
                   {order.status === "delivered" && "Hoàn thành"}
@@ -276,16 +276,8 @@ function OrderManagement() {
                 )}
                 {order.status === "confirmed" && (
                   <button
-                    onClick={() => updateStatus(order.id, "preparing")}
-                    className="prepare-btn btn-small"
-                  >
-                    Bắt đầu chuẩn bị
-                  </button>
-                )}
-                {order.status === "preparing" && (
-                  <button
                     onClick={() => updateStatus(order.id, "ready")}
-                    className="ready-btn btn-small"
+                    className="prepare-btn btn-small"
                   >
                     Sẵn sàng giao
                   </button>

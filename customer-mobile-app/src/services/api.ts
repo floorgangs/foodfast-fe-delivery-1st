@@ -1,12 +1,24 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 // IMPORTANT: Thay YOUR_IP bằng IP máy tính chạy backend
 // Windows: Chạy ipconfig trong CMD để xem IPv4 Address
 // Mac/Linux: Chạy ifconfig để xem IP
-const API_URL = __DEV__ 
-  ? 'http://192.168.1.140:5000/api' // IP máy tính đang chạy backend
+// Choose a sensible default for development depending on platform:
+// - Android emulator should use 10.0.2.2 to reach host machine
+// - iOS simulator / physical device should use your machine LAN IP (adjust below)
+const DEFAULT_LAN_IP = '192.168.1.201'; // <-- adjust this if your machine IP is different
+const DEV_HOST = Platform.OS === 'android' ? '10.0.2.2' : DEFAULT_LAN_IP;
+const API_URL = __DEV__
+  ? `http://${DEV_HOST}:5000/api`
   : 'https://your-production-api.com/api';
+
+// Helpful debug log so you can see which backend URL the app is using
+if (__DEV__) {
+  // eslint-disable-next-line no-console
+  console.log(`[api] Using API_URL=${API_URL} (Platform=${Platform.OS})`);
+}
 
 const api = axios.create({
   baseURL: API_URL,
@@ -142,8 +154,21 @@ export const reviewAPI = {
 };
 
 export const paymentAPI = {
-  confirmThirdParty: (payload: { orderId: string; sessionId: string; status: 'success' | 'failed' }) =>
-    api.post('/orders/confirm-payment', payload),
+  confirmThirdParty: async (payload: { orderId: string; sessionId: string; status: 'success' | 'failed' }) => {
+    console.log('[paymentAPI] confirmThirdParty payload:', payload);
+    try {
+      const response = await api.post('/orders/confirm-payment', payload);
+      console.log('[paymentAPI] confirmThirdParty response:', response);
+      return response;
+    } catch (error: any) {
+      console.error('[paymentAPI] confirmThirdParty error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
+      throw error;
+    }
+  },
 };
 
 // Notification APIs
@@ -159,6 +184,22 @@ export const notificationAPI = {
   
   markAllAsRead: () =>
     api.put('/notifications/mark-all-read'),
+};
+
+// Cart APIs
+export const cartAPI = {
+  get: () => api.get('/cart'),
+  upsert: (payload: any) => api.put('/cart', payload),
+  clear: () => api.delete('/cart'),
+};
+
+// Saved Orders APIs
+export const savedOrderAPI = {
+  getAll: (params?: any) => api.get('/saved-orders', { params }),
+  create: (payload: any) => api.post('/saved-orders', payload),
+  update: (id: string, payload: any) => api.put(`/saved-orders/${id}`, payload),
+  delete: (id: string) => api.delete(`/saved-orders/${id}`),
+  orderFrom: (id: string) => api.post(`/saved-orders/${id}/order`),
 };
 
 export default api;

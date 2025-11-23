@@ -18,6 +18,8 @@ import voucherRoutes from "./routes/voucherRoutes.js";
 import reviewRoutes from "./routes/reviewRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
+import cartRoutes from "./routes/cartRoutes.js";
+import savedOrderRoutes from "./routes/savedOrderRoutes.js";
 
 dotenv.config();
 
@@ -180,6 +182,8 @@ app.use("/api/vouchers", voucherRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/cart", cartRoutes);
+app.use("/api/saved-orders", savedOrderRoutes);
 
 // Error handler
 app.use(errorHandler);

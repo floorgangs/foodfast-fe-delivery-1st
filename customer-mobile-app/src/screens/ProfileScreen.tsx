@@ -139,7 +139,7 @@ const ProfileScreen = ({ navigation }: any) => {
               <TouchableOpacity
                 key={order.id}
                 style={styles.orderCard}
-                onPress={() => navigation.navigate('OrderTracking')}
+                onPress={() => navigation.navigate('OrderTracking', { orderId: order.id })}
               >
                 <View style={styles.orderHeader}>
                   <Text style={styles.orderId}>{`#${order.id}`}</Text>
@@ -169,10 +169,13 @@ const ProfileScreen = ({ navigation }: any) => {
 
 const getStatusText = (status: string) => {
   const statusMap: Record<string, string> = {
+    pending: 'Chờ xác nhận',
     confirmed: 'Đã xác nhận',
     preparing: 'Đang chuẩn bị',
+    ready: 'Sẵn sàng giao',
     delivering: 'Đang giao',
     delivered: 'Đã giao',
+    cancelled: 'Đã hủy',
   };
   return statusMap[status] || status;
 };
@@ -180,6 +183,7 @@ const getStatusText = (status: string) => {
 const getStatusStyle = (status: string) => {
   if (status === 'delivered') return { color: '#10B981' };
   if (status === 'delivering') return { color: '#EA5034' };
+  if (status === 'cancelled') return { color: '#EF4444' };
   return { color: '#F59E0B' };
 };
 

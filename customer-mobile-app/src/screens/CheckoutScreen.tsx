@@ -130,19 +130,99 @@ const CheckoutScreen = ({ navigation }: any) => {
     try {
       setLoading(true);
       
+      const normalizeCoordinate = (value: any) => {
+        if (typeof value === 'number') {
+          return value;
+        }
+        if (typeof value === 'string' && value.trim() !== '') {
+          const parsed = Number(value);
+          return Number.isFinite(parsed) ? parsed : undefined;
+        }
+        return undefined;
+      };
+
+      const parseAddressComponents = (fullAddress: string) => {
+        const normalized = fullAddress.toLowerCase().replace(/\s+/g, ' ').trim();
+        
+        const districtPatterns = [
+          { pattern: /quận\s*(\d+|[\w\sàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]+)/i, prefix: 'Quận' },
+          { pattern: /huyện\s*([\w\sàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]+)/i, prefix: 'Huyện' },
+          { pattern: /thành phố\s*([\w\sàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]+)/i, prefix: 'Thành phố' },
+        ];
+        
+        const wardPatterns = [
+          { pattern: /phường\s*(\d+|[\w\sàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]+)/i, prefix: 'Phường' },
+          { pattern: /xã\s*([\w\sàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]+)/i, prefix: 'Xã' },
+          { pattern: /thị trấn\s*([\w\sàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]+)/i, prefix: 'Thị trấn' },
+        ];
+
+        let district = '';
+        let ward = '';
+        let city = '';
+
+        for (const { pattern, prefix } of districtPatterns) {
+          const match = normalized.match(pattern);
+          if (match) {
+            const value = match[1].trim();
+            district = `${prefix} ${value.charAt(0).toUpperCase() + value.slice(1)}`;
+            break;
+          }
+        }
+
+        for (const { pattern, prefix } of wardPatterns) {
+          const match = normalized.match(pattern);
+          if (match) {
+            const value = match[1].trim();
+            ward = `${prefix} ${value.charAt(0).toUpperCase() + value.slice(1)}`;
+            break;
+          }
+        }
+
+        if (/tp\.?\s*hồ chí minh|tp\.?\s*hcm|hồ chí minh|sài gòn|saigon/i.test(normalized)) {
+          city = 'Hồ Chí Minh';
+        } else if (/hà nội|hanoi/i.test(normalized)) {
+          city = 'Hà Nội';
+        } else if (/đà nẵng|da nang/i.test(normalized)) {
+          city = 'Đà Nẵng';
+        } else if (/cần thơ|can tho/i.test(normalized)) {
+          city = 'Cần Thơ';
+        } else if (/hải phòng|hai phong/i.test(normalized)) {
+          city = 'Hải Phòng';
+        }
+
+        return { ward, district, city: city || 'Hồ Chí Minh' };
+      };
+
+      const normalizedCoordinates = selectedAddressData?.coordinates
+        ? {
+            lat: normalizeCoordinate(selectedAddressData.coordinates.lat),
+            lng: normalizeCoordinate(selectedAddressData.coordinates.lng),
+          }
+        : undefined;
+
+      const fullAddressString = selectedAddressData?.address || '';
+      const parsedComponents = parseAddressComponents(fullAddressString);
+
       const deliveryAddressPayload = isAuthenticated
         ? {
-            street: selectedAddressData?.address || '',
-            city: 'TP.HCM',
-            district: 'Quận 1',
-            ward: 'Phường 1',
+            street: selectedAddressData?.street || selectedAddressData?.address || '',
+            address: fullAddressString,
+            city: selectedAddressData?.city || parsedComponents.city,
+            district: selectedAddressData?.district || parsedComponents.district,
+            ward: selectedAddressData?.ward || parsedComponents.ward,
             phone: selectedAddressData?.phone || user?.phone || '',
+            label: selectedAddressData?.label,
+            coordinates:
+              normalizedCoordinates?.lat != null && normalizedCoordinates?.lng != null
+                ? normalizedCoordinates
+                : undefined,
           }
         : {
             street: guestInfo.address,
-            city: 'TP.HCM',
-            district: 'Quận 1',
-            ward: 'Phường 1',
+            address: guestInfo.address,
+            city: DEFAULT_ADDRESS.city,
+            district: DEFAULT_ADDRESS.district,
+            ward: DEFAULT_ADDRESS.ward,
             phone: guestInfo.phone,
             label: 'Khách lẻ',
           };
@@ -150,7 +230,7 @@ const CheckoutScreen = ({ navigation }: any) => {
       const orderData = {
         restaurant: currentRestaurantId,
         items: items.map((item) => ({
-          product: item.id,
+          product: item.productId || item.id,
           quantity: item.quantity,
           price: item.price,
         })),
@@ -165,13 +245,16 @@ const CheckoutScreen = ({ navigation }: any) => {
         customerInfo: isAuthenticated ? undefined : guestInfo,
       };
 
+      console.log('[Checkout] Creating order with data:', orderData);
       const response = await orderAPI.create(orderData);
+      console.log('[Checkout] Order creation response:', response);
 
       if (!response?.data?._id || !response?.paymentSession?.sessionId) {
+        console.error('[Checkout] Invalid response structure:', response);
         throw new Error('Không thể khởi tạo phiên thanh toán. Vui lòng thử lại.');
       }
 
-      navigation.replace('ThirdPartyPayment', {
+      const navigationParams = {
         orderId: response.data._id,
         orderNumber: response.data.orderNumber,
         amount: response.data.total,
@@ -181,7 +264,10 @@ const CheckoutScreen = ({ navigation }: any) => {
         redirectUrl: response.paymentSession.redirectUrl,
         expiresAt: response.paymentSession.expiresAt,
         restaurantName: items[0]?.restaurantName,
-      });
+      };
+      
+      console.log('[Checkout] Navigating to ThirdPartyPayment with params:', navigationParams);
+      navigation.replace('ThirdPartyPayment', navigationParams);
     } catch (error: any) {
       Alert.alert('Lỗi', error.message || 'Không thể tạo đơn hàng. Vui lòng thử lại!');
     } finally {

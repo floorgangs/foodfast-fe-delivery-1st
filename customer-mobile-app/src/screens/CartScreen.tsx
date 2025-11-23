@@ -14,18 +14,26 @@ import {
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
 import { removeFromCart, updateQuantity, clearCart } from '../store/slices/cartSlice';
-import { createOrder } from '../store/slices/orderSlice';
+import type { AppDispatch } from '../store';
 
 const CartScreen = ({ navigation }: any) => {
-  const { items, total } = useSelector((state: RootState) => state.cart);
-  const dispatch = useDispatch();
+  const { items, total, isSyncing } = useSelector((state: RootState) => state.cart);
+  const dispatch = useDispatch<AppDispatch>();
 
-  const handleUpdateQuantity = (productId: string, quantity: number) => {
-    dispatch(updateQuantity({ id: productId, quantity }));
+  const handleUpdateQuantity = async (productId: string, quantity: number) => {
+    try {
+      await dispatch(updateQuantity({ id: productId, quantity }));
+    } catch (error: any) {
+      Alert.alert('Lỗi', error?.message || 'Không thể cập nhật giỏ hàng');
+    }
   };
 
-  const handleRemoveItem = (productId: string) => {
-    dispatch(removeFromCart(productId));
+  const handleRemoveItem = async (productId: string) => {
+    try {
+      await dispatch(removeFromCart(productId));
+    } catch (error: any) {
+      Alert.alert('Lỗi', error?.message || 'Không thể cập nhật giỏ hàng');
+    }
   };
 
   const handleCheckout = () => {
@@ -89,7 +97,13 @@ const CartScreen = ({ navigation }: any) => {
         {items.length > 0 && (
           <TouchableOpacity onPress={() => Alert.alert('Xóa tất cả', 'Bạn có chắc muốn xóa tất cả sản phẩm?', [
             { text: 'Hủy', style: 'cancel' },
-            { text: 'Xóa', onPress: () => dispatch(clearCart()), style: 'destructive' }
+            { text: 'Xóa', onPress: async () => {
+              try {
+                await dispatch(clearCart());
+              } catch (error: any) {
+                Alert.alert('Lỗi', error?.message || 'Không thể xóa giỏ hàng');
+              }
+            }, style: 'destructive' }
           ])}>
             <Text style={styles.clearButton}>Xóa tất cả</Text>
           </TouchableOpacity>
@@ -125,7 +139,7 @@ const CartScreen = ({ navigation }: any) => {
               <Text style={styles.totalLabel}>Tổng cộng</Text>
               <Text style={styles.totalAmount}>{`${total.toLocaleString('vi-VN')}đ`}</Text>
             </View>
-            <TouchableOpacity style={styles.checkoutButton} onPress={handleCheckout}>
+            <TouchableOpacity style={[styles.checkoutButton, isSyncing && styles.checkoutButtonDisabled]} onPress={handleCheckout} disabled={isSyncing}>
               <Text style={styles.checkoutButtonText}>Tiến hành đặt hàng</Text>
               <Text style={styles.checkoutButtonArrow}>→</Text>
             </TouchableOpacity>
@@ -381,6 +395,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
+  },
+  checkoutButtonDisabled: {
+    opacity: 0.7,
   },
   checkoutButtonText: {
     color: '#fff',

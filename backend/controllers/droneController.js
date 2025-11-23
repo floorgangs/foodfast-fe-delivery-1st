@@ -1,5 +1,6 @@
 import Drone from "../models/Drone.js";
 import Restaurant from "../models/Restaurant.js";
+import Order from "../models/Order.js";
 
 // Get all drones
 export const getAllDrones = async (req, res) => {
@@ -162,7 +163,7 @@ export const updateDroneStatus = async (req, res) => {
 // Update drone location
 export const updateDroneLocation = async (req, res) => {
   try {
-    const { lat, lng } = req.body;
+    const { lat, lng, heading } = req.body;
     const drone = await Drone.findById(req.params.id);
 
     if (!drone) {
@@ -172,8 +173,42 @@ export const updateDroneLocation = async (req, res) => {
       });
     }
 
+    if (typeof lat !== 'number' || typeof lng !== 'number') {
+      return res.status(400).json({
+        success: false,
+        message: 'Thiếu tọa độ hợp lệ cho drone',
+      });
+    }
+
     drone.currentLocation = { lat, lng };
     await drone.save();
+
+    const activeOrder = await Order.findOne({
+      $or: [
+        { drone: drone._id },
+        { assignedDrone: drone._id },
+      ],
+      status: { $in: ['confirmed', 'preparing', 'ready', 'delivering'] },
+    });
+
+    if (activeOrder) {
+      activeOrder.droneDeliveryDetails = activeOrder.droneDeliveryDetails || {};
+      activeOrder.droneDeliveryDetails.currentLocation = {
+        lat,
+        lng,
+        heading,
+        updatedAt: new Date(),
+      };
+      activeOrder.markModified('droneDeliveryDetails');
+      await activeOrder.save();
+
+      if (req.io && activeOrder.customer) {
+        req.io.to(`customer_${activeOrder.customer}`).emit('order_tracking_updated', {
+          orderId: activeOrder._id,
+          droneLocation: activeOrder.droneDeliveryDetails.currentLocation,
+        });
+      }
+    }
 
     // Emit socket event for real-time tracking
     if (req.io) {

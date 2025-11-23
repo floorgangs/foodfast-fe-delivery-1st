@@ -77,6 +77,20 @@ export const register = createAsyncThunk(
   }
 );
 
+export const updateProfile = createAsyncThunk(
+  'auth/updateProfile',
+  async (payload: any, { rejectWithValue }) => {
+    try {
+      const response = await authAPI.updateProfile(payload);
+      const updatedUser = response?.data ?? response;
+      await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
+      return updatedUser;
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Cập nhật hồ sơ thất bại');
+    }
+  }
+);
+
 export const loadUser = createAsyncThunk(
   'auth/loadUser',
   async (_, { rejectWithValue }) => {
@@ -97,7 +111,7 @@ export const loadUser = createAsyncThunk(
 export const logout = createAsyncThunk(
   'auth/logout',
   async () => {
-    await AsyncStorage.multiRemove(['token', 'user', 'cart']);
+    await AsyncStorage.multiRemove(['token', 'user']);
   }
 );
 
@@ -142,6 +156,20 @@ const authSlice = createSlice({
       state.token = action.payload.token;
     });
     builder.addCase(register.rejected, (state, action) => {
+      state.loading = false;
+      state.error = action.payload as string;
+    });
+
+    // Update profile
+    builder.addCase(updateProfile.pending, (state) => {
+      state.loading = true;
+      state.error = null;
+    });
+    builder.addCase(updateProfile.fulfilled, (state, action) => {
+      state.loading = false;
+      state.user = action.payload;
+    });
+    builder.addCase(updateProfile.rejected, (state, action) => {
       state.loading = false;
       state.error = action.payload as string;
     });

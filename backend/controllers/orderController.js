@@ -86,12 +86,119 @@ export const createOrder = async (req, res) => {
     const discount = clientDiscount || 0;
     const total = subtotal + deliveryFee - discount;
 
-    // Geocode delivery address to get coordinates
-    const deliveryCoordinates = geocodeAddress(deliveryAddress);
-    const deliveryAddressWithCoords = {
-      ...deliveryAddress,
-      coordinates: deliveryCoordinates,
+    const normalizeCoordinateValue = (value) => {
+      if (typeof value === "number" && Number.isFinite(value)) {
+        return value;
+      }
+      if (typeof value === "string" && value.trim() !== "") {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : undefined;
+      }
+      return undefined;
     };
+
+    const normalizeCoordinates = (coords) => {
+      if (!coords) {
+        return null;
+      }
+
+      if (Array.isArray(coords)) {
+        const latFromArray = normalizeCoordinateValue(coords[0]);
+        const lngFromArray = normalizeCoordinateValue(coords[1]);
+        if (latFromArray == null || lngFromArray == null) {
+          return null;
+        }
+        return { lat: latFromArray, lng: lngFromArray };
+      }
+
+      const lat = normalizeCoordinateValue(
+        coords.lat ?? coords.latitude ?? coords.y,
+      );
+      const lng = normalizeCoordinateValue(
+        coords.lng ?? coords.lon ?? coords.longitude ?? coords.x,
+      );
+
+      if (lat == null || lng == null) {
+        return null;
+      }
+
+      return { lat, lng };
+    };
+
+    const normalizeDeliveryAddressInput = (input) => {
+      const raw =
+        typeof input === "string"
+          ? { address: input }
+          : { ...(input || {}) };
+
+      const normalized = {
+        label: raw.label || raw.name || raw.title,
+        street:
+          raw.street ||
+          raw.streetName ||
+          raw.address ||
+          raw.addressLine ||
+          raw.detailAddress ||
+          raw.detail ||
+          "",
+        address:
+          raw.address ||
+          raw.addressLine ||
+          raw.street ||
+          raw.streetName ||
+          raw.detailAddress ||
+          raw.detail ||
+          "",
+        ward: raw.ward || raw.subdistrict || raw.wardName || raw.neighborhood || "",
+        district: raw.district || raw.county || raw.districtName || raw.locality || "",
+        city: raw.city || raw.province || raw.cityName || raw.state || "Hồ Chí Minh",
+        phone: raw.phone || raw.contactPhone || customerInfo?.phone || undefined,
+        note: raw.note || raw.instructions,
+      };
+
+      if (!normalized.street && normalized.address) {
+        normalized.street = normalized.address;
+      }
+
+      if (!normalized.address && normalized.street) {
+        normalized.address = normalized.street;
+      }
+
+      if (raw.postalCode) {
+        normalized.postalCode = raw.postalCode;
+      }
+
+      const coordinateCandidate =
+        raw.coordinates ||
+        (raw.location && (raw.location.coordinates || raw.location)) ||
+        (raw.lat != null || raw.latitude != null || raw.lng != null || raw.longitude != null
+          ? { lat: raw.lat ?? raw.latitude, lng: raw.lng ?? raw.longitude ?? raw.lon }
+          : null);
+
+      const normalizedCoordinates = normalizeCoordinates(coordinateCandidate);
+      if (normalizedCoordinates) {
+        normalized.coordinates = normalizedCoordinates;
+      }
+
+      return normalized;
+    };
+
+    const normalizedDeliveryAddress = normalizeDeliveryAddressInput(deliveryAddress);
+
+    let deliveryCoordinates = normalizeCoordinates(normalizedDeliveryAddress.coordinates);
+
+    if (!deliveryCoordinates) {
+      const geocodedDelivery = geocodeAddress(normalizedDeliveryAddress);
+      deliveryCoordinates = normalizeCoordinates(geocodedDelivery) || geocodedDelivery || null;
+    }
+
+    if (deliveryCoordinates) {
+      normalizedDeliveryAddress.coordinates = deliveryCoordinates;
+    } else {
+      delete normalizedDeliveryAddress.coordinates;
+    }
+
+    console.log('[createOrder] normalizedDeliveryAddress:', normalizedDeliveryAddress);
 
     // Generate order number
     const orderNumber = `FD${Date.now()}`;
@@ -116,7 +223,7 @@ export const createOrder = async (req, res) => {
       deliveryFee,
       discount,
       total,
-      deliveryAddress: deliveryAddressWithCoords,
+      deliveryAddress: normalizedDeliveryAddress,
       paymentMethod: normalizedPaymentMethod,
       paymentProvider,
       paymentSessionId,
@@ -308,6 +415,35 @@ export const updateOrderStatus = async (req, res) => {
       order.actualDeliveryTime = new Date();
     }
 
+    // When order status becomes "delivering", assign a drone and update its status
+    if (status === "delivering" && !order.drone) {
+      const Drone = (await import('../models/Drone.js')).default;
+      const availableDrone = await Drone.findOne({ status: 'available' }).sort({ batteryLevel: -1 });
+      
+      if (availableDrone) {
+        availableDrone.status = 'delivering';
+        availableDrone.currentOrder = order._id;
+        await availableDrone.save();
+        
+        order.drone = availableDrone._id;
+        order.droneDeliveryDetails = {
+          assignedAt: new Date(),
+          launchedAt: new Date(),
+        };
+      }
+    }
+
+    // When order is delivered, free up the drone
+    if (status === "delivered" && order.drone) {
+      const Drone = (await import('../models/Drone.js')).default;
+      const drone = await Drone.findById(order.drone);
+      if (drone) {
+        drone.status = 'available';
+        drone.currentOrder = null;
+        await drone.save();
+      }
+    }
+
     await order.save();
 
     const populatedOrder = await Order.findById(order._id)
@@ -374,8 +510,11 @@ export const updateOrderStatus = async (req, res) => {
 export const confirmThirdPartyPayment = async (req, res) => {
   try {
     const { orderId, sessionId, status, rawData } = req.body;
+    
+    console.log('[confirmThirdPartyPayment] Request body:', { orderId, sessionId, status });
 
     if (!orderId || !sessionId || !status) {
+      console.error('[confirmThirdPartyPayment] Missing required fields');
       return res.status(400).json({
         success: false,
         message: "Thiếu thông tin thanh toán",
@@ -385,11 +524,20 @@ export const confirmThirdPartyPayment = async (req, res) => {
     const order = await Order.findById(orderId).populate('customer restaurant');
 
     if (!order) {
+      console.error('[confirmThirdPartyPayment] Order not found:', orderId);
       return res.status(404).json({
         success: false,
         message: "Không tìm thấy đơn hàng",
       });
     }
+    
+    console.log('[confirmThirdPartyPayment] Order found:', {
+      orderId: order._id,
+      orderNumber: order.orderNumber,
+      currentStatus: order.status,
+      paymentStatus: order.paymentStatus,
+      paymentSessionId: order.paymentSessionId,
+    });
 
     if (status === 'success') {
       const paidAt = new Date();
@@ -410,6 +558,7 @@ export const confirmThirdPartyPayment = async (req, res) => {
 
       // Tạo bản ghi Payment riêng cho thống kê/đối soát
       await Payment.create({
+        paymentId: sessionId,
         order: order._id,
         user: order.customer?._id,
         amount: order.total,
@@ -500,7 +649,8 @@ export const trackOrder = async (req, res) => {
     const order = await Order.findById(req.params.id)
       .populate('customer', 'name phone')
       .populate('restaurant', 'name address coordinates')
-      .populate('assignedDrone', 'name model currentLocation batteryLevel');
+      .populate('drone', 'droneId name model status batteryLevel currentLocation')
+      .populate('items.product', 'name image price');
 
     if (!order) {
       return res.status(404).json({
@@ -509,43 +659,121 @@ export const trackOrder = async (req, res) => {
       });
     }
 
-    // Get actual coordinates from order data
-    const { getRestaurantCoordinates } = await import('../utils/geocoding.js');
-    const restaurantCoords = order.restaurant?.coordinates || getRestaurantCoordinates(order.restaurant);
-    const deliveryCoords = order.deliveryAddress?.coordinates;
+    const { getRestaurantCoordinates, geocodeAddress, buildAddressString } = await import('../utils/geocoding.js');
+    const normalizeCoordinateValue = (value) => {
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+      }
+      if (typeof value === 'string' && value.trim() !== '') {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : undefined;
+      }
+      return undefined;
+    };
 
-    if (!deliveryCoords) {
+    const normalizeCoordinates = (coords) => {
+      if (!coords) {
+        return null;
+      }
+      const lat = normalizeCoordinateValue(coords.lat ?? coords.latitude);
+      const lng = normalizeCoordinateValue(coords.lng ?? coords.lon ?? coords.longitude);
+      if (lat == null || lng == null) {
+        return null;
+      }
+      return { lat, lng };
+    };
+
+    const restaurantCoords = normalizeCoordinates(order.restaurant?.coordinates)
+      || normalizeCoordinates(order.restaurant?.address?.coordinates)
+      || getRestaurantCoordinates(order.restaurant || {});
+
+    let deliveryCoords = normalizeCoordinates(order.deliveryAddress?.coordinates);
+
+    if (!deliveryCoords?.lat || !deliveryCoords?.lng) {
+      const geocodedDelivery = geocodeAddress(order.deliveryAddress || order.deliveryAddress?.address);
+      if (geocodedDelivery) {
+        deliveryCoords = normalizeCoordinates(geocodedDelivery) || geocodedDelivery;
+      }
+    }
+
+    console.log('[trackOrder] deliveryAddress stored:', order.deliveryAddress);
+    console.log('[trackOrder] resolved deliveryCoords:', deliveryCoords);
+
+    if (!deliveryCoords?.lat || !deliveryCoords?.lng) {
       return res.status(400).json({
         success: false,
         message: 'Không tìm thấy tọa độ địa chỉ giao hàng',
       });
     }
 
-    // Calculate drone position based on order status
-    let currentDronePosition = { lat: restaurantCoords.lat, lng: restaurantCoords.lng };
-    let progress = 0;
+    const normalizeStatus = (status) => {
+      if (!status) return 'pending';
+      if (status === 'completed') return 'delivered';
+      return status;
+    };
 
-    if (order.status === 'confirmed' || order.status === 'preparing') {
-      currentDronePosition = { lat: restaurantCoords.lat, lng: restaurantCoords.lng };
-      progress = 0;
-    } else if (order.status === 'ready') {
-      currentDronePosition = { lat: restaurantCoords.lat, lng: restaurantCoords.lng };
-      progress = 10;
-    } else if (order.status === 'delivering') {
-      // Calculate position along the route
-      const elapsed = Date.now() - new Date(order.droneDispatchedAt || order.updatedAt).getTime();
-      const estimatedDuration = 20 * 60 * 1000; // 20 minutes
-      progress = Math.min(90, 10 + (elapsed / estimatedDuration) * 80);
+    const statusSequence = ['pending', 'confirmed', 'preparing', 'ready', 'delivering', 'delivered'];
+    const currentStatus = normalizeStatus(order.status);
+    const statusIndex = Math.max(statusSequence.indexOf(currentStatus), 0);
+    const progress = statusSequence.length > 1 ? statusIndex / (statusSequence.length - 1) : 0;
 
-      const ratio = (progress - 10) / 80;
-      currentDronePosition = {
-        lat: restaurantCoords.lat + (deliveryCoords.lat - restaurantCoords.lat) * ratio,
-        lng: restaurantCoords.lng + (deliveryCoords.lng - restaurantCoords.lng) * ratio,
-      };
-    } else if (order.status === 'delivered') {
-      currentDronePosition = { lat: deliveryCoords.lat, lng: deliveryCoords.lng };
-      progress = 100;
-    }
+    const buildFullAddress = (address) => buildAddressString(address);
+
+    const persistedLocation = order.droneDeliveryDetails?.currentLocation;
+    const normalizedPersistedDrone = normalizeCoordinates(persistedLocation);
+    const droneLocationFromOrder = normalizedPersistedDrone
+      ? {
+          lat: normalizedPersistedDrone.lat,
+          lng: normalizedPersistedDrone.lng,
+          heading: persistedLocation.heading,
+          updatedAt: persistedLocation.updatedAt,
+        }
+      : null;
+
+    const normalizedDroneLocation = normalizeCoordinates(order.drone?.currentLocation);
+    const droneLocationFromDrone = normalizedDroneLocation
+      ? {
+          lat: normalizedDroneLocation.lat,
+          lng: normalizedDroneLocation.lng,
+          heading: undefined,
+          updatedAt: order.drone.updatedAt,
+        }
+      : null;
+
+    const defaultDroneLocation = currentStatus === 'delivered'
+      ? { lat: deliveryCoords.lat, lng: deliveryCoords.lng }
+      : { lat: restaurantCoords.lat, lng: restaurantCoords.lng };
+
+    const droneLocation = droneLocationFromOrder || droneLocationFromDrone || defaultDroneLocation;
+
+    const toRadians = (deg) => (deg * Math.PI) / 180;
+    const haversineDistance = (pointA, pointB) => {
+      if (!pointA || !pointB) return 0;
+      const earthRadius = 6371e3; // metres
+      const dLat = toRadians(pointB.lat - pointA.lat);
+      const dLng = toRadians(pointB.lng - pointA.lng);
+      const lat1 = toRadians(pointA.lat);
+      const lat2 = toRadians(pointB.lat);
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+        + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return earthRadius * c;
+    };
+
+    const calculateFlightProgress = () => {
+      if (currentStatus === 'delivered') {
+        return 1;
+      }
+      if (currentStatus !== 'delivering') {
+        return 0;
+      }
+      const totalDistance = haversineDistance(restaurantCoords, deliveryCoords);
+      if (!totalDistance) {
+        return 0;
+      }
+      const travelled = haversineDistance(restaurantCoords, droneLocation);
+      return Math.min(Math.max(travelled / totalDistance, 0), 1);
+    };
 
     res.json({
       success: true,
@@ -553,27 +781,44 @@ export const trackOrder = async (req, res) => {
         order: {
           id: order._id,
           orderNumber: order.orderNumber,
-          status: order.status,
+          status: currentStatus,
           timeline: order.timeline,
+          paymentStatus: order.paymentStatus,
+          createdAt: order.createdAt,
+          updatedAt: order.updatedAt,
+          items: order.items.map((item) => ({
+            id: item._id,
+            quantity: item.quantity,
+            price: item.price,
+            name: item.name || item.product?.name,
+            product: item.product?._id || item.product,
+          })),
         },
         tracking: {
           pickupLocation: {
             name: order.restaurant?.name,
-            address: order.restaurant?.address,
+            address: buildAddressString(order.restaurant?.address || order.restaurant),
             coordinates: restaurantCoords,
           },
           deliveryLocation: {
-            address: `${order.deliveryAddress?.street}, ${order.deliveryAddress?.ward}, ${order.deliveryAddress?.district}, ${order.deliveryAddress?.city}`,
+            address: buildFullAddress(order.deliveryAddress),
             coordinates: deliveryCoords,
           },
-          droneLocation: currentDronePosition,
-          progress: progress,
+          droneLocation,
+          progress,
+          flightProgress: calculateFlightProgress(),
           estimatedArrival: order.estimatedDeliveryTime,
-          drone: order.assignedDrone ? {
-            name: order.assignedDrone.name,
-            model: order.assignedDrone.model,
-            batteryLevel: order.assignedDrone.batteryLevel,
-          } : null,
+          updatedAt: new Date(),
+          drone: order.drone
+            ? {
+                id: order.drone._id,
+                droneId: order.drone.droneId,
+                name: order.drone.name,
+                model: order.drone.model,
+                status: order.drone.status,
+                batteryLevel: order.drone.batteryLevel,
+              }
+            : null,
         },
       },
     });

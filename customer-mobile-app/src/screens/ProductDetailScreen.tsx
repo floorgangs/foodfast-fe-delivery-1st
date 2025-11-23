@@ -17,6 +17,7 @@ import { addToCart } from '../store/slices/cartSlice';
 import { Ionicons } from '@expo/vector-icons';
 import { RootState } from '../store';
 import { reviewAPI } from '../services/api';
+import type { AppDispatch } from '../store';
 
 const { width } = Dimensions.get('window');
 
@@ -50,7 +51,7 @@ const ProductDetailScreen = ({ route, navigation }: any) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const [failedImageIndexes, setFailedImageIndexes] = useState<Record<number, boolean>>({});
   const scrollRef = useRef<ScrollView | null>(null);
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const { isAuthenticated } = useSelector((state: RootState) => state.auth);
 
   const price = product.price ?? 0;
@@ -63,7 +64,7 @@ const ProductDetailScreen = ({ route, navigation }: any) => {
   const [reviews, setReviews] = useState<any[]>([]);
   const [loadingReviews, setLoadingReviews] = useState(true);
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!isAuthenticated) {
       // nếu chưa đăng nhập, chuyển tới màn hình Login và truyền item đang chờ
       navigation.navigate('Login', { pendingAdd: { product, restaurant } });
@@ -71,17 +72,21 @@ const ProductDetailScreen = ({ route, navigation }: any) => {
     }
 
     // Thêm 1 món vào giỏ (số lượng mặc định 1)
-    dispatch(addToCart({
-      id: productId || product.id || `${Date.now()}`,
-      name: product.name,
-      price,
-      quantity: 1,
-      restaurantId,
-      restaurantName: restaurant.name,
-      image: images[0] || restaurantImageUri || PLACEHOLDER_IMAGE,
-    }));
-    Alert.alert('Thành công', 'Đã thêm vào giỏ hàng');
-    navigation.goBack();
+    try {
+      await dispatch(addToCart({
+        id: productId || product.id || `${Date.now()}`,
+        productId: productId || product.id || `${Date.now()}`,
+        name: product.name,
+        price,
+        restaurantId,
+        restaurantName: restaurant.name,
+        image: images[0] || restaurantImageUri || PLACEHOLDER_IMAGE,
+      }));
+      Alert.alert('Thành công', 'Đã thêm vào giỏ hàng');
+      navigation.goBack();
+    } catch (error: any) {
+      Alert.alert('Lỗi', error?.message || 'Không thể lưu giỏ hàng');
+    }
   };
 
   const onScroll = (e: any) => {

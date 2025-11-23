@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -9,13 +9,26 @@ import {
   Modal,
   Platform,
   StatusBar,
+  Alert,
 } from 'react-native';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState } from '../store';
+import { updateProfile } from '../store/slices/authSlice';
 
-interface Address {
+interface AddressItem {
   id: string;
-  name: string;
+  mongoId?: string;
+  label: string;
+  contactName?: string;
   phone: string;
   address: string;
+  city?: string;
+  district?: string;
+  ward?: string;
+  coordinates?: {
+    lat?: number;
+    lng?: number;
+  };
   isDefault: boolean;
 }
 
@@ -55,16 +68,81 @@ const ADDRESS_SUGGESTIONS = [
 const QUICK_ADDRESS_TAGS = ['Nhà riêng', 'Văn phòng', 'Chung cư', 'Sảnh bảo vệ'];
 
 const AddressScreen = ({ navigation }: any) => {
-  const [addresses, setAddresses] = useState<Address[]>([]);
+  const dispatch = useDispatch();
+  const user = useSelector((state: RootState) => state.auth.user);
+
+  const [addresses, setAddresses] = useState<AddressItem[]>([]);
+  const [saving, setSaving] = useState(false);
 
   const [modalVisible, setModalVisible] = useState(false);
-  const [editingAddress, setEditingAddress] = useState<Address | null>(null);
+  const [editingAddress, setEditingAddress] = useState<AddressItem | null>(null);
   const [formData, setFormData] = useState({
-    name: '',
+    label: '',
     phone: '',
     address: '',
   });
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const fallbackPhone = user?.phone ?? '';
+
+  const mapAddressFromBackend = (entry: any, index: number): AddressItem => ({
+    id: entry?._id || entry?.id || `addr-${index}-${Date.now()}`,
+    mongoId: entry?._id,
+    label: entry?.label || entry?.name || 'Địa chỉ',
+    contactName: entry?.contactName || entry?.recipientName || entry?.label || '',
+    phone: entry?.contactPhone || entry?.phone || fallbackPhone,
+    address: entry?.address || entry?.fullAddress || '',
+    city: entry?.city,
+    district: entry?.district,
+    ward: entry?.ward,
+    coordinates: entry?.coordinates,
+    isDefault: Boolean(entry?.isDefault),
+  });
+
+  useEffect(() => {
+    const source = Array.isArray(user?.addresses) ? user?.addresses : [];
+    const normalized = source.map((entry: any, index: number) =>
+      mapAddressFromBackend(entry, index)
+    );
+    setAddresses(normalized);
+  }, [user?.addresses, fallbackPhone]);
+
+  const toBackendPayload = (entries: AddressItem[]) =>
+    entries.map((item) => ({
+      _id: item.mongoId,
+      label: item.label,
+      contactName: item.contactName ?? item.label,
+      contactPhone: item.phone,
+      address: item.address,
+      city: item.city,
+      district: item.district,
+      ward: item.ward,
+      coordinates: item.coordinates,
+      isDefault: item.isDefault,
+    }));
+
+  const persistAddresses = async (next: AddressItem[]): Promise<boolean> => {
+    const previous = addresses.map((addr) => ({ ...addr }));
+    setAddresses(next);
+    try {
+      setSaving(true);
+      await dispatch(updateProfile({ addresses: toBackendPayload(next) })).unwrap();
+      return true;
+    } catch (error: any) {
+      const message = error?.message || 'Không thể lưu địa chỉ. Vui lòng thử lại.';
+      if (Platform.OS === 'web') {
+        window.alert(message);
+      } else {
+        Alert.alert('Không thành công', message);
+      }
+      const fallback = Array.isArray(user?.addresses)
+        ? (user.addresses as any[]).map((entry, index) => mapAddressFromBackend(entry, index))
+        : previous;
+      setAddresses(fallback);
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const filteredSuggestions = useMemo(() => {
     const keyword = formData.address.trim().toLowerCase();
@@ -80,15 +158,15 @@ const AddressScreen = ({ navigation }: any) => {
 
   const handleAdd = () => {
     setEditingAddress(null);
-    setFormData({ name: '', phone: '', address: '' });
+    setFormData({ label: '', phone: fallbackPhone, address: '' });
     setShowSuggestions(false);
     setModalVisible(true);
   };
 
-  const handleEdit = (address: Address) => {
+  const handleEdit = (address: AddressItem) => {
     setEditingAddress(address);
     setFormData({
-      name: address.name,
+      label: address.label,
       phone: address.phone,
       address: address.address,
     });
@@ -96,17 +174,27 @@ const AddressScreen = ({ navigation }: any) => {
     setModalVisible(true);
   };
 
-  const handleDelete = (id: string) => {
-    const confirmDelete = Platform.OS === 'web' 
-      ? window.confirm('Bạn có chắc chắn muốn xóa địa chỉ này?')
-      : true;
+  const handleDelete = async (id: string) => {
+    const confirmDelete =
+      Platform.OS === 'web'
+        ? window.confirm('Bạn có chắc chắn muốn xóa địa chỉ này?')
+        : true;
 
-    if (confirmDelete) {
-      setAddresses(addresses.filter(addr => addr.id !== id));
-      if (Platform.OS !== 'web') {
-        const Alert = require('react-native').Alert;
-        Alert.alert('Thành công', 'Đã xóa địa chỉ');
-      }
+    if (!confirmDelete) {
+      return;
+    }
+
+    const next = addresses
+      .filter(addr => addr.id !== id)
+      .map(addr => ({ ...addr }));
+
+    if (next.length > 0 && !next.some(addr => addr.isDefault)) {
+      next[0].isDefault = true;
+    }
+
+    const success = await persistAddresses(next);
+    if (success && Platform.OS !== 'web') {
+      Alert.alert('Thành công', 'Đã xóa địa chỉ');
     }
   };
 
@@ -114,37 +202,79 @@ const AddressScreen = ({ navigation }: any) => {
     setFormData(prev => ({
       ...prev,
       address: `${suggestion.label}, ${suggestion.address}`,
-      name: prev.name || suggestion.label,
+      label: prev.label || suggestion.label,
     }));
     setShowSuggestions(false);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    const trimmedLabel = formData.label.trim();
+    const trimmedAddress = formData.address.trim();
+    const trimmedPhone = formData.phone.trim() || fallbackPhone;
+
+    if (!trimmedLabel || !trimmedAddress) {
+      const message = 'Vui lòng nhập đầy đủ thông tin địa chỉ.';
+      if (Platform.OS === 'web') {
+        window.alert(message);
+      } else {
+        Alert.alert('Thiếu thông tin', message);
+      }
+      return;
+    }
+
+    let next: AddressItem[];
+
     if (editingAddress) {
-      // Update existing address
-      setAddresses(addresses.map(addr => 
-        addr.id === editingAddress.id 
-          ? { ...addr, ...formData }
-          : addr
-      ));
+      next = addresses.map(addr => {
+        if (addr.id !== editingAddress.id) {
+          return { ...addr };
+        }
+        return {
+          ...addr,
+          label: trimmedLabel,
+          contactName: addr.contactName || trimmedLabel,
+          phone: trimmedPhone,
+          address: trimmedAddress,
+        };
+      });
     } else {
-      // Add new address
-      const newAddress: Address = {
-        id: Date.now().toString(),
-        ...formData,
+      const newAddress: AddressItem = {
+        id: `addr-${Date.now()}`,
+        label: trimmedLabel,
+        contactName: trimmedLabel,
+        phone: trimmedPhone,
+        address: trimmedAddress,
         isDefault: addresses.length === 0,
       };
-      setAddresses([...addresses, newAddress]);
+      next = [...addresses.map(addr => ({ ...addr })), newAddress];
     }
-    setModalVisible(false);
-    setShowSuggestions(false);
+
+    if (next.length > 0 && !next.some(addr => addr.isDefault)) {
+      next[0].isDefault = true;
+    }
+
+    const success = await persistAddresses(next);
+    if (success) {
+      setModalVisible(false);
+      setShowSuggestions(false);
+      setEditingAddress(null);
+      setFormData({ label: '', phone: fallbackPhone, address: '' });
+      if (Platform.OS !== 'web') {
+        Alert.alert('Thành công', 'Đã lưu địa chỉ');
+      }
+    }
   };
 
-  const handleSetDefault = (id: string) => {
-    setAddresses(addresses.map(addr => ({
+  const handleSetDefault = async (id: string) => {
+    const next = addresses.map(addr => ({
       ...addr,
       isDefault: addr.id === id,
-    })));
+    }));
+
+    const success = await persistAddresses(next);
+    if (success && Platform.OS !== 'web') {
+      Alert.alert('Thành công', 'Đã cập nhật địa chỉ mặc định');
+    }
   };
 
   return (
@@ -164,7 +294,7 @@ const AddressScreen = ({ navigation }: any) => {
           <View key={address.id} style={styles.addressCard}>
             <View style={styles.addressHeader}>
               <View style={styles.addressNameRow}>
-                <Text style={styles.addressName}>{address.name}</Text>
+                <Text style={styles.addressName}>{address.label}</Text>
                 {address.isDefault && (
                   <View style={styles.defaultBadge}>
                     <Text style={styles.defaultBadgeText}>Mặc định</Text>
@@ -225,8 +355,8 @@ const AddressScreen = ({ navigation }: any) => {
                 <TextInput
                   style={styles.input}
                   placeholder="VD: Nhà riêng, Văn phòng"
-                  value={formData.name}
-                  onChangeText={(text) => setFormData({ ...formData, name: text })}
+                  value={formData.label}
+                  onChangeText={(text) => setFormData({ ...formData, label: text })}
                 />
               </View>
 
@@ -302,8 +432,14 @@ const AddressScreen = ({ navigation }: any) => {
                 )}
               </View>
 
-              <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-                <Text style={styles.saveButtonText}>Lưu</Text>
+              <TouchableOpacity
+                style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+                onPress={handleSave}
+                disabled={saving}
+              >
+                <Text style={styles.saveButtonText}>
+                  {saving ? 'Đang lưu...' : 'Lưu'}
+                </Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -549,6 +685,9 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
     marginTop: 8,
+  },
+  saveButtonDisabled: {
+    opacity: 0.7,
   },
   saveButtonText: {
     color: '#fff',

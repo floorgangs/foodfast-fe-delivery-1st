@@ -17,6 +17,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { addToCart } from '../store/slices/cartSlice';
 import { RootState } from '../store';
+import type { AppDispatch } from '../store';
 import { productAPI, reviewAPI } from '../services/api';
 
 const RATING_BREAKDOWN_TEMPLATE = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
@@ -26,7 +27,7 @@ const resolveRestaurantImage = (restaurant: any) =>
 
 const RestaurantDetailScreen = ({ route, navigation }: any) => {
   const { restaurant } = route.params;
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const { items, currentRestaurantId, currentRestaurantName } = useSelector((state: RootState) => state.cart);
   const { isAuthenticated } = useSelector((state: RootState) => state.auth);
   const restaurantId = (restaurant._id || restaurant.id || '').toString();
@@ -169,6 +170,23 @@ const RestaurantDetailScreen = ({ route, navigation }: any) => {
       return;
     }
 
+    const attemptAdd = async () => {
+      try {
+        await dispatch(addToCart({
+          id: (product._id || product.id || `${Date.now()}`).toString(),
+          productId: (product._id || product.id || `${Date.now()}`).toString(),
+          name: product.name,
+          price: product.price ?? 0,
+          restaurantId,
+          restaurantName: restaurant.name,
+          image: product.image || restaurantImageUri,
+        }));
+        Alert.alert('Thành công', 'Đã thêm món ăn vào giỏ hàng!');
+      } catch (error: any) {
+        Alert.alert('Lỗi', error?.message || 'Không thể lưu giỏ hàng');
+      }
+    };
+
     // Kiểm tra nếu giỏ hàng có món từ nhà hàng khác
     if (items.length > 0 && currentRestaurantId && currentRestaurantId !== restaurantId) {
       Alert.alert(
@@ -182,29 +200,13 @@ const RestaurantDetailScreen = ({ route, navigation }: any) => {
           {
             text: 'Tiếp tục',
             onPress: () => {
-              dispatch(addToCart({
-                id: (product._id || product.id || `${Date.now()}`).toString(),
-                name: product.name,
-                price: product.price ?? 0,
-                restaurantId,
-                restaurantName: restaurant.name,
-                image: product.image || restaurantImageUri,
-              }));
-              Alert.alert('Thành công', 'Đã thêm món ăn vào giỏ hàng!');
+              attemptAdd();
             },
           },
         ]
       );
     } else {
-      dispatch(addToCart({
-        id: (product._id || product.id || `${Date.now()}`).toString(),
-        name: product.name,
-        price: product.price ?? 0,
-        restaurantId,
-        restaurantName: restaurant.name,
-        image: product.image || restaurantImageUri,
-      }));
-      Alert.alert('Thành công', 'Đã thêm vào giỏ hàng!');
+      attemptAdd();
     }
   };
 

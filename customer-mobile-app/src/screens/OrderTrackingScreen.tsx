@@ -1,7 +1,7 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
-  Animated,
+  ActivityIndicator,
   Dimensions,
   Platform,
   ScrollView,
@@ -11,37 +11,23 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import MapView, { Circle, LatLng, Marker, Polyline, PROVIDER_GOOGLE, Region } from 'react-native-maps';
+import MapView, { LatLng, Marker, Polyline, Region } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
-import { useSelector } from 'react-redux';
-import { RootState } from '../store';
+import { useFocusEffect } from '@react-navigation/native';
+import { orderAPI } from '../services/api';
 
 const { height } = Dimensions.get('window');
 const MAP_HEIGHT = height * 0.42;
-const INITIAL_CAMERA_ZOOM = 15.8;
-const CAMERA_PITCH = 45;
-const CAMERA_ANIMATION_DURATION = 750;
-const ETA_SECONDS = 15 * 60;
 
-const statusSteps = [
-  { key: 'confirmed', label: 'Đã xác nhận', description: 'FoodFast đã nhận đơn của bạn', threshold: 0 },
-  { key: 'preparing', label: 'Đang chuẩn bị', description: 'Nhà hàng đang hoàn tất món ăn', threshold: 0.2 },
-  { key: 'inflight', label: 'Drone đang bay', description: 'Drone rời bãi đáp và bay đường thẳng', threshold: 0.45 },
-  { key: 'arriving', label: 'Sắp giao', description: 'Drone hạ độ cao để giao hàng', threshold: 0.75 },
-  { key: 'delivered', label: 'Đã giao', description: 'Phi công xác nhận bạn đã nhận hàng', threshold: 0.98 },
+const STATUS_STEPS = [
+  { key: 'pending', label: 'Chờ xác nhận', description: 'Đơn hàng đang chờ nhà hàng xác nhận' },
+  { key: 'confirmed', label: 'Đã xác nhận', description: 'Nhà hàng đã tiếp nhận và chuẩn bị đơn' },
+  { key: 'ready', label: 'Sẵn sàng giao', description: 'Đơn đã đóng gói, chờ drone tiếp nhận' },
+  { key: 'delivering', label: 'Drone đang giao', description: 'Drone đang trên đường bay tới vị trí của bạn' },
+  { key: 'delivered', label: 'Đã giao', description: 'Bạn đã nhận được đơn hàng' },
 ] as const;
 
-const getFlightProgress = (progress: number): number => {
-  const inflightStep = statusSteps.find(step => step.key === 'inflight');
-  const inflightThreshold = inflightStep?.threshold ?? 0.45;
-
-  if (progress <= inflightThreshold) {
-    return 0;
-  }
-
-  const normalized = (progress - inflightThreshold) / (1 - inflightThreshold);
-  return Math.min(Math.max(normalized, 0), 1);
-};
+const STATUS_SEQUENCE = STATUS_STEPS.map(step => step.key);
 
 const FALLBACK_PICKUP: LatLng = { latitude: 10.776923, longitude: 106.700981 };
 const FALLBACK_DROPOFF: LatLng = { latitude: 10.782112, longitude: 106.70917 };
@@ -228,101 +214,203 @@ const buildProgressPolyline = (route: LatLng[], progress: number): LatLng[] => {
   return polyline;
 };
 
-const OrderTrackingScreen = ({ navigation }: any) => {
-  const { currentOrder } = useSelector((state: RootState) => state.orders);
-  const progressRef = useRef(new Animated.Value(0));
-  const mapRef = useRef<MapView | null>(null);
-  const cameraReadyRef = useRef(false);
-  const lastHeadingRef = useRef(0);
-  const [progressValue, setProgressValue] = useState(0);
-  const [acknowledged, setAcknowledged] = useState(false);
-  const fallbackOrder = useMemo(
-    () => ({
-      id: 'FFDEMO1',
-      restaurantName: 'FoodFast Demo Kitchen',
-      items: [
-        { id: 'demo-1', name: 'Foodie Rice Bowl', quantity: 1, price: 78000 },
-        { id: 'demo-2', name: 'Coconut Smoothie', quantity: 2, price: 45000 },
-        { id: 'demo-3', name: 'Veggie Spring Rolls', quantity: 1, price: 32000 },
-      ],
-      total: 200000,
-      status: 'delivering' as const,
-      createdAt: new Date().toISOString(),
-      deliveryAddress: '21 Nguyễn Trung Trực, Quận 1, TP.HCM',
-      pickupCoordinate: FALLBACK_PICKUP,
-      dropoffCoordinate: FALLBACK_DROPOFF,
-      unlockPin: '4821',
-    }),
-    [],
-  );
-  const activeOrder = currentOrder ?? fallbackOrder;
-  const isMockOrder = !currentOrder;
+type CoordinatePayload = {
+  lat: number;
+  lng: number;
+};
 
-  useEffect(() => {
-    const listener = progressRef.current.addListener(({ value }) => setProgressValue(value));
-    return () => progressRef.current.removeListener(listener);
-  }, []);
+type DroneCoordinatePayload = CoordinatePayload & {
+  heading?: number;
+  updatedAt?: string;
+};
 
-  useEffect(() => {
-    const progress = progressRef.current;
+interface TrackingTimelineEntry {
+  status: string;
+  timestamp?: string;
+  note?: string;
+}
 
-    progress.stopAnimation();
-    progress.setValue(0);
-    setProgressValue(0);
-    setAcknowledged(false);
+interface TrackingItem {
+  id?: string;
+  product?: string;
+  name?: string;
+  quantity: number;
+  price?: number;
+}
 
-    const animation = Animated.timing(progress, {
-      toValue: 1,
-      duration: 22000,
-      useNativeDriver: false,
-    });
-
-    animation.start(({ finished }) => {
-      if (finished) {
-        progress.setValue(1);
-        setProgressValue(1);
-      }
-    });
-
-    return () => {
-      animation.stop();
+interface TrackingPayload {
+  order: {
+    id: string;
+    orderNumber?: string;
+    status: string;
+    timeline: TrackingTimelineEntry[];
+    paymentStatus?: string;
+    createdAt?: string;
+    updatedAt?: string;
+    items: TrackingItem[];
+  };
+  tracking: {
+    pickupLocation?: {
+      name?: string;
+      address?: string;
+      coordinates?: CoordinatePayload | null;
     };
-  }, [currentOrder?.id]);
+    deliveryLocation?: {
+      address?: string;
+      coordinates?: CoordinatePayload | null;
+    };
+    droneLocation?: DroneCoordinatePayload | null;
+    progress?: number;
+    flightProgress?: number;
+    estimatedArrival?: string;
+    updatedAt?: string;
+    drone?: {
+      id?: string;
+      droneId?: string;
+      name?: string;
+      model?: string;
+      status?: string;
+      batteryLevel?: number;
+    } | null;
+  };
+}
 
-  const activeStepIndex = useMemo(
-    () => statusSteps.reduce((acc, step, index) => (progressValue >= step.threshold ? index : acc), 0),
-    [progressValue],
-  );
+const normalizeStatus = (status?: string): string => {
+  if (!status) return 'pending';
+  if (status === 'completed') return 'delivered';
+  return status;
+};
 
-  const etaSeconds = Math.max(0, Math.round((1 - progressValue) * ETA_SECONDS));
-  const etaMinutes = Math.floor(etaSeconds / 60);
-  const etaRemainingSeconds = etaSeconds % 60;
-  const droneCode = `FF-${activeOrder.id.slice(0, 4).toUpperCase()}`;
-  const canConfirm = progressValue >= statusSteps[statusSteps.length - 1].threshold;
-  const pickupCoordinate = activeOrder.pickupCoordinate ?? FALLBACK_PICKUP;
-  const dropoffCoordinate = activeOrder.dropoffCoordinate ?? FALLBACK_DROPOFF;
-  const routeCoordinates = useMemo(
-    () => buildRouteCoordinates(pickupCoordinate, dropoffCoordinate),
-    [pickupCoordinate, dropoffCoordinate],
-  );
-  const mapRegion = useMemo(() => computeRegionFromRoute(routeCoordinates), [routeCoordinates]);
-  const flightProgress = useMemo(() => getFlightProgress(progressValue), [progressValue]);
-  const droneCoordinate = useMemo(
-    () => getCoordinateAtProgress(routeCoordinates, flightProgress),
-    [routeCoordinates, flightProgress],
-  );
-  const routeHeading = useMemo(() => {
-    const nextPoint = getCoordinateAtProgress(routeCoordinates, Math.min(flightProgress + 0.02, 1));
-    return calculateBearing(droneCoordinate, nextPoint);
-  }, [routeCoordinates, flightProgress, droneCoordinate]);
-  const progressPolyline = useMemo(
-    () => buildProgressPolyline(routeCoordinates, flightProgress),
-    [routeCoordinates, flightProgress],
+const toLatLng = (coordinate?: CoordinatePayload | null): LatLng | null => {
+  if (!coordinate || typeof coordinate.lat !== 'number' || typeof coordinate.lng !== 'number') {
+    return null;
+  }
+
+  return {
+    latitude: coordinate.lat,
+    longitude: coordinate.lng,
+  };
+};
+
+const formatTimestamp = (timestamp?: string) => {
+  if (!timestamp) {
+    return null;
+  }
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+};
+
+const OrderTrackingScreen = ({ navigation, route }: any) => {
+  const { orderId } = route?.params ?? {};
+  const mapRef = useRef<MapView | null>(null);
+  const cameraReadyRef = useRef<boolean>(false);
+  const [trackingData, setTrackingData] = useState<TrackingPayload | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [acknowledged, setAcknowledged] = useState(false);
+
+  const fetchTracking = useCallback(async () => {
+    if (!orderId) {
+      setError('Không tìm thấy mã đơn hàng');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const response = await orderAPI.track(orderId);
+      if (response?.data) {
+        setTrackingData(response.data as TrackingPayload);
+        setError(null);
+      } else {
+        setError('Không nhận được dữ liệu theo dõi');
+      }
+    } catch (err: any) {
+      console.error('[OrderTracking] fetch error:', err);
+      setError(err.message || 'Không thể tải dữ liệu theo dõi');
+    } finally {
+      setLoading(false);
+    }
+  }, [orderId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchTracking();
+      const interval = setInterval(fetchTracking, 10000);
+      return () => clearInterval(interval);
+    }, [fetchTracking])
   );
 
   useEffect(() => {
     cameraReadyRef.current = false;
-  }, [activeOrder.id]);
+  }, [orderId]);
+
+  const normalizedStatus = useMemo(
+    () => normalizeStatus(trackingData?.order?.status),
+    [trackingData?.order?.status]
+  );
+
+  useEffect(() => {
+    if (normalizedStatus !== 'delivered') {
+      setAcknowledged(false);
+    }
+  }, [normalizedStatus]);
+
+  const statusIndex = useMemo(() => {
+    const idx = STATUS_SEQUENCE.indexOf(normalizedStatus);
+    return idx >= 0 ? idx : 0;
+  }, [normalizedStatus]);
+
+  const timelineMap = useMemo(() => {
+    const map = new Map<string, TrackingTimelineEntry>();
+    (trackingData?.order?.timeline ?? []).forEach((entry) => {
+      if (entry?.status) {
+        map.set(entry.status, entry);
+      }
+    });
+    return map;
+  }, [trackingData?.order?.timeline]);
+
+  const timelineStatuses = useMemo(() => new Set(timelineMap.keys()), [timelineMap]);
+
+  const pickupCoordinate = useMemo(
+    () => toLatLng(trackingData?.tracking?.pickupLocation?.coordinates) ?? FALLBACK_PICKUP,
+    [trackingData?.tracking?.pickupLocation]
+  );
+
+  const dropoffCoordinate = useMemo(
+    () => toLatLng(trackingData?.tracking?.deliveryLocation?.coordinates) ?? FALLBACK_DROPOFF,
+    [trackingData?.tracking?.deliveryLocation]
+  );
+
+  const routeCoordinates = useMemo(
+    () => buildRouteCoordinates(pickupCoordinate, dropoffCoordinate),
+    [pickupCoordinate, dropoffCoordinate]
+  );
+
+  const mapRegion = useMemo(() => computeRegionFromRoute(routeCoordinates), [routeCoordinates]);
+
+  const droneCoordinate = useMemo(() => {
+    const coordinate = toLatLng(trackingData?.tracking?.droneLocation);
+    if (coordinate) {
+      return coordinate;
+    }
+    return normalizedStatus === 'delivered' ? dropoffCoordinate : pickupCoordinate;
+  }, [trackingData?.tracking?.droneLocation, normalizedStatus, dropoffCoordinate, pickupCoordinate]);
+
+  const flightProgress = trackingData?.tracking?.flightProgress ?? 0;
+
+  const progressPolyline = useMemo(
+    () => buildProgressPolyline(routeCoordinates, flightProgress),
+    [routeCoordinates, flightProgress]
+  );
+
+  const routeHeading = useMemo(() => {
+    const nextPoint = getCoordinateAtProgress(routeCoordinates, Math.min(flightProgress + 0.02, 1));
+    return calculateBearing(droneCoordinate, nextPoint);
+  }, [routeCoordinates, flightProgress, droneCoordinate]);
 
   useEffect(() => {
     if (!cameraReadyRef.current || !mapRef.current) {
@@ -350,32 +438,123 @@ const OrderTrackingScreen = ({ navigation }: any) => {
         latitudeDelta: 0.015,
         longitudeDelta: 0.015,
       },
-      500,
+      500
     );
   }, [droneCoordinate, flightProgress]);
 
+  const etaInfo = useMemo(() => {
+    const etaValue = trackingData?.tracking?.estimatedArrival ? new Date(trackingData.tracking.estimatedArrival) : null;
+    if (!etaValue || Number.isNaN(etaValue.getTime())) {
+      return null;
+    }
+    const now = new Date();
+    const diffSeconds = Math.max(0, Math.floor((etaValue.getTime() - now.getTime()) / 1000));
+    const minutes = Math.floor(diffSeconds / 60);
+    const seconds = diffSeconds % 60;
+    return {
+      text: `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`,
+      rawSeconds: diffSeconds,
+    };
+  }, [trackingData?.tracking?.estimatedArrival]);
+
+  const orderNumber = trackingData?.order?.orderNumber ?? trackingData?.order?.id ?? '---';
+  const restaurantName = trackingData?.tracking?.pickupLocation?.name || 'Nhà hàng FoodFast';
+  const restaurantAddress = trackingData?.tracking?.pickupLocation?.address;
+  const deliveryAddress = trackingData?.tracking?.deliveryLocation?.address || 'Đang cập nhật địa chỉ giao hàng';
+  const droneInfo = trackingData?.tracking?.drone;
+  const droneCode = droneInfo?.droneId || droneInfo?.name || orderNumber.slice(0, 6).toUpperCase();
+  const items = trackingData?.order?.items ?? [];
+  const totalAmount = items.reduce((sum, item) => sum + (item.price ?? 0) * item.quantity, 0);
+  const canConfirm = normalizedStatus === 'delivered';
+  const timelineUpdatedAt = formatTimestamp(trackingData?.order?.updatedAt);
+
+  const handleConfirm = () => {
+    setAcknowledged(true);
+    if (Platform.OS === 'web') {
+      alert('Cảm ơn bạn! Đơn hàng đã được xác nhận.');
+    } else {
+      Alert.alert('Hoàn tất', 'Cảm ơn bạn! Đơn hàng đã được xác nhận.');
+    }
+  };
+
+  const renderHeader = (title: string) => (
+    <View style={styles.header}>
+      <TouchableOpacity onPress={() => navigation.goBack()}>
+        <Ionicons name="chevron-back" size={22} color="#EA5034" />
+      </TouchableOpacity>
+      <Text style={styles.headerTitle}>{title}</Text>
+      <View style={{ width: 22 }} />
+    </View>
+  );
+
+  if (!orderId) {
+    return (
+      <View style={styles.container}>
+        {renderHeader('Theo dõi drone')}
+        <View style={styles.centeredState}>
+          <Ionicons name="alert-circle-outline" size={48} color="#EA5034" />
+          <Text style={styles.centeredTitle}>Không tìm thấy thông tin đơn hàng</Text>
+          <Text style={styles.centeredText}>Vui lòng quay lại danh sách đơn hàng và chọn đơn cần theo dõi.</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={() => navigation.goBack()}>
+            <Text style={styles.retryButtonText}>Quay lại</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  if (loading && !trackingData) {
+    return (
+      <View style={styles.container}>
+        {renderHeader('Theo dõi drone')}
+        <View style={styles.centeredState}>
+          <ActivityIndicator size="large" color="#EA5034" />
+          <Text style={styles.centeredTitle}>Đang tải dữ liệu theo dõi...</Text>
+          <Text style={styles.centeredText}>Vui lòng chờ trong giây lát.</Text>
+        </View>
+      </View>
+    );
+  }
+
+  const renderErrorBanner = () => {
+    if (!error) {
+      return null;
+    }
+    return (
+      <View style={styles.errorBanner}>
+        <Ionicons name="warning-outline" size={16} color="#B91C1C" />
+        <Text style={styles.errorBannerText}>{error}</Text>
+        <TouchableOpacity onPress={fetchTracking} style={styles.errorBannerRetry}>
+          <Text style={styles.errorBannerRetryText}>Thử lại</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="chevron-back" size={22} color="#EA5034" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Theo dõi drone</Text>
-        <View style={{ width: 22 }} />
-      </View>
+      {renderHeader('Theo dõi drone')}
+
+      {renderErrorBanner()}
 
       <View style={styles.banner}>
         <View style={styles.bannerLeft}>
-          <Text style={styles.bannerLabel}>Drone tự động</Text>
-          <Text style={styles.bannerText}>Drone {droneCode} đang bay thẳng từ nhà hàng đến vị trí giao hàng.</Text>
+          <Text style={styles.bannerLabel}>Trạng thái đơn</Text>
+          <Text style={styles.bannerText}>
+            Drone {droneCode}{' '}
+            {normalizedStatus === 'delivering' ? 'đang bay tới điểm giao.' : 'đang sẵn sàng cho đơn hàng của bạn.'}
+          </Text>
+          {restaurantAddress ? (
+            <Text style={styles.bannerSubText}>{restaurantAddress}</Text>
+          ) : null}
         </View>
         <Ionicons name="radio-outline" size={20} color="#EA5034" />
       </View>
 
       <View style={styles.mapWrapper}>
         <MapView
-          key={activeOrder.id}
-          ref={mapInstance => {
+          key={orderNumber}
+          ref={(mapInstance) => {
             mapRef.current = mapInstance;
           }}
           style={styles.map}
@@ -420,10 +599,10 @@ const OrderTrackingScreen = ({ navigation }: any) => {
             />
           )}
 
-          <Marker 
-            coordinate={pickupCoordinate} 
-            title="Nhà hàng" 
-            description={activeOrder.restaurantName}
+          <Marker
+            coordinate={pickupCoordinate}
+            title="Nhà hàng"
+            description={restaurantName}
             tracksViewChanges={false}
             zIndex={100}
           >
@@ -435,10 +614,10 @@ const OrderTrackingScreen = ({ navigation }: any) => {
             </View>
           </Marker>
 
-          <Marker 
-            coordinate={dropoffCoordinate} 
-            title="Điểm giao hàng" 
-            description={activeOrder.deliveryAddress}
+          <Marker
+            coordinate={dropoffCoordinate}
+            title="Điểm giao hàng"
+            description={deliveryAddress}
             tracksViewChanges={false}
             zIndex={100}
           >
@@ -453,7 +632,7 @@ const OrderTrackingScreen = ({ navigation }: any) => {
           <Marker
             coordinate={droneCoordinate}
             title={`Drone ${droneCode}`}
-            description={`Đang bay: ${Math.round(progressValue * 100)}%`}
+            description={`Tiến độ: ${Math.round(flightProgress * 100)}%`}
             anchor={{ x: 0.5, y: 0.5 }}
             tracksViewChanges={false}
             rotation={routeHeading}
@@ -471,43 +650,38 @@ const OrderTrackingScreen = ({ navigation }: any) => {
 
         <View style={[styles.mapBadge, styles.shadow]}>
           <Ionicons name="navigate" size={16} color="#EA5034" />
-          <View style={{ marginLeft: 10 }}>
+          <View style={{ marginLeft: 10, flex: 1 }}>
             <Text style={styles.mapBadgeLabel}>Điểm giao</Text>
-            <Text style={styles.mapBadgeText}>Cửa nhà • Khu vực an toàn</Text>
+            <Text style={styles.mapBadgeText} numberOfLines={1}>
+              {deliveryAddress}
+            </Text>
           </View>
         </View>
-        {isMockOrder && (
-          <View style={styles.demoChip}>
-            <Ionicons name="sparkles-outline" size={14} color="#EA5034" />
-            <Text style={styles.demoChipText}>Dữ liệu demo</Text>
-          </View>
-        )}
       </View>
 
       <View style={styles.bottomSheet}>
-        <ScrollView
-          contentContainerStyle={styles.bottomContent}
-          showsVerticalScrollIndicator={false}
-          bounces
-        >
+        <ScrollView contentContainerStyle={styles.bottomContent} showsVerticalScrollIndicator={false} bounces>
           <View style={styles.summaryHeader}>
             <View>
-              <Text style={styles.orderCode}>#{activeOrder.id.slice(0, 6)}</Text>
-              <Text style={styles.restaurantName}>{activeOrder.restaurantName}</Text>
-              <Text style={styles.deliveryAddress}>{activeOrder.deliveryAddress}</Text>
+              <Text style={styles.orderCode}>#{orderNumber}</Text>
+              <Text style={styles.restaurantName}>{restaurantName}</Text>
+              <Text style={styles.deliveryAddress}>{deliveryAddress}</Text>
+              {timelineUpdatedAt ? (
+                <Text style={styles.timelineUpdatedAt}>{`Cập nhật: ${timelineUpdatedAt}`}</Text>
+              ) : null}
             </View>
             <View style={styles.etaPill}>
               <Ionicons name="time-outline" size={16} color="#EA5034" />
-              <Text style={styles.etaText}>
-                {etaMinutes.toString().padStart(2, '0')}:{etaRemainingSeconds.toString().padStart(2, '0')}
-              </Text>
+              <Text style={styles.etaText}>{etaInfo?.text ?? '--:--'}</Text>
             </View>
           </View>
 
           <View style={styles.timeline}>
-            {statusSteps.map((step, index) => {
-              const reached = index <= activeStepIndex;
-              const nextReached = index < activeStepIndex;
+            {STATUS_STEPS.map((step, index) => {
+              const reached = timelineStatuses.has(step.key) || index <= statusIndex;
+              const nextReached = index < statusIndex;
+              const event = timelineMap.get(step.key);
+              const timestamp = formatTimestamp(event?.timestamp);
               return (
                 <View key={step.key} style={styles.timelineRow}>
                   <View style={styles.timelineRail}>
@@ -518,13 +692,15 @@ const OrderTrackingScreen = ({ navigation }: any) => {
                         <Ionicons name="ellipse" size={8} color="#CBD3E3" />
                       )}
                     </View>
-                    {index < statusSteps.length - 1 && (
+                    {index < STATUS_STEPS.length - 1 && (
                       <View style={[styles.timelineConnector, nextReached && styles.timelineConnectorActive]} />
                     )}
                   </View>
                   <View style={styles.timelineContent}>
                     <Text style={[styles.timelineTitle, reached && styles.timelineTitleActive]}>{String(step.label)}</Text>
                     <Text style={styles.timelineDescription}>{String(step.description)}</Text>
+                    {timestamp ? <Text style={styles.timelineTimestamp}>{timestamp}</Text> : null}
+                    {event?.note ? <Text style={styles.timelineNote}>{event.note}</Text> : null}
                   </View>
                 </View>
               );
@@ -533,22 +709,22 @@ const OrderTrackingScreen = ({ navigation }: any) => {
 
           <View style={styles.orderCard}>
             <Text style={styles.sectionHeading}>Chi tiết đơn hàng</Text>
-            {activeOrder.items.slice(0, 3).map((item: any, index: number) => (
-              <View key={`${item.id}-${index}`} style={styles.orderRow}>
-                <Text style={styles.orderRowText}>
-                  {`${item.quantity}x ${item.name}`}
-                </Text>
-                <Text style={styles.orderRowPrice}>
-                  {`${(item.price * item.quantity).toLocaleString('vi-VN')}đ`}
-                </Text>
-              </View>
-            ))}
-            {activeOrder.items.length > 3 && (
-              <Text style={styles.moreItemsText}>{`và ${activeOrder.items.length - 3} món khác`}</Text>
+            {items.length === 0 ? (
+              <Text style={styles.emptyOrderText}>Đang cập nhật danh sách món.</Text>
+            ) : (
+              items.slice(0, 3).map((item, index) => (
+                <View key={`${item.id || item.product || index}`} style={styles.orderRow}>
+                  <Text style={styles.orderRowText}>{`${item.quantity}x ${item.name || 'Món ăn'}`}</Text>
+                  <Text style={styles.orderRowPrice}>{`${((item.price ?? 0) * item.quantity).toLocaleString('vi-VN')}đ`}</Text>
+                </View>
+              ))
+            )}
+            {items.length > 3 && (
+              <Text style={styles.moreItemsText}>{`và ${items.length - 3} món khác`}</Text>
             )}
             <View style={styles.totalRow}>
               <Text style={styles.totalLabel}>Tổng cộng</Text>
-              <Text style={styles.totalValue}>{`${activeOrder.total.toLocaleString('vi-VN')}đ`}</Text>
+              <Text style={styles.totalValue}>{`${totalAmount.toLocaleString('vi-VN')}đ`}</Text>
             </View>
           </View>
 
@@ -558,25 +734,20 @@ const OrderTrackingScreen = ({ navigation }: any) => {
               <Text style={styles.sectionHeading}>Xác nhận nhận hàng</Text>
             </View>
             <Text style={styles.handoverText}>
-              Khi drone hạ cánh, hãy kiểm tra mã PIN trên khoang chứa. Nhấn "Tôi đã nhận hàng" để mở khoang và hoàn tất đơn.
+              Khi drone hạ cánh, hãy kiểm tra khoang chứa. Nhấn "Tôi đã nhận hàng" để xác nhận với hệ thống.
             </Text>
             <TouchableOpacity
               style={[styles.confirmButton, (!canConfirm || acknowledged) && styles.confirmButtonDisabled]}
               disabled={!canConfirm || acknowledged}
-              onPress={() => {
-                setAcknowledged(true);
-                if (Platform.OS === 'web') {
-                  alert('Cảm ơn bạn! Đơn hàng đã được xác nhận.');
-                } else {
-                  Alert.alert('Hoàn tất', 'Cảm ơn bạn! Đơn hàng đã được xác nhận.');
-                }
-              }}
+              onPress={handleConfirm}
             >
-              <Text style={styles.confirmButtonText}>
-                {acknowledged ? 'Đã xác nhận' : 'Tôi đã nhận hàng'}
-              </Text>
+              <Text style={styles.confirmButtonText}>{acknowledged ? 'Đã xác nhận' : 'Tôi đã nhận hàng'}</Text>
             </TouchableOpacity>
-            <Text style={styles.pinNote}>{`Mã PIN: ${activeOrder.unlockPin ?? '****'}`}</Text>
+            {canConfirm ? (
+              <Text style={styles.pinNote}>Mã xác nhận sẽ hiển thị từ nhân viên giao nhận.</Text>
+            ) : (
+              <Text style={styles.pinNote}>Mã xác nhận sẽ xuất hiện khi đơn được đánh dấu đã giao.</Text>
+            )}
           </View>
         </ScrollView>
       </View>
@@ -589,6 +760,71 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F6F8FD',
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 0,
+  },
+  centeredState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  centeredTitle: {
+    marginTop: 16,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1B2945',
+  },
+  centeredText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#7B85A1',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  retryButton: {
+    marginTop: 20,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: '#EA5034',
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 20,
+    marginTop: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: '#FEE2E2',
+  },
+  errorBannerText: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 13,
+    color: '#7F1D1D',
+  },
+  errorBannerRetry: {
+    marginLeft: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#B91C1C',
+  },
+  errorBannerRetryText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  emptyOrderText: {
+    fontSize: 13,
+    color: '#7B85A1',
+    marginTop: 8,
+    lineHeight: 18,
   },
   header: {
     flexDirection: 'row',
@@ -642,6 +878,11 @@ const styles = StyleSheet.create({
   bannerText: {
     fontSize: 14,
     color: '#5D6379',
+  },
+  bannerSubText: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#9CA3AF',
   },
   mapBadge: {
     position: 'absolute',
@@ -786,6 +1027,11 @@ const styles = StyleSheet.create({
     color: '#7B85A1',
     marginTop: 4,
   },
+  timelineUpdatedAt: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    marginTop: 6,
+  },
   etaPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -856,6 +1102,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#7B85A1',
     marginTop: 4,
+  },
+  timelineTimestamp: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  timelineNote: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#4B5563',
   },
   orderCard: {
     backgroundColor: '#fff',
