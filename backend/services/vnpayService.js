@@ -5,11 +5,20 @@ import moment from "moment";
 class VNPayService {
   constructor() {
     this.vnpayConfig = {
-      vnp_TmnCode: process.env.VNPAY_TMN_CODE,
-      vnp_HashSecret: process.env.VNPAY_HASH_SECRET,
-      vnp_Url: process.env.VNPAY_URL,
-      vnp_ReturnUrl: process.env.VNPAY_RETURN_URL,
+      vnp_TmnCode: process.env.VNPAY_TMN_CODE || "CGQT26W9",
+      vnp_HashSecret:
+        process.env.VNPAY_HASH_SECRET || "FGZXUFIRDFOYEMSHZYBXNJTRJVSCZKRG",
+      vnp_Url:
+        process.env.VNPAY_URL ||
+        "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html",
+      vnp_ReturnUrl:
+        process.env.VNPAY_RETURN_URL ||
+        "http://localhost:5173/payment-return/vnpay",
     };
+    console.log("✅ VNPay Config loaded:", {
+      tmnCode: this.vnpayConfig.vnp_TmnCode,
+      url: this.vnpayConfig.vnp_Url,
+    });
   }
 
   sortObject(obj) {

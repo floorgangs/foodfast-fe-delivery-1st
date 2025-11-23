@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import axios from "axios";
+import DroneMap from "../../components/DroneMap/DroneMap";
 import {
   cancelOrder,
   confirmReceived,
@@ -20,6 +21,7 @@ function OrderTracking() {
   const orderId = paramOrderId || location.state?.orderId;
 
   const [order, setOrder] = useState(null);
+  const [deliveryInfo, setDeliveryInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [droneProgress, setDroneProgress] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(0);
@@ -47,6 +49,11 @@ function OrderTracking() {
         console.log("Order data loaded:", response.data);
         if (response.data.success) {
           setOrder(response.data.data);
+
+          // Load delivery info if order is delivering
+          if (["delivering", "picked_up"].includes(response.data.data.status)) {
+            loadDeliveryInfo();
+          }
         } else {
           console.error("Order not found");
           alert("Không tìm thấy đơn hàng");
@@ -59,7 +66,30 @@ function OrderTracking() {
       }
     };
 
+    const loadDeliveryInfo = async () => {
+      try {
+        const response = await axios.get(
+          `${API_URL}/deliveries/tracking/${orderId}`
+        );
+        if (response.data.success) {
+          setDeliveryInfo(response.data.data);
+        }
+      } catch (error) {
+        // 404 is expected for orders without delivery/drone assignment yet
+        if (error.response?.status !== 404) {
+          console.error("Error loading delivery info:", error);
+        }
+      }
+    };
+
     loadOrder();
+
+    // Poll delivery info every 5 seconds when delivering
+    const deliveryInterval = setInterval(() => {
+      if (order?.status === "delivering" || order?.status === "picked_up") {
+        loadDeliveryInfo();
+      }
+    }, 5000);
 
     // Subscribe to order updates
     const unsubscribe = subscribeToOrderUpdates((update) => {
@@ -68,7 +98,10 @@ function OrderTracking() {
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      clearInterval(deliveryInterval);
+    };
   }, [orderId, navigate]);
 
   // Update cancel timer
@@ -119,14 +152,22 @@ function OrderTracking() {
     }
   };
 
-  const handleConfirmReceived = () => {
-    const updatedOrder = confirmReceived(orderId);
-    setOrder(updatedOrder);
-
-    // Navigate to review page after 1 second
-    setTimeout(() => {
-      navigate(`/review/${orderId}`);
-    }, 1000);
+  const handleConfirmReceived = async () => {
+    try {
+      const response = await axios.patch(
+        `${API_URL}/orders/${orderId}/complete`
+      );
+      if (response.data.success) {
+        setOrder(response.data.data);
+        // Navigate to review page after 1 second
+        setTimeout(() => {
+          navigate(`/review/${orderId}`);
+        }, 1000);
+      }
+    } catch (error) {
+      console.error("Error confirming received:", error);
+      alert("Có lỗi xảy ra khi xác nhận đã nhận hàng");
+    }
   };
 
   if (loading) {
@@ -296,45 +337,39 @@ function OrderTracking() {
             })}
           </div>
 
-          {/* Drone Tracking Animation */}
-          {order.status === "delivering" && (
-            <div className="drone-tracking">
-              <h3>🚁 Drone đang giao hàng</h3>
-              <div className="drone-animation">
-                <div className="route">
-                  <div className="location start">
-                    <span className="icon">🏪</span>
-                    <span className="label">Nhà hàng</span>
-                  </div>
-                  <div className="drone-path">
-                    <div
-                      className="drone"
-                      style={{ left: `${droneProgress}%` }}
-                    >
-                      <span className="drone-icon">🚁</span>
-                      <span className="drone-shadow"></span>
-                    </div>
-                    <div className="path-line">
-                      <div
-                        className="path-progress"
-                        style={{ width: `${droneProgress}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                  <div className="location end">
-                    <span className="icon">🏠</span>
-                    <span className="label">Bạn</span>
-                  </div>
-                </div>
-                <div className="delivery-eta">
-                  <p>
-                    Thời gian còn lại:{" "}
-                    <strong>
-                      {Math.max(0, Math.ceil(15 - (droneProgress / 100) * 15))}s
-                    </strong>
-                  </p>
-                </div>
+          {/* Real-time Drone Tracking Map */}
+          {(order.status === "delivering" || order.status === "picked_up") && (
+            <div className="drone-tracking-map">
+              <h3>🚁 Theo dõi drone giao hàng</h3>
+              <div className="map-container">
+                <DroneMap order={order} deliveryInfo={deliveryInfo} />
               </div>
+              {deliveryInfo && (
+                <div className="delivery-stats">
+                  <div className="stat">
+                    <span className="stat-label">Drone:</span>
+                    <span className="stat-value">
+                      {deliveryInfo.drone?.model || "N/A"}
+                    </span>
+                  </div>
+                  <div className="stat">
+                    <span className="stat-label">Pin:</span>
+                    <span className="stat-value">
+                      {deliveryInfo.drone?.batteryLevel || 0}%
+                    </span>
+                  </div>
+                  <div className="stat">
+                    <span className="stat-label">Trạng thái:</span>
+                    <span className="stat-value">
+                      {deliveryInfo.status === "picked_up"
+                        ? "Đã lấy hàng"
+                        : deliveryInfo.status === "assigned"
+                        ? "Đã được giao nhiệm vụ"
+                        : "Đang giao hàng"}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -426,11 +461,12 @@ function OrderTracking() {
               </button>
             )}
 
-            {order.status === "delivering" && droneProgress >= 100 && (
+            {(order.status === "delivering" && droneProgress >= 100) ||
+            order.status === "delivered" ? (
               <button className="btn-confirm" onClick={handleConfirmReceived}>
                 ✓ Đã nhận được đơn hàng
               </button>
-            )}
+            ) : null}
 
             {order.status === "completed" && !order.review && (
               <button

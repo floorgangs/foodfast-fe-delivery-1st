@@ -39,11 +39,24 @@ export const createOrder = async (req, res) => {
       }
     }
 
-    const supportedPaymentMethods = ["momo", "vnpay", "zalopay", "card", "banking", "dronepay"];
-    const normalizedPaymentMethod = supportedPaymentMethods.includes(paymentMethod)
+    const supportedPaymentMethods = [
+      "cod",
+      "cash",
+      "momo",
+      "vnpay",
+      "zalopay",
+      "card",
+      "banking",
+      "dronepay",
+    ];
+    const normalizedPaymentMethod = supportedPaymentMethods.includes(
+      paymentMethod
+    )
       ? paymentMethod
-      : "momo";
+      : "cod"; // Default to COD instead of momo
     const paymentProviderMap = {
+      cod: "Tiền mặt",
+      cash: "Tiền mặt",
       momo: "MoMo",
       vnpay: "VNPay",
       zalopay: "ZaloPay",
@@ -120,10 +133,10 @@ export const createOrder = async (req, res) => {
       }
 
       const lat = normalizeCoordinateValue(
-        coords.lat ?? coords.latitude ?? coords.y,
+        coords.lat ?? coords.latitude ?? coords.y
       );
       const lng = normalizeCoordinateValue(
-        coords.lng ?? coords.lon ?? coords.longitude ?? coords.x,
+        coords.lng ?? coords.lon ?? coords.longitude ?? coords.x
       );
 
       if (lat == null || lng == null) {
@@ -135,9 +148,7 @@ export const createOrder = async (req, res) => {
 
     const normalizeDeliveryAddressInput = (input) => {
       const raw =
-        typeof input === "string"
-          ? { address: input }
-          : { ...(input || {}) };
+        typeof input === "string" ? { address: input } : { ...(input || {}) };
 
       const normalized = {
         label: raw.label || raw.name || raw.title,
@@ -157,10 +168,18 @@ export const createOrder = async (req, res) => {
           raw.detailAddress ||
           raw.detail ||
           "",
-        ward: raw.ward || raw.subdistrict || raw.wardName || raw.neighborhood || "",
-        district: raw.district || raw.county || raw.districtName || raw.locality || "",
-        city: raw.city || raw.province || raw.cityName || raw.state || "Hồ Chí Minh",
-        phone: raw.phone || raw.contactPhone || customerInfo?.phone || undefined,
+        ward:
+          raw.ward || raw.subdistrict || raw.wardName || raw.neighborhood || "",
+        district:
+          raw.district || raw.county || raw.districtName || raw.locality || "",
+        city:
+          raw.city ||
+          raw.province ||
+          raw.cityName ||
+          raw.state ||
+          "Hồ Chí Minh",
+        phone:
+          raw.phone || raw.contactPhone || customerInfo?.phone || undefined,
         note: raw.note || raw.instructions,
       };
 
@@ -179,8 +198,14 @@ export const createOrder = async (req, res) => {
       const coordinateCandidate =
         raw.coordinates ||
         (raw.location && (raw.location.coordinates || raw.location)) ||
-        (raw.lat != null || raw.latitude != null || raw.lng != null || raw.longitude != null
-          ? { lat: raw.lat ?? raw.latitude, lng: raw.lng ?? raw.longitude ?? raw.lon }
+        (raw.lat != null ||
+        raw.latitude != null ||
+        raw.lng != null ||
+        raw.longitude != null
+          ? {
+              lat: raw.lat ?? raw.latitude,
+              lng: raw.lng ?? raw.longitude ?? raw.lon,
+            }
           : null);
 
       const normalizedCoordinates = normalizeCoordinates(coordinateCandidate);
@@ -191,13 +216,17 @@ export const createOrder = async (req, res) => {
       return normalized;
     };
 
-    const normalizedDeliveryAddress = normalizeDeliveryAddressInput(deliveryAddress);
+    const normalizedDeliveryAddress =
+      normalizeDeliveryAddressInput(deliveryAddress);
 
-    let deliveryCoordinates = normalizeCoordinates(normalizedDeliveryAddress.coordinates);
+    let deliveryCoordinates = normalizeCoordinates(
+      normalizedDeliveryAddress.coordinates
+    );
 
     if (!deliveryCoordinates) {
       const geocodedDelivery = geocodeAddress(normalizedDeliveryAddress);
-      deliveryCoordinates = normalizeCoordinates(geocodedDelivery) || geocodedDelivery || null;
+      deliveryCoordinates =
+        normalizeCoordinates(geocodedDelivery) || geocodedDelivery || null;
     }
 
     if (deliveryCoordinates) {
@@ -206,7 +235,10 @@ export const createOrder = async (req, res) => {
       delete normalizedDeliveryAddress.coordinates;
     }
 
-    console.log('[createOrder] normalizedDeliveryAddress:', normalizedDeliveryAddress);
+    console.log(
+      "[createOrder] normalizedDeliveryAddress:",
+      normalizedDeliveryAddress
+    );
 
     // Generate order number
     const orderNumber = `FD${Date.now()}`;
@@ -214,7 +246,13 @@ export const createOrder = async (req, res) => {
       Math.random() * 9999
     )}`;
     const paymentSessionExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
-    const paymentProvider = paymentProviderMap[normalizedPaymentMethod] || "DronePay Gateway";
+    const paymentProvider =
+      paymentProviderMap[normalizedPaymentMethod] || "DronePay Gateway";
+
+    // For COD, set paymentStatus to paid immediately but status stays pending for restaurant confirmation
+    const isCOD = paymentMethod === "cod" || paymentMethod === "cash";
+    const initialPaymentStatus = isCOD ? "paid" : "pending";
+    const initialOrderStatus = "pending"; // Always pending, waiting for restaurant confirmation
 
     const order = await Order.create({
       orderNumber,
@@ -234,17 +272,20 @@ export const createOrder = async (req, res) => {
       discount,
       total,
       deliveryAddress: normalizedDeliveryAddress,
-      paymentMethod: normalizedPaymentMethod,
-      paymentProvider,
+      paymentMethod: isCOD ? "cod" : normalizedPaymentMethod,
+      paymentProvider: isCOD ? "Tiền mặt" : paymentProvider,
+      paymentStatus: initialPaymentStatus,
       paymentSessionId,
       paymentSessionExpiresAt,
       customerNote,
       voucherCode,
-      status: "pending",
+      status: initialOrderStatus,
       timeline: [
         {
-          status: "pending",
-          note: "Đơn hàng đã được tạo",
+          status: initialOrderStatus,
+          note: isCOD
+            ? "Đơn hàng COD đã được tạo, chờ nhà hàng xác nhận"
+            : "Đơn hàng đã được tạo, chờ thanh toán",
           timestamp: new Date(),
         },
       ],
@@ -260,21 +301,32 @@ export const createOrder = async (req, res) => {
 
     const populatedOrder = await orderQuery;
 
-    // DON'T emit socket event here - only emit after payment confirmation
-    // Restaurant should only see orders that have been paid
+    // Emit socket event for COD orders (already paid)
+    if (isCOD) {
+      const io = req.app.get("io");
+      if (io) {
+        io.to(`restaurant_${restaurantId}`).emit("new_order", {
+          order: populatedOrder,
+          message: "Có đơn hàng mới COD!",
+        });
+        console.log(`🔔 Emitted new_order event to restaurant_${restaurantId}`);
+      }
+    }
 
     res.status(201).json({
       success: true,
       data: populatedOrder,
-      paymentSession: {
-        sessionId: paymentSessionId,
-        providerName: paymentProvider,
-        amount: total,
-        expiresAt: paymentSessionExpiresAt,
-        redirectUrl:
-          process.env.THIRD_PARTY_PAYMENT_URL ||
-          `https://dronepay.foodfast.dev/session/${paymentSessionId}`,
-      },
+      paymentSession: isCOD
+        ? null
+        : {
+            sessionId: paymentSessionId,
+            providerName: paymentProvider,
+            amount: total,
+            expiresAt: paymentSessionExpiresAt,
+            redirectUrl:
+              process.env.THIRD_PARTY_PAYMENT_URL ||
+              `https://dronepay.foodfast.dev/session/${paymentSessionId}`,
+          },
     });
   } catch (error) {
     res.status(500).json({
@@ -305,7 +357,7 @@ export const getOrders = async (req, res) => {
       }
       query.restaurant = restaurant._id;
       // Restaurant sees all orders that have been paid (including paid pending orders)
-      query.paymentStatus = 'paid';
+      query.paymentStatus = "paid";
     }
     // Admin can see all orders
 
@@ -390,7 +442,8 @@ export const updateOrderStatus = async (req, res) => {
   try {
     const { status: requestedStatus, note } = req.body;
 
-    const status = requestedStatus === 'completed' ? 'delivered' : requestedStatus;
+    const status =
+      requestedStatus === "completed" ? "delivered" : requestedStatus;
 
     const order = await Order.findById(req.params.id);
 
@@ -427,14 +480,16 @@ export const updateOrderStatus = async (req, res) => {
 
     // When order status becomes "delivering", assign a drone and update its status
     if (status === "delivering" && !order.drone) {
-      const Drone = (await import('../models/Drone.js')).default;
-      const availableDrone = await Drone.findOne({ status: 'available' }).sort({ batteryLevel: -1 });
-      
+      const Drone = (await import("../models/Drone.js")).default;
+      const availableDrone = await Drone.findOne({ status: "available" }).sort({
+        batteryLevel: -1,
+      });
+
       if (availableDrone) {
-        availableDrone.status = 'delivering';
+        availableDrone.status = "delivering";
         availableDrone.currentOrder = order._id;
         await availableDrone.save();
-        
+
         order.drone = availableDrone._id;
         order.droneDeliveryDetails = {
           assignedAt: new Date(),
@@ -445,10 +500,10 @@ export const updateOrderStatus = async (req, res) => {
 
     // When order is delivered, free up the drone
     if (status === "delivered" && order.drone) {
-      const Drone = (await import('../models/Drone.js')).default;
+      const Drone = (await import("../models/Drone.js")).default;
       const drone = await Drone.findById(order.drone);
       if (drone) {
-        drone.status = 'available';
+        drone.status = "available";
         drone.currentOrder = null;
         await drone.save();
       }
@@ -462,24 +517,24 @@ export const updateOrderStatus = async (req, res) => {
       .populate("items.product", "name image");
 
     // Create notification for customer
-    const Notification = (await import('../models/Notification.js')).default;
+    const Notification = (await import("../models/Notification.js")).default;
     if (order.customer) {
       const statusMessages = {
-        confirmed: 'Đơn hàng đã được xác nhận',
-        preparing: 'Đơn hàng đang được chuẩn bị',
-        ready: 'Đơn hàng sẵn sàng giao',
-        delivering: 'Drone đang giao hàng',
-        delivered: 'Đơn hàng đã giao thành công',
-        cancelled: 'Đơn hàng đã bị hủy',
+        confirmed: "Đơn hàng đã được xác nhận",
+        preparing: "Đơn hàng đang được chuẩn bị",
+        ready: "Đơn hàng sẵn sàng giao",
+        delivering: "Drone đang giao hàng",
+        delivered: "Đơn hàng đã giao thành công",
+        cancelled: "Đơn hàng đã bị hủy",
       };
 
       const notificationTypeMap = {
-        confirmed: 'order_confirmed',
-        preparing: 'order_preparing',
-        ready: 'order_ready',
-        delivering: 'order_delivering',
-        delivered: 'order_delivered',
-        cancelled: 'order_cancelled',
+        confirmed: "order_confirmed",
+        preparing: "order_preparing",
+        ready: "order_ready",
+        delivering: "order_delivering",
+        delivered: "order_delivered",
+        cancelled: "order_cancelled",
       };
 
       const notificationType = notificationTypeMap[status];
@@ -487,10 +542,12 @@ export const updateOrderStatus = async (req, res) => {
       if (notificationType) {
         await Notification.create({
           recipient: order.customer,
-          recipientRole: 'customer',
+          recipientRole: "customer",
           type: notificationType,
-          title: statusMessages[status] || 'Cập nhật đơn hàng',
-          message: `Đơn hàng #${order.orderNumber}: ${statusMessages[status] || status}`,
+          title: statusMessages[status] || "Cập nhật đơn hàng",
+          message: `Đơn hàng #${order.orderNumber}: ${
+            statusMessages[status] || status
+          }`,
           relatedOrder: order._id,
         });
       }
@@ -524,28 +581,32 @@ export const updateOrderStatus = async (req, res) => {
 export const confirmThirdPartyPayment = async (req, res) => {
   try {
     const { orderId, sessionId, status, rawData } = req.body;
-    
-    console.log('[confirmThirdPartyPayment] Request body:', { orderId, sessionId, status });
+
+    console.log("[confirmThirdPartyPayment] Request body:", {
+      orderId,
+      sessionId,
+      status,
+    });
 
     if (!orderId || !sessionId || !status) {
-      console.error('[confirmThirdPartyPayment] Missing required fields');
+      console.error("[confirmThirdPartyPayment] Missing required fields");
       return res.status(400).json({
         success: false,
         message: "Thiếu thông tin thanh toán",
       });
     }
 
-    const order = await Order.findById(orderId).populate('customer restaurant');
+    const order = await Order.findById(orderId).populate("customer restaurant");
 
     if (!order) {
-      console.error('[confirmThirdPartyPayment] Order not found:', orderId);
+      console.error("[confirmThirdPartyPayment] Order not found:", orderId);
       return res.status(404).json({
         success: false,
         message: "Không tìm thấy đơn hàng",
       });
     }
-    
-    console.log('[confirmThirdPartyPayment] Order found:', {
+
+    console.log("[confirmThirdPartyPayment] Order found:", {
       orderId: order._id,
       orderNumber: order.orderNumber,
       currentStatus: order.status,
@@ -553,11 +614,11 @@ export const confirmThirdPartyPayment = async (req, res) => {
       paymentSessionId: order.paymentSessionId,
     });
 
-    if (status === 'success') {
+    if (status === "success") {
       const paidAt = new Date();
 
-      order.paymentStatus = 'paid';
-      order.status = 'pending'; // Keep as pending until restaurant confirms
+      order.paymentStatus = "paid";
+      order.status = "pending"; // Keep as pending until restaurant confirms
       order.paymentTransaction = {
         transactionId: sessionId,
         paidAt,
@@ -566,8 +627,8 @@ export const confirmThirdPartyPayment = async (req, res) => {
         provider: order.paymentProvider,
       };
       order.timeline.push({
-        status: 'pending',
-        note: 'Thanh toán thành công, chờ nhà hàng xác nhận',
+        status: "pending",
+        note: "Thanh toán thành công, chờ nhà hàng xác nhận",
       });
 
       // Tạo bản ghi Payment riêng cho thống kê/đối soát
@@ -586,13 +647,13 @@ export const confirmThirdPartyPayment = async (req, res) => {
       });
 
       // Create notification for customer
-      const Notification = (await import('../models/Notification.js')).default;
+      const Notification = (await import("../models/Notification.js")).default;
       if (order.customer) {
         await Notification.create({
           recipient: order.customer._id,
-          recipientRole: 'customer',
-          type: 'payment_received',
-          title: 'Thanh toán thành công',
+          recipientRole: "customer",
+          type: "payment_received",
+          title: "Thanh toán thành công",
           message: `Đơn hàng #${order.orderNumber} đã thanh toán thành công, đang chờ nhà hàng xác nhận`,
           relatedOrder: order._id,
         });
@@ -604,9 +665,9 @@ export const confirmThirdPartyPayment = async (req, res) => {
       if (restaurantOwnerId) {
         await Notification.create({
           recipient: restaurantOwnerId,
-          recipientRole: 'restaurant',
-          type: 'new_order',
-          title: 'Đơn hàng mới',
+          recipientRole: "restaurant",
+          type: "new_order",
+          title: "Đơn hàng mới",
           message: `Bạn có đơn hàng mới #${order.orderNumber} cần xác nhận`,
           relatedOrder: order._id,
         });
@@ -614,7 +675,7 @@ export const confirmThirdPartyPayment = async (req, res) => {
 
       await order.save();
 
-      console.log('✅ Payment confirmed:', {
+      console.log("✅ Payment confirmed:", {
         orderId: order._id,
         orderNumber: order.orderNumber,
         paymentStatus: order.paymentStatus,
@@ -624,33 +685,37 @@ export const confirmThirdPartyPayment = async (req, res) => {
       // Emit socket events
       if (req.io) {
         if (order.customer) {
-          req.io.to(`customer_${order.customer._id}`).emit('order_updated', order);
+          req.io
+            .to(`customer_${order.customer._id}`)
+            .emit("order_updated", order);
         }
-        req.io.to(`restaurant_${order.restaurant._id}`).emit('new_order', order);
+        req.io
+          .to(`restaurant_${order.restaurant._id}`)
+          .emit("new_order", order);
       }
 
       return res.json({
         success: true,
-        message: 'Thanh toán thành công',
+        message: "Thanh toán thành công",
         data: order,
       });
     } else {
       // Payment failed - keep order in pending status
-      order.paymentStatus = 'failed';
+      order.paymentStatus = "failed";
       order.timeline.push({
-        status: 'pending',
-        note: 'Thanh toán thất bại hoặc bị hủy',
+        status: "pending",
+        note: "Thanh toán thất bại hoặc bị hủy",
       });
       await order.save();
 
       return res.json({
         success: true,
-        message: 'Thanh toán đã bị hủy',
+        message: "Thanh toán đã bị hủy",
         data: order,
       });
     }
   } catch (error) {
-    console.error('[confirmThirdPartyPayment] Error:', error);
+    console.error("[confirmThirdPartyPayment] Error:", error);
     return res.status(500).json({
       success: false,
       message: error.message,
@@ -661,24 +726,28 @@ export const confirmThirdPartyPayment = async (req, res) => {
 export const trackOrder = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
-      .populate('customer', 'name phone')
-      .populate('restaurant', 'name address coordinates')
-      .populate('drone', 'droneId name model status batteryLevel currentLocation')
-      .populate('items.product', 'name image price');
+      .populate("customer", "name phone")
+      .populate("restaurant", "name address coordinates")
+      .populate(
+        "drone",
+        "droneId name model status batteryLevel currentLocation"
+      )
+      .populate("items.product", "name image price");
 
     if (!order) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy đơn hàng',
+        message: "Không tìm thấy đơn hàng",
       });
     }
 
-    const { getRestaurantCoordinates, geocodeAddress, buildAddressString } = await import('../utils/geocoding.js');
+    const { getRestaurantCoordinates, geocodeAddress, buildAddressString } =
+      await import("../utils/geocoding.js");
     const normalizeCoordinateValue = (value) => {
-      if (typeof value === 'number' && Number.isFinite(value)) {
+      if (typeof value === "number" && Number.isFinite(value)) {
         return value;
       }
-      if (typeof value === 'string' && value.trim() !== '') {
+      if (typeof value === "string" && value.trim() !== "") {
         const parsed = Number(value);
         return Number.isFinite(parsed) ? parsed : undefined;
       }
@@ -690,46 +759,62 @@ export const trackOrder = async (req, res) => {
         return null;
       }
       const lat = normalizeCoordinateValue(coords.lat ?? coords.latitude);
-      const lng = normalizeCoordinateValue(coords.lng ?? coords.lon ?? coords.longitude);
+      const lng = normalizeCoordinateValue(
+        coords.lng ?? coords.lon ?? coords.longitude
+      );
       if (lat == null || lng == null) {
         return null;
       }
       return { lat, lng };
     };
 
-    const restaurantCoords = normalizeCoordinates(order.restaurant?.coordinates)
-      || normalizeCoordinates(order.restaurant?.address?.coordinates)
-      || getRestaurantCoordinates(order.restaurant || {});
+    const restaurantCoords =
+      normalizeCoordinates(order.restaurant?.coordinates) ||
+      normalizeCoordinates(order.restaurant?.address?.coordinates) ||
+      getRestaurantCoordinates(order.restaurant || {});
 
-    let deliveryCoords = normalizeCoordinates(order.deliveryAddress?.coordinates);
+    let deliveryCoords = normalizeCoordinates(
+      order.deliveryAddress?.coordinates
+    );
 
     if (!deliveryCoords?.lat || !deliveryCoords?.lng) {
-      const geocodedDelivery = geocodeAddress(order.deliveryAddress || order.deliveryAddress?.address);
+      const geocodedDelivery = geocodeAddress(
+        order.deliveryAddress || order.deliveryAddress?.address
+      );
       if (geocodedDelivery) {
-        deliveryCoords = normalizeCoordinates(geocodedDelivery) || geocodedDelivery;
+        deliveryCoords =
+          normalizeCoordinates(geocodedDelivery) || geocodedDelivery;
       }
     }
 
-    console.log('[trackOrder] deliveryAddress stored:', order.deliveryAddress);
-    console.log('[trackOrder] resolved deliveryCoords:', deliveryCoords);
+    console.log("[trackOrder] deliveryAddress stored:", order.deliveryAddress);
+    console.log("[trackOrder] resolved deliveryCoords:", deliveryCoords);
 
     if (!deliveryCoords?.lat || !deliveryCoords?.lng) {
       return res.status(400).json({
         success: false,
-        message: 'Không tìm thấy tọa độ địa chỉ giao hàng',
+        message: "Không tìm thấy tọa độ địa chỉ giao hàng",
       });
     }
 
     const normalizeStatus = (status) => {
-      if (!status) return 'pending';
-      if (status === 'completed') return 'delivered';
+      if (!status) return "pending";
+      if (status === "completed") return "delivered";
       return status;
     };
 
-    const statusSequence = ['pending', 'confirmed', 'preparing', 'ready', 'delivering', 'delivered'];
+    const statusSequence = [
+      "pending",
+      "confirmed",
+      "preparing",
+      "ready",
+      "delivering",
+      "delivered",
+    ];
     const currentStatus = normalizeStatus(order.status);
     const statusIndex = Math.max(statusSequence.indexOf(currentStatus), 0);
-    const progress = statusSequence.length > 1 ? statusIndex / (statusSequence.length - 1) : 0;
+    const progress =
+      statusSequence.length > 1 ? statusIndex / (statusSequence.length - 1) : 0;
 
     const buildFullAddress = (address) => buildAddressString(address);
 
@@ -744,7 +829,9 @@ export const trackOrder = async (req, res) => {
         }
       : null;
 
-    const normalizedDroneLocation = normalizeCoordinates(order.drone?.currentLocation);
+    const normalizedDroneLocation = normalizeCoordinates(
+      order.drone?.currentLocation
+    );
     const droneLocationFromDrone = normalizedDroneLocation
       ? {
           lat: normalizedDroneLocation.lat,
@@ -754,11 +841,13 @@ export const trackOrder = async (req, res) => {
         }
       : null;
 
-    const defaultDroneLocation = currentStatus === 'delivered'
-      ? { lat: deliveryCoords.lat, lng: deliveryCoords.lng }
-      : { lat: restaurantCoords.lat, lng: restaurantCoords.lng };
+    const defaultDroneLocation =
+      currentStatus === "delivered"
+        ? { lat: deliveryCoords.lat, lng: deliveryCoords.lng }
+        : { lat: restaurantCoords.lat, lng: restaurantCoords.lng };
 
-    const droneLocation = droneLocationFromOrder || droneLocationFromDrone || defaultDroneLocation;
+    const droneLocation =
+      droneLocationFromOrder || droneLocationFromDrone || defaultDroneLocation;
 
     const toRadians = (deg) => (deg * Math.PI) / 180;
     const haversineDistance = (pointA, pointB) => {
@@ -768,17 +857,21 @@ export const trackOrder = async (req, res) => {
       const dLng = toRadians(pointB.lng - pointA.lng);
       const lat1 = toRadians(pointA.lat);
       const lat2 = toRadians(pointB.lat);
-      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
-        + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1) *
+          Math.cos(lat2) *
+          Math.sin(dLng / 2) *
+          Math.sin(dLng / 2);
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       return earthRadius * c;
     };
 
     const calculateFlightProgress = () => {
-      if (currentStatus === 'delivered') {
+      if (currentStatus === "delivered") {
         return 1;
       }
-      if (currentStatus !== 'delivering') {
+      if (currentStatus !== "delivering") {
         return 0;
       }
       const totalDistance = haversineDistance(restaurantCoords, deliveryCoords);
@@ -811,7 +904,9 @@ export const trackOrder = async (req, res) => {
         tracking: {
           pickupLocation: {
             name: order.restaurant?.name,
-            address: buildAddressString(order.restaurant?.address || order.restaurant),
+            address: buildAddressString(
+              order.restaurant?.address || order.restaurant
+            ),
             coordinates: restaurantCoords,
           },
           deliveryLocation: {
@@ -837,7 +932,7 @@ export const trackOrder = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('[trackOrder] Error:', error);
+    console.error("[trackOrder] Error:", error);
     res.status(500).json({
       success: false,
       message: error.message,
@@ -849,7 +944,9 @@ export const cancelOrder = async (req, res) => {
   try {
     const { reason } = req.body;
 
-    const order = await Order.findById(req.params.id).populate('customer restaurant');
+    const order = await Order.findById(req.params.id).populate(
+      "customer restaurant"
+    );
 
     if (!order) {
       return res.status(404).json({
@@ -875,13 +972,13 @@ export const cancelOrder = async (req, res) => {
     await order.save();
 
     // Create notification
-    const Notification = (await import('../models/Notification.js')).default;
+    const Notification = (await import("../models/Notification.js")).default;
     if (order.customer) {
       await Notification.create({
         recipient: order.customer._id,
-        recipientRole: 'customer',
-        type: 'order_cancelled',
-        title: 'Đơn hàng đã bị hủy',
+        recipientRole: "customer",
+        type: "order_cancelled",
+        title: "Đơn hàng đã bị hủy",
         message: `Đơn hàng #${order.orderNumber} đã bị hủy: ${reason}`,
         relatedOrder: order._id,
       });
@@ -890,7 +987,9 @@ export const cancelOrder = async (req, res) => {
     // Emit socket event
     if (req.io) {
       if (order.customer) {
-        req.io.to(`customer_${order.customer._id}`).emit("order_cancelled", order);
+        req.io
+          .to(`customer_${order.customer._id}`)
+          .emit("order_cancelled", order);
       }
       req.io
         .to(`restaurant_${order.restaurant}`)
@@ -901,6 +1000,68 @@ export const cancelOrder = async (req, res) => {
     res.json({
       success: true,
       data: order,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Customer completes order
+export const completeOrder = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy đơn hàng",
+      });
+    }
+
+    // Only customer can complete their own order
+    if (order.customer.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "Bạn không có quyền xác nhận đơn hàng này",
+      });
+    }
+
+    // Order must be delivered first
+    if (order.status !== "delivered") {
+      return res.status(400).json({
+        success: false,
+        message: "Chỉ có thể xác nhận đơn hàng đã được giao",
+      });
+    }
+
+    order.status = "completed";
+    order.completedAt = new Date();
+    order.timeline.push({
+      status: "completed",
+      note: "Khách hàng đã xác nhận nhận hàng",
+    });
+
+    await order.save();
+
+    const populatedOrder = await Order.findById(order._id)
+      .populate("customer", "name phone")
+      .populate("restaurant", "name phone address")
+      .populate("items.product", "name image");
+
+    // Emit socket event
+    if (req.io) {
+      req.io
+        .to(`restaurant_${order.restaurant}`)
+        .emit("order_completed", populatedOrder);
+      req.io.to("admin").emit("order_completed", populatedOrder);
+    }
+
+    res.json({
+      success: true,
+      data: populatedOrder,
     });
   } catch (error) {
     res.status(500).json({

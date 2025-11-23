@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useParams } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { clearCart } from "../../store/slices/cartSlice";
 import axios from "axios";
 import "./PaymentReturn.css";
 
@@ -7,18 +9,23 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 function PaymentReturn() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const { provider } = useParams(); // 'vnpay' or 'momo'
   const [searchParams] = useSearchParams();
   const [status, setStatus] = useState("processing");
   const [message, setMessage] = useState("Đang xử lý thanh toán...");
   const [orderData, setOrderData] = useState(null);
+  const [countdown, setCountdown] = useState(5);
 
   useEffect(() => {
     const handlePaymentReturn = async () => {
       try {
-        // Get payment method from path
-        const paymentMethod = window.location.pathname.includes("vnpay")
-          ? "vnpay"
-          : "momo";
+        // Get payment method from URL param or path
+        const paymentMethod =
+          provider ||
+          (window.location.pathname.includes("vnpay") ? "vnpay" : "momo");
+
+        console.log(`🔍 Verifying ${paymentMethod} payment...`);
 
         // Call backend API to verify payment
         const response = await axios.get(
@@ -28,6 +35,8 @@ function PaymentReturn() {
           }
         );
 
+        console.log("✅ Payment response:", response.data);
+
         if (
           response.data.success &&
           response.data.data.paymentStatus === "success"
@@ -35,12 +44,27 @@ function PaymentReturn() {
           setStatus("success");
           setMessage("Thanh toán thành công!");
           setOrderData(response.data.data.order);
+
+          // Clear cart
+          dispatch(clearCart());
+
+          // Start countdown
+          const timer = setInterval(() => {
+            setCountdown((prev) => {
+              if (prev <= 1) {
+                clearInterval(timer);
+                navigate(`/order-tracking/${response.data.data.order._id}`);
+                return 0;
+              }
+              return prev - 1;
+            });
+          }, 1000);
         } else {
           setStatus("failed");
           setMessage(response.data.data.message || "Thanh toán thất bại!");
         }
       } catch (error) {
-        console.error("Payment return error:", error);
+        console.error("❌ Payment return error:", error);
         setStatus("failed");
         setMessage(
           error.response?.data?.message || "Có lỗi xảy ra khi xử lý thanh toán"
@@ -49,7 +73,7 @@ function PaymentReturn() {
     };
 
     handlePaymentReturn();
-  }, [searchParams]);
+  }, [searchParams, provider, dispatch, navigate]);
 
   return (
     <div className="payment-return-page">
@@ -59,6 +83,7 @@ function PaymentReturn() {
             <div className="processing">
               <div className="spinner"></div>
               <h2>{message}</h2>
+              <p>Vui lòng không tắt trình duyệt</p>
             </div>
           )}
 
@@ -74,19 +99,22 @@ function PaymentReturn() {
                   </p>
                   <p>
                     <strong>Tổng tiền:</strong>{" "}
-                    {orderData.total?.toLocaleString()}đ
+                    {orderData.total?.toLocaleString("vi-VN")}đ
                   </p>
                   <p>
-                    <strong>Trạng thái:</strong> Đã xác nhận
+                    <strong>Trạng thái:</strong> Đã thanh toán
                   </p>
                 </div>
               )}
+              <p className="countdown-text">
+                Chuyển hướng trong <strong>{countdown}</strong> giây...
+              </p>
               <div className="actions">
                 <button
-                  onClick={() => navigate("/orders")}
+                  onClick={() => navigate(`/order-tracking/${orderData?._id}`)}
                   className="btn-primary"
                 >
-                  Xem đơn hàng
+                  Xem đơn hàng ngay
                 </button>
                 <button onClick={() => navigate("/")} className="btn-secondary">
                   Về trang chủ

@@ -1,33 +1,50 @@
-import { useState, useEffect } from 'react'
-import { useSelector } from 'react-redux'
-import { droneAPI } from '../../services/api'
-import './Drones.css'
+import { useState, useEffect } from "react";
+import { useSelector } from "react-redux";
+import { Link } from "react-router-dom";
+import { droneAPI } from "../../services/api";
+import "./Drones.css";
 
 function Drones() {
-  const [activeTab, setActiveTab] = useState('all')
-  const [showAddModal, setShowAddModal] = useState(false)
-  const [selectedDrone, setSelectedDrone] = useState(null)
-  const [showDetailModal, setShowDetailModal] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [activeTab, setActiveTab] = useState("all");
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedDrone, setSelectedDrone] = useState(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const restaurant = useSelector((state) => state.auth.restaurant)
-  const [drones, setDrones] = useState([])
+  const restaurant = useSelector((state) => state.auth.restaurant);
+  const [drones, setDrones] = useState([]);
 
   useEffect(() => {
-    if (restaurant?._id) {
-      loadDrones()
+    console.log("Drones useEffect - restaurant:", restaurant);
+    const restaurantId = restaurant?._id || restaurant?.id;
+    if (restaurantId) {
+      console.log("Loading drones for restaurant:", restaurantId);
+      loadDrones();
+    } else {
+      console.warn("⚠️ No restaurant ID found, cannot load drones");
+      setLoading(false);
+      setError("Vui lòng chọn nhà hàng để xem drone");
     }
-  }, [restaurant])
+  }, [restaurant]);
 
   const loadDrones = async () => {
+    const restaurantId = restaurant?._id || restaurant?.id;
+    if (!restaurantId) {
+      console.error("Cannot load drones: restaurant ID is missing");
+      setError("Vui lòng chọn nhà hàng để xem drone");
+      setLoading(false);
+      return;
+    }
+
     try {
-      setLoading(true)
-      setError('')
-      const response = await droneAPI.getMyDrones(restaurant._id)
-      
+      setLoading(true);
+      setError("");
+      console.log("Fetching drones for restaurant:", restaurantId);
+      const response = await droneAPI.getMyDrones(restaurantId);
+
       if (response?.success) {
-        const apiDrones = response.data || []
+        const apiDrones = response.data || [];
         // Transform API data sang format của Drones page
         const transformedDrones = apiDrones.map((drone) => ({
           id: drone._id,
@@ -39,173 +56,183 @@ function Drones() {
           totalFlights: drone.totalFlights || 0,
           totalDistance: drone.totalDistance || 0,
           lastMaintenance: drone.lastMaintenance
-            ? new Date(drone.lastMaintenance).toLocaleDateString('vi-VN')
-            : '',
+            ? new Date(drone.lastMaintenance).toLocaleDateString("vi-VN")
+            : "",
           nextMaintenance: drone.nextMaintenance
-            ? new Date(drone.nextMaintenance).toLocaleDateString('vi-VN')
-            : '',
-          location: drone.location || 'Không xác định',
+            ? new Date(drone.nextMaintenance).toLocaleDateString("vi-VN")
+            : "",
+          location: drone.location || "Không xác định",
           maxWeight: drone.maxPayload || 5,
           maxDistance: drone.maxRange || 15,
           averageSpeed: 45,
-        }))
-        setDrones(transformedDrones)
+        }));
+        setDrones(transformedDrones);
       } else {
-        throw new Error(response?.message || 'Không thể tải danh sách drone')
+        throw new Error(response?.message || "Không thể tải danh sách drone");
       }
     } catch (err) {
-      setError(err?.message || 'Đã xảy ra lỗi khi tải drone')
-      console.error('Error loading drones:', err)
+      setError(err?.message || "Đã xảy ra lỗi khi tải drone");
+      console.error("Error loading drones:", err);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const [formData, setFormData] = useState({
-    name: '',
-    serialNumber: '',
-    uavRegistrationCode: '',
-    model: 'FF-D100',
-    firmwareVersion: '',
+    name: "",
+    serialNumber: "",
+    uavRegistrationCode: "",
+    model: "FF-D100",
+    firmwareVersion: "",
     operatingLicense: null,
     maxWeight: 5,
     maxDistance: 15,
     averageSpeed: 45,
-    batteryCapacity: '',
-    cargoCompartmentSize: ''
-  })
+    batteryCapacity: "",
+    cargoCompartmentSize: "",
+  });
 
   const getFilteredDrones = () => {
-    switch(activeTab) {
-      case 'all':
-        return drones
-      case 'available':
-        return drones.filter(d => d.status === 'available')
-      case 'delivering':
-        return drones.filter(d => d.status === 'delivering')
-      case 'charging':
-        return drones.filter(d => d.status === 'charging')
-      case 'maintenance':
-        return drones.filter(d => d.status === 'maintenance')
+    switch (activeTab) {
+      case "all":
+        return drones;
+      case "available":
+        return drones.filter((d) => d.status === "available");
+      case "delivering":
+        return drones.filter((d) => d.status === "delivering");
+      case "charging":
+        return drones.filter((d) => d.status === "charging");
+      case "maintenance":
+        return drones.filter((d) => d.status === "maintenance");
       default:
-        return drones
+        return drones;
     }
-  }
+  };
 
   const handleChange = (e) => {
-    const { name, value, files } = e.target
-    
-    if (name === 'operatingLicense') {
+    const { name, value, files } = e.target;
+
+    if (name === "operatingLicense") {
       setFormData({
         ...formData,
-        [name]: files[0]
-      })
+        [name]: files[0],
+      });
     } else {
       setFormData({
         ...formData,
-        [name]: value
-      })
+        [name]: value,
+      });
     }
-  }
+  };
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
+    e.preventDefault();
     try {
       const payload = {
         name: formData.name,
         model: formData.model,
         serialNumber: formData.serialNumber,
         restaurant: restaurant._id,
-        status: 'available',
+        status: "available",
         batteryLevel: 100,
         maxPayload: parseInt(formData.maxWeight),
         maxRange: parseInt(formData.maxDistance),
-      }
-      
-      const response = await droneAPI.create(payload)
+      };
+
+      const response = await droneAPI.create(payload);
       if (response?.success) {
-        await loadDrones()
-        setShowAddModal(false)
-        resetForm()
+        await loadDrones();
+        setShowAddModal(false);
+        resetForm();
       } else {
-        alert(response?.message || 'Không thể thêm drone')
+        alert(response?.message || "Không thể thêm drone");
       }
     } catch (err) {
-      alert(err?.message || 'Không thể thêm drone')
+      alert(err?.message || "Không thể thêm drone");
     }
-  }
+  };
 
   const resetForm = () => {
     setFormData({
-      name: '',
-      serialNumber: '',
-      uavRegistrationCode: '',
-      model: 'FF-D100',
-      firmwareVersion: '',
+      name: "",
+      serialNumber: "",
+      uavRegistrationCode: "",
+      model: "FF-D100",
+      firmwareVersion: "",
       operatingLicense: null,
       maxWeight: 5,
       maxDistance: 15,
       averageSpeed: 45,
-      batteryCapacity: '',
-      cargoCompartmentSize: ''
-    })
-  }
+      batteryCapacity: "",
+      cargoCompartmentSize: "",
+    });
+  };
 
   const handleDroneClick = (drone) => {
-    setSelectedDrone(drone)
-    setShowDetailModal(true)
-  }
+    setSelectedDrone(drone);
+    setShowDetailModal(true);
+  };
 
   const updateDroneStatus = async (droneId, newStatus) => {
     try {
-      const response = await droneAPI.updateStatus(droneId, newStatus, 100)
+      const response = await droneAPI.updateStatus(droneId, newStatus, 100);
       if (response?.success) {
-        await loadDrones()
+        await loadDrones();
       } else {
-        alert(response?.message || 'Không thể cập nhật trạng thái')
+        alert(response?.message || "Không thể cập nhật trạng thái");
       }
     } catch (err) {
-      alert(err?.message || 'Không thể cập nhật trạng thái drone')
+      alert(err?.message || "Không thể cập nhật trạng thái drone");
     }
-  }
+  };
 
   const deleteDrone = async (droneId) => {
-    if (window.confirm('Bạn có chắc muốn xóa drone này?')) {
+    if (window.confirm("Bạn có chắc muốn xóa drone này?")) {
       try {
-        const response = await droneAPI.delete(droneId)
+        const response = await droneAPI.delete(droneId);
         if (response?.success) {
-          await loadDrones()
-          setShowDetailModal(false)
+          await loadDrones();
+          setShowDetailModal(false);
         } else {
-          alert(response?.message || 'Không thể xóa drone')
+          alert(response?.message || "Không thể xóa drone");
         }
       } catch (err) {
-        alert(err?.message || 'Không thể xóa drone')
+        alert(err?.message || "Không thể xóa drone");
       }
     }
-  }
+  };
 
   const getStatusColor = (status) => {
-    switch(status) {
-      case 'available': return '#52c41a'
-      case 'delivering': return '#1890ff'
-      case 'charging': return '#fa8c16'
-      case 'maintenance': return '#ff4d4f'
-      default: return '#8c8c8c'
+    switch (status) {
+      case "available":
+        return "#52c41a";
+      case "delivering":
+        return "#1890ff";
+      case "charging":
+        return "#fa8c16";
+      case "maintenance":
+        return "#ff4d4f";
+      default:
+        return "#8c8c8c";
     }
-  }
+  };
 
   const getStatusText = (status) => {
-    switch(status) {
-      case 'available': return 'Sẵn sàng'
-      case 'delivering': return 'Đang giao hàng'
-      case 'charging': return 'Đang sạc'
-      case 'maintenance': return 'Bảo trì'
-      default: return 'Không xác định'
+    switch (status) {
+      case "available":
+        return "Sẵn sàng";
+      case "delivering":
+        return "Đang giao hàng";
+      case "charging":
+        return "Đang sạc";
+      case "maintenance":
+        return "Bảo trì";
+      default:
+        return "Không xác định";
     }
-  }
+  };
 
-  const filteredDrones = getFilteredDrones()
+  const filteredDrones = getFilteredDrones();
 
   if (loading) {
     return (
@@ -215,7 +242,7 @@ function Drones() {
           <p>Đang tải danh sách drone...</p>
         </div>
       </div>
-    )
+    );
   }
 
   if (error) {
@@ -229,7 +256,7 @@ function Drones() {
           </button>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -250,62 +277,83 @@ function Drones() {
           <span className="stat-label">Tổng số Drone</span>
         </div>
         <div className="stat-card available">
-          <span className="stat-number">{drones.filter(d => d.status === 'available').length}</span>
+          <span className="stat-number">
+            {drones.filter((d) => d.status === "available").length}
+          </span>
           <span className="stat-label">Sẵn sàng</span>
         </div>
         <div className="stat-card delivering">
-          <span className="stat-number">{drones.filter(d => d.status === 'delivering').length}</span>
+          <span className="stat-number">
+            {drones.filter((d) => d.status === "delivering").length}
+          </span>
           <span className="stat-label">Đang giao</span>
         </div>
         <div className="stat-card charging">
-          <span className="stat-number">{drones.filter(d => d.status === 'charging').length}</span>
+          <span className="stat-number">
+            {drones.filter((d) => d.status === "charging").length}
+          </span>
           <span className="stat-label">Đang sạc</span>
         </div>
       </div>
 
       <div className="drones-tabs">
-        <button 
-          className={`tab-btn ${activeTab === 'all' ? 'active' : ''}`}
-          onClick={() => setActiveTab('all')}
+        <button
+          className={`tab-btn ${activeTab === "all" ? "active" : ""}`}
+          onClick={() => setActiveTab("all")}
         >
           Tất cả
           <span className="tab-count">{drones.length}</span>
         </button>
-        <button 
-          className={`tab-btn ${activeTab === 'available' ? 'active' : ''}`}
-          onClick={() => setActiveTab('available')}
+        <button
+          className={`tab-btn ${activeTab === "available" ? "active" : ""}`}
+          onClick={() => setActiveTab("available")}
         >
           Sẵn sàng
-          <span className="tab-count">{drones.filter(d => d.status === 'available').length}</span>
+          <span className="tab-count">
+            {drones.filter((d) => d.status === "available").length}
+          </span>
         </button>
-        <button 
-          className={`tab-btn ${activeTab === 'delivering' ? 'active' : ''}`}
-          onClick={() => setActiveTab('delivering')}
+        <button
+          className={`tab-btn ${activeTab === "delivering" ? "active" : ""}`}
+          onClick={() => setActiveTab("delivering")}
         >
           Đang giao
-          <span className="tab-count">{drones.filter(d => d.status === 'delivering').length}</span>
+          <span className="tab-count">
+            {drones.filter((d) => d.status === "delivering").length}
+          </span>
         </button>
-        <button 
-          className={`tab-btn ${activeTab === 'charging' ? 'active' : ''}`}
-          onClick={() => setActiveTab('charging')}
+        <button
+          className={`tab-btn ${activeTab === "charging" ? "active" : ""}`}
+          onClick={() => setActiveTab("charging")}
         >
           Đang sạc
-          <span className="tab-count">{drones.filter(d => d.status === 'charging').length}</span>
+          <span className="tab-count">
+            {drones.filter((d) => d.status === "charging").length}
+          </span>
         </button>
-        <button 
-          className={`tab-btn ${activeTab === 'maintenance' ? 'active' : ''}`}
-          onClick={() => setActiveTab('maintenance')}
+        <button
+          className={`tab-btn ${activeTab === "maintenance" ? "active" : ""}`}
+          onClick={() => setActiveTab("maintenance")}
         >
           Bảo trì
-          <span className="tab-count">{drones.filter(d => d.status === 'maintenance').length}</span>
+          <span className="tab-count">
+            {drones.filter((d) => d.status === "maintenance").length}
+          </span>
         </button>
       </div>
 
       <div className="drones-grid">
-        {filteredDrones.map(drone => (
-          <div key={drone.id} className="drone-card" onClick={() => handleDroneClick(drone)}>
+        {filteredDrones.map((drone) => (
+          <div
+            key={drone.id}
+            className="drone-card"
+            onClick={() => handleDroneClick(drone)}
+          >
             <div className="drone-header">
-              <div className="drone-icon" style={{ borderColor: getStatusColor(drone.status) }}>
+              <div
+                className="drone-icon"
+                style={{ borderColor: getStatusColor(drone.status) }}
+              >
                 <span>✈</span>
               </div>
               <span className={`drone-status ${drone.status}`}>
@@ -322,13 +370,27 @@ function Drones() {
             <div className="drone-battery">
               <div className="battery-header">
                 <span>Pin</span>
-                <span className={`battery-value ${drone.battery < 20 ? 'low' : drone.battery < 50 ? 'medium' : ''}`}>
+                <span
+                  className={`battery-value ${
+                    drone.battery < 20
+                      ? "low"
+                      : drone.battery < 50
+                      ? "medium"
+                      : ""
+                  }`}
+                >
                   {drone.battery}%
                 </span>
               </div>
               <div className="battery-bar">
-                <div 
-                  className={`battery-fill ${drone.battery < 20 ? 'low' : drone.battery < 50 ? 'medium' : ''}`}
+                <div
+                  className={`battery-fill ${
+                    drone.battery < 20
+                      ? "low"
+                      : drone.battery < 50
+                      ? "medium"
+                      : ""
+                  }`}
                   style={{ width: `${drone.battery}%` }}
                 ></div>
               </div>
@@ -396,7 +458,11 @@ function Drones() {
 
               <div className="form-group">
                 <label>Model *</label>
-                <select name="model" value={formData.model} onChange={handleChange}>
+                <select
+                  name="model"
+                  value={formData.model}
+                  onChange={handleChange}
+                >
                   <option value="FF-D100">FF-D100 (Cơ bản)</option>
                   <option value="FF-D200">FF-D200 (Nâng cao)</option>
                   <option value="FF-D300">FF-D300 (Cao cấp)</option>
@@ -498,7 +564,11 @@ function Drones() {
               </div>
 
               <div className="modal-actions">
-                <button type="button" onClick={() => setShowAddModal(false)} className="cancel-btn">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="cancel-btn"
+                >
                   Hủy
                 </button>
                 <button type="submit" className="submit-btn">
@@ -511,20 +581,38 @@ function Drones() {
       )}
 
       {showDetailModal && selectedDrone && (
-        <div className="modal-overlay" onClick={() => setShowDetailModal(false)}>
-          <div className="drone-detail-modal" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="modal-overlay"
+          onClick={() => setShowDetailModal(false)}
+        >
+          <div
+            className="drone-detail-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-header">
               <h2>{selectedDrone.name}</h2>
-              <button className="close-btn" onClick={() => setShowDetailModal(false)}>×</button>
+              <button
+                className="close-btn"
+                onClick={() => setShowDetailModal(false)}
+              >
+                ×
+              </button>
             </div>
 
             <div className="modal-body">
               <div className="detail-section">
                 <div className="drone-status-large">
-                  <div className="drone-icon-large" style={{ borderColor: getStatusColor(selectedDrone.status) }}>
+                  <div
+                    className="drone-icon-large"
+                    style={{
+                      borderColor: getStatusColor(selectedDrone.status),
+                    }}
+                  >
                     <span>🚁</span>
                   </div>
-                  <span className={`status-badge-large ${selectedDrone.status}`}>
+                  <span
+                    className={`status-badge-large ${selectedDrone.status}`}
+                  >
                     {getStatusText(selectedDrone.status)}
                   </span>
                 </div>
@@ -532,8 +620,13 @@ function Drones() {
                 <div className="battery-section">
                   <h3>Pin hiện tại</h3>
                   <div className="battery-large">
-                    <div className="battery-fill-large" style={{ width: `${selectedDrone.battery}%` }}>
-                      <span className="battery-text">{selectedDrone.battery}%</span>
+                    <div
+                      className="battery-fill-large"
+                      style={{ width: `${selectedDrone.battery}%` }}
+                    >
+                      <span className="battery-text">
+                        {selectedDrone.battery}%
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -552,15 +645,21 @@ function Drones() {
                   </div>
                   <div className="info-item">
                     <span className="info-label">Tải trọng tối đa:</span>
-                    <span className="info-value">{selectedDrone.maxWeight} kg</span>
+                    <span className="info-value">
+                      {selectedDrone.maxWeight} kg
+                    </span>
                   </div>
                   <div className="info-item">
                     <span className="info-label">Tầm bay tối đa:</span>
-                    <span className="info-value">{selectedDrone.maxDistance} km</span>
+                    <span className="info-value">
+                      {selectedDrone.maxDistance} km
+                    </span>
                   </div>
                   <div className="info-item">
                     <span className="info-label">Tốc độ TB:</span>
-                    <span className="info-value">{selectedDrone.averageSpeed} km/h</span>
+                    <span className="info-value">
+                      {selectedDrone.averageSpeed} km/h
+                    </span>
                   </div>
                   <div className="info-item">
                     <span className="info-label">Vị trí hiện tại:</span>
@@ -573,12 +672,18 @@ function Drones() {
                 <h3>Thống kê hoạt động</h3>
                 <div className="stats-grid">
                   <div className="stat-box">
-                    <span className="stat-number-large">{selectedDrone.totalFlights}</span>
+                    <span className="stat-number-large">
+                      {selectedDrone.totalFlights}
+                    </span>
                     <span className="stat-label-large">Tổng chuyến bay</span>
                   </div>
                   <div className="stat-box">
-                    <span className="stat-number-large">{selectedDrone.totalDistance}</span>
-                    <span className="stat-label-large">Tổng quãng đường (km)</span>
+                    <span className="stat-number-large">
+                      {selectedDrone.totalDistance}
+                    </span>
+                    <span className="stat-label-large">
+                      Tổng quãng đường (km)
+                    </span>
                   </div>
                 </div>
               </div>
@@ -588,11 +693,15 @@ function Drones() {
                 <div className="info-grid">
                   <div className="info-item">
                     <span className="info-label">Bảo trì lần cuối:</span>
-                    <span className="info-value">{selectedDrone.lastMaintenance}</span>
+                    <span className="info-value">
+                      {selectedDrone.lastMaintenance}
+                    </span>
                   </div>
                   <div className="info-item">
                     <span className="info-label">Bảo trì tiếp theo:</span>
-                    <span className="info-value">{selectedDrone.nextMaintenance}</span>
+                    <span className="info-value">
+                      {selectedDrone.nextMaintenance}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -601,45 +710,57 @@ function Drones() {
                 <div className="detail-section current-order-section">
                   <h3>Đơn hàng hiện tại</h3>
                   <div className="current-order-info">
-                    <span className="order-badge">Đơn hàng #{selectedDrone.currentOrder}</span>
+                    <span className="order-badge">
+                      Đơn hàng #{selectedDrone.currentOrder}
+                    </span>
                   </div>
                 </div>
               )}
 
               <div className="detail-actions">
-                {selectedDrone.status === 'available' && (
-                  <button 
-                    onClick={() => updateDroneStatus(selectedDrone.id, 'charging')}
+                {selectedDrone.status === "available" && (
+                  <button
+                    onClick={() =>
+                      updateDroneStatus(selectedDrone.id, "charging")
+                    }
                     className="action-btn charging-btn"
                   >
                     Bắt đầu sạc
                   </button>
                 )}
-                {selectedDrone.status === 'charging' && selectedDrone.battery >= 90 && (
-                  <button 
-                    onClick={() => updateDroneStatus(selectedDrone.id, 'available')}
-                    className="action-btn available-btn"
-                  >
-                    Đã sạc xong
-                  </button>
-                )}
-                {(selectedDrone.status === 'available' || selectedDrone.status === 'charging') && (
-                  <button 
-                    onClick={() => updateDroneStatus(selectedDrone.id, 'maintenance')}
+                {selectedDrone.status === "charging" &&
+                  selectedDrone.battery >= 90 && (
+                    <button
+                      onClick={() =>
+                        updateDroneStatus(selectedDrone.id, "available")
+                      }
+                      className="action-btn available-btn"
+                    >
+                      Đã sạc xong
+                    </button>
+                  )}
+                {(selectedDrone.status === "available" ||
+                  selectedDrone.status === "charging") && (
+                  <button
+                    onClick={() =>
+                      updateDroneStatus(selectedDrone.id, "maintenance")
+                    }
                     className="action-btn maintenance-btn"
                   >
                     Bảo trì
                   </button>
                 )}
-                {selectedDrone.status === 'maintenance' && (
-                  <button 
-                    onClick={() => updateDroneStatus(selectedDrone.id, 'available')}
+                {selectedDrone.status === "maintenance" && (
+                  <button
+                    onClick={() =>
+                      updateDroneStatus(selectedDrone.id, "available")
+                    }
                     className="action-btn available-btn"
                   >
                     Hoàn thành bảo trì
                   </button>
                 )}
-                <button 
+                <button
                   onClick={() => deleteDrone(selectedDrone.id)}
                   className="action-btn delete-btn"
                 >
@@ -651,7 +772,7 @@ function Drones() {
         </div>
       )}
     </div>
-  )
+  );
 }
 
-export default Drones
+export default Drones;

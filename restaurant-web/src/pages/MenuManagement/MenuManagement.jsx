@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSelector } from "react-redux";
+import { Link } from "react-router-dom";
 import { productAPI } from "../../services/api";
 import "./MenuManagement.css";
 
@@ -26,18 +27,34 @@ function MenuManagement() {
 
   // Load menu từ API
   useEffect(() => {
-    if (restaurant?._id) {
+    console.log("MenuManagement useEffect - restaurant:", restaurant);
+    const restaurantId = restaurant?._id || restaurant?.id;
+    if (restaurantId) {
+      console.log("Loading menu items for restaurant:", restaurantId);
       loadMenuItems();
+    } else {
+      console.warn("⚠️ No restaurant ID found, cannot load menu");
+      setLoading(false);
+      setError("Vui lòng chọn nhà hàng để xem thực đơn");
     }
   }, [restaurant]);
 
   const loadMenuItems = async () => {
+    const restaurantId = restaurant?._id || restaurant?.id;
+    if (!restaurantId) {
+      console.error("Cannot load menu: restaurant ID is missing");
+      setError("Vui lòng chọn nhà hàng để xem thực đơn");
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError("");
+      console.log("Fetching products for restaurant:", restaurantId);
       // Truyền includeHidden=true để lấy cả món ẩn
-      const response = await productAPI.getByRestaurant(restaurant._id, true);
-      
+      const response = await productAPI.getByRestaurant(restaurantId, true);
+
       if (response?.success) {
         const items = response.data || [];
         // Transform API data sang MenuManagement format
@@ -158,13 +175,13 @@ function MenuManagement() {
         isAvailable: true,
         preparationTime: parseInt(formData.cookTime),
       };
-      
+
       // Convert image to base64 if uploaded
       if (imageFile) {
         const base64Image = await convertImageToBase64(imageFile);
         payload.image = base64Image;
       }
-      
+
       const response = await productAPI.create(payload);
       if (response?.success) {
         await loadMenuItems(); // Reload danh sách
@@ -190,13 +207,13 @@ function MenuManagement() {
         description: formData.description,
         preparationTime: parseInt(formData.cookTime),
       };
-      
+
       // Convert image to base64 if uploaded new one
       if (imageFile) {
         const base64Image = await convertImageToBase64(imageFile);
         payload.image = base64Image;
       }
-      
+
       const response = await productAPI.update(selectedItem.id, payload);
       if (response?.success) {
         await loadMenuItems(); // Reload danh sách
@@ -234,8 +251,8 @@ function MenuManagement() {
       });
       if (response?.success) {
         // Cập nhật local state thay vì reload
-        setMenuItems(prevItems => 
-          prevItems.map(i => 
+        setMenuItems((prevItems) =>
+          prevItems.map((i) =>
             i.id === id ? { ...i, available: !i.available } : i
           )
         );
@@ -293,9 +310,16 @@ function MenuManagement() {
         <div className="error-state">
           <span>⚠️</span>
           <p>{error}</p>
-          <button onClick={loadMenuItems} className="retry-btn">
-            Thử lại
-          </button>
+          <div style={{ display: "flex", gap: "1rem" }}>
+            <button onClick={loadMenuItems} className="retry-btn">
+              Thử lại
+            </button>
+            {!restaurant?._id && (
+              <Link to="/restaurant-selection" className="retry-btn">
+                Chọn nhà hàng
+              </Link>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -306,7 +330,9 @@ function MenuManagement() {
       <div className="page-header">
         <div>
           <h1>Quản lý thực đơn</h1>
-          <p className="subtitle">Quản lý món ăn và danh mục của {restaurant?.name}</p>
+          <p className="subtitle">
+            Quản lý món ăn và danh mục của {restaurant?.name}
+          </p>
         </div>
         <button onClick={() => setShowAddModal(true)} className="add-btn">
           + Thêm món mới

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSelector } from "react-redux";
+import { Link } from "react-router-dom";
 import { voucherAPI } from "../../services/api";
 import "./Promotions.css";
 
@@ -14,17 +15,33 @@ function Promotions() {
 
   // Load promotions từ API
   useEffect(() => {
-    if (restaurant?._id) {
+    console.log("Promotions useEffect - restaurant:", restaurant);
+    const restaurantId = restaurant?._id || restaurant?.id;
+    if (restaurantId) {
+      console.log("Loading promotions for restaurant:", restaurantId);
       loadPromotions();
+    } else {
+      console.warn("⚠️ No restaurant ID found, cannot load promotions");
+      setLoading(false);
+      setError("Vui lòng chọn nhà hàng để xem khuyến mãi");
     }
   }, [restaurant]);
 
   const loadPromotions = async () => {
+    const restaurantId = restaurant?._id || restaurant?.id;
+    if (!restaurantId) {
+      console.error("Cannot load promotions: restaurant ID is missing");
+      setError("Vui lòng chọn nhà hàng để xem khuyến mãi");
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError("");
-      const response = await voucherAPI.getAll({ restaurant: restaurant._id });
-      
+      console.log("Fetching vouchers for restaurant:", restaurantId);
+      const response = await voucherAPI.getAll({ restaurant: restaurantId });
+
       if (response?.success) {
         const vouchers = response.data || [];
         // Transform API data sang format của Promotions page
@@ -32,11 +49,12 @@ function Promotions() {
           const now = new Date();
           const startDate = new Date(voucher.validFrom);
           const endDate = new Date(voucher.validUntil);
-          
-          let status = 'expired';
-          if (now < startDate) status = 'upcoming';
-          else if (now >= startDate && now <= endDate && voucher.isActive) status = 'active';
-          
+
+          let status = "expired";
+          if (now < startDate) status = "upcoming";
+          else if (now >= startDate && now <= endDate && voucher.isActive)
+            status = "active";
+
           return {
             id: voucher._id,
             name: voucher.name,
@@ -112,7 +130,7 @@ function Promotions() {
         applicableRestaurants: [restaurant._id],
         isActive: true,
       };
-      
+
       const response = await voucherAPI.create(payload);
       if (response?.success) {
         await loadPromotions();

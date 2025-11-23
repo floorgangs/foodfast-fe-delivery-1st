@@ -4,13 +4,24 @@ import axios from "axios";
 class MoMoService {
   constructor() {
     this.config = {
-      partnerCode: process.env.MOMO_PARTNER_CODE,
-      accessKey: process.env.MOMO_ACCESS_KEY,
-      secretKey: process.env.MOMO_SECRET_KEY,
-      endpoint: process.env.MOMO_ENDPOINT,
-      returnUrl: process.env.MOMO_RETURN_URL,
-      ipnUrl: process.env.MOMO_IPN_URL,
+      partnerCode: process.env.MOMO_PARTNER_CODE || "MOMOBKUN20180529",
+      accessKey: process.env.MOMO_ACCESS_KEY || "klm05TvNBzhg7h7j",
+      secretKey:
+        process.env.MOMO_SECRET_KEY || "at67qH6mk8w5Y1NH7yMXYMHWrUwcb5r",
+      endpoint:
+        process.env.MOMO_ENDPOINT ||
+        "https://test-payment.momo.vn/v2/gateway/api/create",
+      returnUrl:
+        process.env.MOMO_RETURN_URL ||
+        "http://localhost:5173/payment-return/momo",
+      ipnUrl:
+        process.env.MOMO_IPN_URL ||
+        "http://localhost:5000/api/payments/momo/ipn",
     };
+    console.log("✅ MoMo Config loaded:", {
+      partnerCode: this.config.partnerCode,
+      endpoint: this.config.endpoint,
+    });
   }
 
   async createPayment(orderId, amount, orderInfo, extraData = "") {

@@ -77,6 +77,7 @@ function App() {
         />
         <Route path="payment/vnpay-return" element={<PaymentReturn />} />
         <Route path="payment/momo-return" element={<PaymentReturn />} />
+        <Route path="payment-return/:provider" element={<PaymentReturn />} />
         <Route
           path="review/:orderId"
           element={

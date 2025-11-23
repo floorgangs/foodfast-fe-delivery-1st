@@ -7,6 +7,7 @@ import {
   cancelOrder,
   confirmThirdPartyPayment,
   trackOrder,
+  completeOrder,
 } from "../controllers/orderController.js";
 import { protect, restrictTo, optionalProtect } from "../middleware/auth.js";
 
@@ -17,6 +18,7 @@ router.get("/", protect, getOrders);
 router.get("/:id", protect, getOrder);
 router.get("/:id/track", protect, trackOrder);
 router.post("/confirm-payment", optionalProtect, confirmThirdPartyPayment);
+router.patch("/:id/complete", protect, completeOrder);
 router.put(
   "/:id/status",
   protect,

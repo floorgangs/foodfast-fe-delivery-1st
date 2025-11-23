@@ -1,84 +1,77 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import axios from "axios";
 import "./RestaurantManagement.css";
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 function RestaurantManagement() {
   const [filter, setFilter] = useState("all"); // all, active, pending, suspended
   const [showViewModal, setShowViewModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedRestaurant, setSelectedRestaurant] = useState(null);
-  const [restaurants, setRestaurants] = useState([
-    {
-      id: 1,
-      name: "Cơm Tấm Sài Gòn",
-      owner: "Nguyễn Văn A",
-      phone: "0901234567",
-      address: "123 Nguyễn Huệ, Q.1, TP.HCM",
-      status: "active",
-      rating: 4.8,
-      orders: 1245,
-      revenue: 125000000,
-      joined: "2024-01-15",
-    },
-    {
-      id: 2,
-      name: "Bún Bò Huế 24H",
-      owner: "Trần Thị B",
-      phone: "0912345678",
-      address: "456 Lê Lợi, Q.1, TP.HCM",
-      status: "active",
-      rating: 4.9,
-      orders: 2130,
-      revenue: 215000000,
-      joined: "2023-11-20",
-    },
-    {
-      id: 3,
-      name: "KFC Hồ Chí Minh",
-      owner: "Lê Văn C",
-      phone: "0923456789",
-      address: "789 Trần Hưng Đạo, Q.5, TP.HCM",
-      status: "active",
-      rating: 4.7,
-      orders: 5420,
-      revenue: 820000000,
-      joined: "2023-09-10",
-    },
-    {
-      id: 4,
-      name: "Quán Ăn Ngon 123",
-      owner: "Phạm Thị D",
-      phone: "0934567890",
-      address: "321 Võ Văn Tần, Q.3, TP.HCM",
-      status: "pending",
-      rating: 0,
-      orders: 0,
-      revenue: 0,
-      joined: "2024-11-15",
-    },
-    {
-      id: 5,
-      name: "Bánh Mì Huỳnh Hoa",
-      owner: "Hoàng Văn E",
-      phone: "0945678901",
-      address: "654 Hai Bà Trưng, Q.1, TP.HCM",
-      status: "pending",
-      rating: 0,
-      orders: 0,
-      revenue: 0,
-      joined: "2024-11-16",
-    },
-    {
-      id: 6,
-      name: "Lẩu Thái Tom Yum",
-      owner: "Võ Thị F",
-      phone: "0956789012",
-      address: "987 Cách Mạng Tháng 8, Q.10, TP.HCM",
-      status: "suspended",
-      rating: 3.2,
-      orders: 450,
-      revenue: 45000000,
-      joined: "2024-05-20",
-    },
-  ]);
+  const [restaurants, setRestaurants] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    password: "",
+    address: "",
+    description: "",
+    cuisine: [],
+  });
+
+  useEffect(() => {
+    loadRestaurants();
+  }, []);
+
+  const loadRestaurants = async () => {
+    try {
+      setLoading(true);
+      const token =
+        localStorage.getItem("admin_token") || localStorage.getItem("token");
+      const response = await axios.get(`${API_URL}/restaurants`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (response.data.success) {
+        const apiRestaurants = response.data.data || [];
+        // Transform to match UI format
+        const transformed = apiRestaurants.map((r) => ({
+          id: r._id,
+          name: r.name,
+          owner: r.owner?.name || "N/A",
+          phone: r.phone || r.owner?.phone || "N/A",
+          email: r.email || r.owner?.email || "N/A",
+          address:
+            typeof r.address === "string"
+              ? r.address
+              : `${r.address?.street || ""}, ${r.address?.district || ""}, ${
+                  r.address?.city || ""
+                }`.trim(),
+          status: r.isApproved
+            ? r.isActive
+              ? "active"
+              : "suspended"
+            : "pending",
+          rating: r.rating || 0,
+          orders: r.totalOrders || 0,
+          revenue: r.totalRevenue || 0,
+          joined: r.createdAt,
+          description: r.description || "",
+          cuisine: r.cuisine || [],
+        }));
+        setRestaurants(transformed);
+      }
+    } catch (error) {
+      console.error("Error loading restaurants:", error);
+      alert("Không thể tải danh sách nhà hàng");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getStatusText = (status) => {
     const statusMap = {
@@ -93,36 +86,168 @@ function RestaurantManagement() {
     return `status-badge ${status}`;
   };
 
-  const filteredRestaurants =
-    filter === "all"
-      ? restaurants
-      : restaurants.filter((r) => r.status === filter);
+  const filteredRestaurants = restaurants.filter((r) => {
+    const matchesFilter = filter === "all" || r.status === filter;
+    const matchesSearch =
+      searchQuery === "" ||
+      r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      r.owner.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      r.phone.includes(searchQuery);
+    return matchesFilter && matchesSearch;
+  });
 
   const handleViewRestaurant = (restaurant) => {
     setSelectedRestaurant(restaurant);
     setShowViewModal(true);
   };
 
-  const handleApprove = (id) => {
-    setRestaurants(
-      restaurants.map((r) => (r.id === id ? { ...r, status: "active" } : r))
-    );
-    alert("Đã duyệt nhà hàng!");
+  const handleApprove = async (id) => {
+    if (!confirm("Bạn có chắc muốn duyệt nhà hàng này?")) return;
+
+    try {
+      const token =
+        localStorage.getItem("admin_token") || localStorage.getItem("token");
+      const response = await axios.put(
+        `${API_URL}/restaurants/${id}`,
+        { isApproved: true, isActive: true },
+        { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+      );
+
+      if (response.data.success) {
+        await loadRestaurants();
+        alert("Đã duyệt nhà hàng!");
+      }
+    } catch (error) {
+      console.error("Error approving restaurant:", error);
+      alert(error.response?.data?.message || "Không thể duyệt nhà hàng");
+    }
   };
 
-  const handleSuspend = (id) => {
-    setRestaurants(
-      restaurants.map((r) => (r.id === id ? { ...r, status: "suspended" } : r))
-    );
-    alert("Đã khóa nhà hàng!");
+  const handleSuspend = async (id) => {
+    if (!confirm("Bạn có chắc muốn khóa nhà hàng này?")) return;
+
+    try {
+      const token =
+        localStorage.getItem("admin_token") || localStorage.getItem("token");
+      const response = await axios.put(
+        `${API_URL}/restaurants/${id}`,
+        { isActive: false },
+        { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+      );
+
+      if (response.data.success) {
+        await loadRestaurants();
+        alert("Đã khóa nhà hàng!");
+      }
+    } catch (error) {
+      console.error("Error suspending restaurant:", error);
+      alert(error.response?.data?.message || "Không thể khóa nhà hàng");
+    }
   };
 
-  const handleActivate = (id) => {
-    setRestaurants(
-      restaurants.map((r) => (r.id === id ? { ...r, status: "active" } : r))
-    );
-    alert("Đã kích hoạt lại nhà hàng!");
+  const handleActivate = async (id) => {
+    if (!confirm("Bạn có chắc muốn kích hoạt lại nhà hàng này?")) return;
+
+    try {
+      const token =
+        localStorage.getItem("admin_token") || localStorage.getItem("token");
+      const response = await axios.put(
+        `${API_URL}/restaurants/${id}`,
+        { isActive: true },
+        { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+      );
+
+      if (response.data.success) {
+        await loadRestaurants();
+        alert("Đã kích hoạt lại nhà hàng!");
+      }
+    } catch (error) {
+      console.error("Error activating restaurant:", error);
+      alert(error.response?.data?.message || "Không thể kích hoạt nhà hàng");
+    }
   };
+
+  const handleCreateRestaurant = async (e) => {
+    e.preventDefault();
+
+    try {
+      const token =
+        localStorage.getItem("admin_token") || localStorage.getItem("token");
+
+      // First, create user account for restaurant owner
+      const userResponse = await axios.post(
+        `${API_URL}/auth/register`,
+        {
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          phone: formData.phone,
+          role: "restaurant",
+        },
+        { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+      );
+
+      if (userResponse.data.success) {
+        const userId = userResponse.data.data._id;
+
+        // Then create restaurant with the user as owner
+        const restaurantResponse = await axios.post(
+          `${API_URL}/restaurants`,
+          {
+            owner: userId,
+            name: formData.name,
+            description: formData.description,
+            address: formData.address,
+            phone: formData.phone,
+            isApproved: true, // Admin-created restaurants are auto-approved
+            isActive: true,
+          },
+          { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+        );
+
+        if (restaurantResponse.data.success) {
+          await loadRestaurants();
+          setShowCreateModal(false);
+          resetForm();
+          alert("Tạo nhà hàng thành công!");
+        }
+      }
+    } catch (error) {
+      console.error("Error creating restaurant:", error);
+      alert(error.response?.data?.message || "Không thể tạo nhà hàng");
+    }
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({
+      ...formData,
+      [name]: value,
+    });
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      email: "",
+      phone: "",
+      password: "",
+      address: "",
+      description: "",
+      cuisine: [],
+    });
+  };
+
+  if (loading) {
+    return (
+      <div className="restaurant-management-page">
+        <div className="loading-state">
+          <div className="spinner"></div>
+          <p>Đang tải dữ liệu...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="restaurant-management-page">
@@ -133,6 +258,9 @@ function RestaurantManagement() {
             Quản lý tất cả nhà hàng trong hệ thống
           </p>
         </div>
+        <button className="create-btn" onClick={() => setShowCreateModal(true)}>
+          + Thêm nhà hàng
+        </button>
       </div>
 
       <div className="filter-bar">
@@ -166,7 +294,12 @@ function RestaurantManagement() {
           </button>
         </div>
         <div className="search-box">
-          <input type="text" placeholder="Tìm kiếm nhà hàng..." />
+          <input
+            type="text"
+            placeholder="Tìm kiếm nhà hàng..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
         </div>
       </div>
 
@@ -340,6 +473,129 @@ function RestaurantManagement() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Modal */}
+      {showCreateModal && (
+        <div
+          className="modal-overlay"
+          onClick={() => setShowCreateModal(false)}
+        >
+          <div
+            className="modal-content create-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h2>Thêm nhà hàng mới</h2>
+              <button
+                className="close-btn"
+                onClick={() => {
+                  setShowCreateModal(false);
+                  resetForm();
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <form onSubmit={handleCreateRestaurant}>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label htmlFor="name">Tên nhà hàng *</label>
+                  <input
+                    type="text"
+                    id="name"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    required
+                    placeholder="Nhập tên nhà hàng"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="email">Email *</label>
+                  <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    required
+                    placeholder="Nhập email"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="password">Mật khẩu *</label>
+                  <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    required
+                    minLength="6"
+                    placeholder="Nhập mật khẩu (tối thiểu 6 ký tự)"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="phone">Số điện thoại *</label>
+                  <input
+                    type="tel"
+                    id="phone"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    required
+                    placeholder="Nhập số điện thoại"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="address">Địa chỉ *</label>
+                  <textarea
+                    id="address"
+                    name="address"
+                    value={formData.address}
+                    onChange={handleChange}
+                    required
+                    placeholder="Nhập địa chỉ đầy đủ"
+                    rows="3"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="description">Mô tả</label>
+                  <textarea
+                    id="description"
+                    name="description"
+                    value={formData.description}
+                    onChange={handleChange}
+                    placeholder="Nhập mô tả về nhà hàng"
+                    rows="4"
+                  />
+                </div>
+
+                <div className="form-actions">
+                  <button
+                    type="button"
+                    className="btn-cancel"
+                    onClick={() => {
+                      setShowCreateModal(false);
+                      resetForm();
+                    }}
+                  >
+                    Hủy
+                  </button>
+                  <button type="submit" className="btn-create">
+                    Tạo nhà hàng
+                  </button>
+                </div>
+              </div>
+            </form>
           </div>
         </div>
       )}

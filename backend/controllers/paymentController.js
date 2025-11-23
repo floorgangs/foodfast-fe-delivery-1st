@@ -99,6 +99,25 @@ export const vnpayReturn = async (req, res) => {
         note: "Thanh toán VNPay thành công",
         timestamp: new Date(),
       });
+
+      await order.save();
+
+      // Emit socket event to restaurant
+      const io = req.app.get("io");
+      if (io) {
+        io.to(`restaurant_${order.restaurant._id || order.restaurant}`).emit(
+          "new_order",
+          {
+            order,
+            message: "Có đơn hàng mới đã thanh toán VNPay!",
+          }
+        );
+        console.log(
+          `🔔 Emitted new_order event to restaurant_${
+            order.restaurant._id || order.restaurant
+          }`
+        );
+      }
     } else {
       // Payment failed
       order.paymentStatus = "failed";
@@ -107,9 +126,8 @@ export const vnpayReturn = async (req, res) => {
         note: `Thanh toán VNPay thất bại (Mã: ${responseCode})`,
         timestamp: new Date(),
       });
+      await order.save();
     }
-
-    await order.save();
 
     res.json({
       success: true,
@@ -160,10 +178,14 @@ export const createMoMoPayment = async (req, res) => {
       "" // extraData
     );
 
+    console.log("MoMo Response:", momoResponse);
+
     if (momoResponse.resultCode !== 0) {
+      console.error("MoMo Error:", momoResponse);
       return res.status(400).json({
         success: false,
         message: momoResponse.message || "Không thể tạo thanh toán MoMo",
+        details: momoResponse,
       });
     }
 
@@ -229,6 +251,25 @@ export const momoReturn = async (req, res) => {
         note: "Thanh toán MoMo thành công",
         timestamp: new Date(),
       });
+
+      await order.save();
+
+      // Emit socket event to restaurant
+      const io = req.app.get("io");
+      if (io) {
+        io.to(`restaurant_${order.restaurant._id || order.restaurant}`).emit(
+          "new_order",
+          {
+            order,
+            message: "Có đơn hàng mới đã thanh toán MoMo!",
+          }
+        );
+        console.log(
+          `🔔 Emitted new_order event to restaurant_${
+            order.restaurant._id || order.restaurant
+          }`
+        );
+      }
     } else {
       // Payment failed
       order.paymentStatus = "failed";
@@ -237,9 +278,8 @@ export const momoReturn = async (req, res) => {
         note: `Thanh toán MoMo thất bại (Mã: ${resultCode})`,
         timestamp: new Date(),
       });
+      await order.save();
     }
-
-    await order.save();
 
     res.json({
       success: true,

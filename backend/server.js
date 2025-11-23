@@ -6,7 +6,10 @@ import cors from "cors";
 import os from "os";
 import { connectDB } from "./config/database.js";
 import { errorHandler } from "./middleware/errorHandler.js";
-import { cleanupExpiredOrders, cleanupOldPendingOrders } from "./utils/orderCleanup.js";
+import {
+  cleanupExpiredOrders,
+  cleanupOldPendingOrders,
+} from "./utils/orderCleanup.js";
 
 // Routes
 import authRoutes from "./routes/authRoutes.js";
@@ -20,6 +23,7 @@ import paymentRoutes from "./routes/paymentRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import cartRoutes from "./routes/cartRoutes.js";
 import savedOrderRoutes from "./routes/savedOrderRoutes.js";
+import deliveryRoutes from "./routes/deliveryRoutes.js";
 
 dotenv.config();
 
@@ -132,14 +136,18 @@ app.use(
 );
 
 // Increase payload limit for base64 images
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // Make io accessible to routes
 app.use((req, res, next) => {
   req.io = io;
+  req.app = app;
   next();
 });
+
+// Store io in app for access in controllers
+app.set("io", io);
 
 // Socket.io connection
 io.on("connection", (socket) => {
@@ -186,6 +194,7 @@ app.use("/api/payments", paymentRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/saved-orders", savedOrderRoutes);
+app.use("/api/deliveries", deliveryRoutes);
 
 // Error handler
 app.use(errorHandler);

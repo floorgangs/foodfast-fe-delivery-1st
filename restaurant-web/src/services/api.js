@@ -60,7 +60,9 @@ api.interceptors.response.use(
     console.error("🔴 API Error:", {
       url: error.config?.url,
       baseURL: error.config?.baseURL,
-      fullURL: error.config ? `${error.config.baseURL}${error.config.url}` : 'N/A',
+      fullURL: error.config
+        ? `${error.config.baseURL}${error.config.url}`
+        : "N/A",
       method: error.config?.method,
       status: error.response?.status,
       statusText: error.response?.statusText,
@@ -70,7 +72,7 @@ api.interceptors.response.use(
     });
 
     if (error.response?.status === 401) {
-      console.warn('⚠️ 401 Unauthorized - redirecting to login');
+      console.warn("⚠️ 401 Unauthorized - redirecting to login");
       // Token hết hạn, xóa và chuyển về login
       localStorage.removeItem("restaurant_token");
       localStorage.removeItem("restaurant_user");
@@ -108,8 +110,13 @@ export const restaurantAPI = {
 
 // Product APIs
 export const productAPI = {
-  getByRestaurant: (restaurantId) =>
-    api.get("/products", { params: { restaurantId } }),
+  getByRestaurant: (restaurantId, includeHidden = false) =>
+    api.get("/products", {
+      params: {
+        restaurantId,
+        includeHidden: includeHidden ? "true" : "false",
+      },
+    }),
 
   getById: (id) => api.get(`/products/${id}`),
 
@@ -129,8 +136,11 @@ export const orderAPI = {
   updateStatus: (id, status, note) =>
     api.put(`/orders/${id}/status`, { status, note }),
 
-  assignDrone: (id, droneId) =>
-    api.put(`/orders/${id}/assign-drone`, { droneId }),
+  getAvailableDrones: (params) =>
+    api.get("/deliveries/drones/available", { params }),
+
+  assignDrone: ({ orderId, droneId }) =>
+    api.post("/deliveries/assign", { orderId, droneId }),
 };
 
 // Drone APIs

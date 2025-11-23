@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
-import { useSelector } from 'react-redux'
-import { Line } from 'react-chartjs-2'
+import { useEffect, useState } from "react";
+import { useSelector } from "react-redux";
+import { Line } from "react-chartjs-2";
+import { orderAPI } from "../../services/api";
+import axios from "axios";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -10,9 +12,11 @@ import {
   Title,
   Tooltip,
   Legend,
-  Filler
-} from 'chart.js'
-import './Dashboard.css'
+  Filler,
+} from "chart.js";
+import "./Dashboard.css";
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 ChartJS.register(
   CategoryScale,
@@ -23,87 +27,211 @@ ChartJS.register(
   Tooltip,
   Legend,
   Filler
-)
+);
 
 function Dashboard() {
-  const { restaurant } = useSelector(state => state.auth)
+  const { restaurant } = useSelector((state) => state.auth);
   const [stats, setStats] = useState({
-    todayOrders: 45,
-    pendingOrders: 8,
-    completedOrders: 37,
-    todayRevenue: 12500000,
-    monthRevenue: 285000000,
-    avgOrderValue: 278000,
-    newCustomers: 12,
-    topDishes: [
-      { name: 'Phở bò đặc biệt', orders: 18, revenue: 1980000 },
-      { name: 'Bún chả Hà Nội', orders: 15, revenue: 1350000 },
-      { name: 'Cơm tấm sườn', orders: 12, revenue: 960000 },
-    ]
-  })
+    todayOrders: 0,
+    pendingOrders: 0,
+    completedOrders: 0,
+    todayRevenue: 0,
+    monthRevenue: 0,
+    avgOrderValue: 0,
+    newCustomers: 0,
+    topDishes: [],
+  });
+  const [recentOrders, setRecentOrders] = useState([]);
+  const [revenueData, setRevenueData] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const [recentOrders, setRecentOrders] = useState([
-    { id: 'FF1001', customer: 'Nguyễn Văn A', total: 125000, status: 'pending', time: '10:30', items: 2 },
-    { id: 'FF1002', customer: 'Trần Thị B', total: 85000, status: 'preparing', time: '10:25', items: 1 },
-    { id: 'FF1003', customer: 'Lê Văn C', total: 150000, status: 'delivering', time: '10:20', items: 3 },
-    { id: 'FF1004', customer: 'Phạm Thị D', total: 95000, status: 'completed', time: '10:15', items: 2 },
-    { id: 'FF1005', customer: 'Hoàng Văn E', total: 210000, status: 'completed', time: '10:10', items: 4 },
-  ])
+  // Load dashboard data
+  useEffect(() => {
+    if (restaurant?._id) {
+      loadDashboardData();
+    }
+  }, [restaurant]);
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem("restaurant_token");
+
+      // Load orders
+      const ordersResponse = await orderAPI.getMyOrders();
+
+      if (ordersResponse?.success) {
+        const orders = ordersResponse.data || [];
+
+        // Calculate today's stats
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const todayOrders = orders.filter((order) => {
+          const orderDate = new Date(order.createdAt);
+          orderDate.setHours(0, 0, 0, 0);
+          return orderDate.getTime() === today.getTime();
+        });
+
+        const pendingOrders = orders.filter(
+          (order) => order.status === "pending"
+        );
+        const completedToday = todayOrders.filter(
+          (order) => order.status === "completed"
+        );
+
+        const todayRevenue = todayOrders.reduce(
+          (sum, order) => sum + (order.totalAmount || 0),
+          0
+        );
+
+        // Calculate month revenue
+        const thisMonth = new Date();
+        thisMonth.setDate(1);
+        thisMonth.setHours(0, 0, 0, 0);
+
+        const monthOrders = orders.filter((order) => {
+          const orderDate = new Date(order.createdAt);
+          return orderDate >= thisMonth;
+        });
+
+        const monthRevenue = monthOrders.reduce(
+          (sum, order) => sum + (order.totalAmount || 0),
+          0
+        );
+
+        const avgOrderValue =
+          todayOrders.length > 0 ? todayRevenue / todayOrders.length : 0;
+
+        // Top dishes
+        const dishMap = {};
+        orders.forEach((order) => {
+          order.items.forEach((item) => {
+            const dishName = item.product?.name || item.name;
+            if (!dishMap[dishName]) {
+              dishMap[dishName] = { name: dishName, orders: 0, revenue: 0 };
+            }
+            dishMap[dishName].orders += item.quantity;
+            dishMap[dishName].revenue += item.price * item.quantity;
+          });
+        });
+
+        const topDishes = Object.values(dishMap)
+          .sort((a, b) => b.orders - a.orders)
+          .slice(0, 5);
+
+        // Recent orders (last 5)
+        const recent = orders.slice(0, 5).map((order) => ({
+          id: order.orderNumber || order._id,
+          customer:
+            order.customer?.name || order.deliveryInfo?.name || "Khách hàng",
+          total: order.totalAmount,
+          status: order.status,
+          time: new Date(order.createdAt).toLocaleTimeString("vi-VN", {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          items: order.items.length,
+        }));
+
+        // Last 7 days revenue
+        const last7Days = [];
+        for (let i = 6; i >= 0; i--) {
+          const date = new Date();
+          date.setDate(date.getDate() - i);
+          date.setHours(0, 0, 0, 0);
+
+          const nextDate = new Date(date);
+          nextDate.setDate(nextDate.getDate() + 1);
+
+          const dayOrders = orders.filter((order) => {
+            const orderDate = new Date(order.createdAt);
+            return orderDate >= date && orderDate < nextDate;
+          });
+
+          const dayRevenue = dayOrders.reduce(
+            (sum, order) => sum + (order.totalAmount || 0),
+            0
+          );
+
+          last7Days.push(dayRevenue);
+        }
+
+        setStats({
+          todayOrders: todayOrders.length,
+          pendingOrders: pendingOrders.length,
+          completedOrders: completedToday.length,
+          todayRevenue,
+          monthRevenue,
+          avgOrderValue,
+          newCustomers: 0, // Would need customer API to calculate
+          topDishes,
+        });
+
+        setRecentOrders(recent);
+        setRevenueData(last7Days);
+      }
+    } catch (error) {
+      console.error("Error loading dashboard data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Revenue chart data for last 7 days
   const revenueChartData = {
-    labels: ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'],
+    labels: ["T2", "T3", "T4", "T5", "T6", "T7", "CN"],
     datasets: [
       {
-        label: 'Doanh thu (VNĐ)',
-        data: [8500000, 9200000, 8800000, 11500000, 13200000, 14800000, 12500000],
-        borderColor: '#ff6b35',
-        backgroundColor: 'rgba(255, 107, 53, 0.1)',
+        label: "Doanh thu (VNĐ)",
+        data: revenueData,
+        borderColor: "#ff6b35",
+        backgroundColor: "rgba(255, 107, 53, 0.1)",
         fill: true,
         tension: 0.4,
         pointRadius: 4,
         pointHoverRadius: 6,
-      }
-    ]
-  }
+      },
+    ],
+  };
 
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        display: false
+        display: false,
       },
       tooltip: {
-        backgroundColor: '#fff',
-        titleColor: '#333',
-        bodyColor: '#666',
-        borderColor: '#eee',
+        backgroundColor: "#fff",
+        titleColor: "#333",
+        bodyColor: "#666",
+        borderColor: "#eee",
         borderWidth: 1,
         padding: 12,
         displayColors: false,
         callbacks: {
-          label: (context) => `${context.parsed.y.toLocaleString('vi-VN')}đ`
-        }
-      }
+          label: (context) => `${context.parsed.y.toLocaleString("vi-VN")}đ`,
+        },
+      },
     },
     scales: {
       y: {
         beginAtZero: true,
         ticks: {
-          callback: (value) => `${(value / 1000000).toFixed(1)}M`
+          callback: (value) => `${(value / 1000000).toFixed(1)}M`,
         },
         grid: {
-          color: '#f0f0f0'
-        }
+          color: "#f0f0f0",
+        },
       },
       x: {
         grid: {
-          display: false
-        }
-      }
-    }
-  }
+          display: false,
+        },
+      },
+    },
+  };
 
   return (
     <div className="dashboard-page">
@@ -149,9 +277,13 @@ function Dashboard() {
             <span className="stat-trend up">+8%</span>
           </div>
           <div className="stat-content">
-            <p className="stat-number">{(stats.todayRevenue / 1000000).toFixed(1)}M</p>
+            <p className="stat-number">
+              {(stats.todayRevenue / 1000000).toFixed(1)}M
+            </p>
             <h3>Doanh thu hôm nay</h3>
-            <p className="stat-detail">Tháng: {(stats.monthRevenue / 1000000).toFixed(1)}M</p>
+            <p className="stat-detail">
+              Tháng: {(stats.monthRevenue / 1000000).toFixed(1)}M
+            </p>
           </div>
         </div>
 
@@ -161,7 +293,9 @@ function Dashboard() {
             <span className="stat-trend up">+5%</span>
           </div>
           <div className="stat-content">
-            <p className="stat-number">{(stats.avgOrderValue / 1000).toFixed(0)}K</p>
+            <p className="stat-number">
+              {(stats.avgOrderValue / 1000).toFixed(0)}K
+            </p>
             <h3>Giá trị TB/đơn</h3>
             <p className="stat-detail">{stats.newCustomers} khách mới</p>
           </div>
@@ -182,7 +316,9 @@ function Dashboard() {
         <div className="top-dishes-section">
           <div className="section-header">
             <h2>Món bán chạy</h2>
-            <a href="/menu-management" className="view-all">Xem tất cả →</a>
+            <a href="/menu-management" className="view-all">
+              Xem tất cả →
+            </a>
           </div>
           <div className="dishes-list">
             {stats.topDishes.map((dish, index) => (
@@ -190,11 +326,13 @@ function Dashboard() {
                 <div className="dish-rank">{index + 1}</div>
                 <div className="dish-info">
                   <h4>{dish.name}</h4>
-                  <p>{dish.orders} đơn • {dish.revenue.toLocaleString('vi-VN')}đ</p>
+                  <p>
+                    {dish.orders} đơn • {dish.revenue.toLocaleString("vi-VN")}đ
+                  </p>
                 </div>
                 <div className="dish-chart">
-                  <div 
-                    className="dish-bar" 
+                  <div
+                    className="dish-bar"
                     style={{ width: `${(dish.orders / 18) * 100}%` }}
                   ></div>
                 </div>
@@ -207,7 +345,9 @@ function Dashboard() {
       <div className="recent-orders">
         <div className="section-header">
           <h2>Đơn hàng gần đây</h2>
-          <a href="/order-management" className="view-all">Xem tất cả →</a>
+          <a href="/order-management" className="view-all">
+            Xem tất cả →
+          </a>
         </div>
         <table className="orders-table">
           <thead>
@@ -221,18 +361,20 @@ function Dashboard() {
             </tr>
           </thead>
           <tbody>
-            {recentOrders.map(order => (
+            {recentOrders.map((order) => (
               <tr key={order.id} className="order-row">
                 <td className="order-id">#{order.id}</td>
                 <td className="customer-name">{order.customer}</td>
                 <td>{order.items} món</td>
-                <td className="order-total">{order.total.toLocaleString('vi-VN')}đ</td>
+                <td className="order-total">
+                  {order.total.toLocaleString("vi-VN")}đ
+                </td>
                 <td>
                   <span className={`status-badge ${order.status}`}>
-                    {order.status === 'pending' && 'Chờ xác nhận'}
-                    {order.status === 'preparing' && 'Đang chuẩn bị'}
-                    {order.status === 'delivering' && 'Đang giao'}
-                    {order.status === 'completed' && '✓ Hoàn thành'}
+                    {order.status === "pending" && "Chờ xác nhận"}
+                    {order.status === "preparing" && "Đang chuẩn bị"}
+                    {order.status === "delivering" && "Đang giao"}
+                    {order.status === "completed" && "✓ Hoàn thành"}
                   </span>
                 </td>
                 <td className="order-time">{order.time}</td>
@@ -242,7 +384,7 @@ function Dashboard() {
         </table>
       </div>
     </div>
-  )
+  );
 }
 
-export default Dashboard
+export default Dashboard;

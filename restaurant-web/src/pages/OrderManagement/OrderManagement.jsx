@@ -7,6 +7,10 @@ function OrderManagement() {
   const [activeTab, setActiveTab] = useState("new");
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showDroneModal, setShowDroneModal] = useState(false);
+  const [availableDrones, setAvailableDrones] = useState([]);
+  const [loadingDrones, setLoadingDrones] = useState(false);
+  const [selectedDrone, setSelectedDrone] = useState(null);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -130,6 +134,18 @@ function OrderManagement() {
 
   const updateStatus = async (id, newStatus) => {
     try {
+      // Nếu chuyển từ preparing sang delivering, cần chọn drone trước
+      if (newStatus === "delivering") {
+        const order = orders.find((o) => o.id === id);
+        if (order && order.status === "preparing") {
+          // Mở modal chọn drone
+          await loadAvailableDrones(order);
+          setSelectedOrder(order);
+          setShowDroneModal(true);
+          return; // Dừng lại, đợi user chọn drone
+        }
+      }
+
       const response = await orderAPI.updateStatus(id, newStatus);
       if (response?.success) {
         await loadOrders(); // Reload danh sách
@@ -138,6 +154,51 @@ function OrderManagement() {
       }
     } catch (err) {
       alert(err?.message || "Không thể cập nhật trạng thái đơn hàng");
+    }
+  };
+
+  const loadAvailableDrones = async (order) => {
+    try {
+      setLoadingDrones(true);
+      const response = await orderAPI.getAvailableDrones({
+        restaurantId: restaurant?._id || restaurant?.id,
+        distance: order.distance || 5,
+        weight: 2, // Default weight
+      });
+
+      if (response?.success) {
+        setAvailableDrones(response.data || []);
+      }
+    } catch (err) {
+      console.error("Error loading drones:", err);
+      alert("Không thể tải danh sách drone");
+    } finally {
+      setLoadingDrones(false);
+    }
+  };
+
+  const handleAssignDrone = async () => {
+    if (!selectedDrone || !selectedOrder) {
+      alert("Vui lòng chọn drone");
+      return;
+    }
+
+    try {
+      const response = await orderAPI.assignDrone({
+        orderId: selectedOrder.id,
+        droneId: selectedDrone._id,
+      });
+
+      if (response?.success) {
+        alert("Giao drone thành công!");
+        setShowDroneModal(false);
+        setShowDetailModal(false);
+        await loadOrders();
+      } else {
+        alert(response?.message || "Không thể giao drone");
+      }
+    } catch (err) {
+      alert(err?.message || "Có lỗi xảy ra khi giao drone");
     }
   };
 
@@ -535,6 +596,117 @@ function OrderManagement() {
                   </button>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Drone Selection Modal */}
+      {showDroneModal && selectedOrder && (
+        <div className="modal-overlay" onClick={() => setShowDroneModal(false)}>
+          <div className="drone-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Chọn Drone Giao Hàng</h2>
+              <button
+                className="close-btn"
+                onClick={() => setShowDroneModal(false)}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="modal-body">
+              <div className="order-summary">
+                <p>
+                  <strong>Đơn hàng:</strong> #{selectedOrder.id}
+                </p>
+                <p>
+                  <strong>Khoảng cách:</strong> {selectedOrder.distance} km
+                </p>
+                <p>
+                  <strong>Địa chỉ:</strong> {selectedOrder.address}
+                </p>
+              </div>
+
+              {loadingDrones ? (
+                <div className="loading-drones">
+                  <div className="spinner"></div>
+                  <p>Đang tải danh sách drone...</p>
+                </div>
+              ) : availableDrones.length === 0 ? (
+                <div className="no-drones">
+                  <p>Không có drone khả dụng</p>
+                  <p className="hint">
+                    Vui lòng kiểm tra lại pin và trạng thái drone
+                  </p>
+                </div>
+              ) : (
+                <div className="drones-list">
+                  {availableDrones.map((drone) => (
+                    <div
+                      key={drone._id}
+                      className={`drone-card ${
+                        selectedDrone?._id === drone._id ? "selected" : ""
+                      }`}
+                      onClick={() => setSelectedDrone(drone)}
+                    >
+                      <div className="drone-info">
+                        <h4>{drone.model}</h4>
+                        <p className="drone-serial">{drone.serialNumber}</p>
+                      </div>
+                      <div className="drone-stats">
+                        <div className="stat">
+                          <span className="stat-label">Pin:</span>
+                          <span
+                            className={`stat-value ${
+                              drone.batteryLevel > 70
+                                ? "good"
+                                : drone.batteryLevel > 30
+                                ? "warning"
+                                : "low"
+                            }`}
+                          >
+                            {drone.batteryLevel}%
+                          </span>
+                        </div>
+                        <div className="stat">
+                          <span className="stat-label">Phạm vi:</span>
+                          <span className="stat-value">
+                            {drone.maxRange} km
+                          </span>
+                        </div>
+                        <div className="stat">
+                          <span className="stat-label">Tải trọng:</span>
+                          <span className="stat-value">
+                            {drone.maxWeight} kg
+                          </span>
+                        </div>
+                      </div>
+                      {drone.batteryLevel < 30 && (
+                        <p className="warning-text">
+                          ⚠️ Pin thấp, không đủ cho chuyến bay
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="modal-footer">
+              <button
+                className="cancel-btn"
+                onClick={() => setShowDroneModal(false)}
+              >
+                Hủy
+              </button>
+              <button
+                className="assign-btn"
+                onClick={handleAssignDrone}
+                disabled={!selectedDrone || loadingDrones}
+              >
+                Giao hàng
+              </button>
             </div>
           </div>
         </div>
