@@ -11,41 +11,49 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { notificationAPI } from '../services/api';
 
 interface Notification {
   _id: string;
-  user: string;
-  type: 'order' | 'promo' | 'system';
+  recipient: string;
+  recipientRole: string;
+  type: string;
   title: string;
   message: string;
-  relatedOrder?: string;
+  relatedOrder?: {
+    _id: string;
+    orderNumber: string;
+    status: string;
+  };
   isRead: boolean;
   createdAt: string;
 }
 
-// TODO: Implement notification API
-// Current: Using empty array until backend notification API is implemented
-// Backend already has Notification model, need to add routes/controllers
-
 const NotificationsScreen = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Placeholder - will fetch from API when notification routes are implemented
   const fetchNotifications = async () => {
     try {
-      setLoading(false);
-      setRefreshing(false);
-      // await notificationAPI.getMyNotifications();
+      const response = await notificationAPI.getAll();
+      if (response?.data) {
+        setNotifications(response.data);
+      }
     } catch (error) {
       console.error('Fetch notifications error:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  useEffect(() => {
-    fetchNotifications();
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchNotifications();
+    }, [])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -92,7 +100,14 @@ const NotificationsScreen = () => {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Thông báo</Text>
-        <TouchableOpacity>
+        <TouchableOpacity onPress={async () => {
+          try {
+            await notificationAPI.markAllAsRead();
+            fetchNotifications();
+          } catch (error) {
+            console.error('Mark all as read error:', error);
+          }
+        }}>
           <Text style={styles.markAllRead}>Đọc tất cả</Text>
         </TouchableOpacity>
       </View>

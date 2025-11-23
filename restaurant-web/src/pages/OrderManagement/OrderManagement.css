@@ -150,12 +150,19 @@
   border: 1px solid #b3e0ff;
 }
 
+.status-badge.ready {
+  background: #fffbe6;
+  color: #faad14;
+  border: 1px solid #ffe58f;
+}
+
 .status-badge.delivering {
   background: #f6ffed;
   color: #52c41a;
   border: 1px solid #b7eb8f;
 }
 
+.status-badge.delivered,
 .status-badge.completed {
   background: #f0f0f0;
   color: #595959;

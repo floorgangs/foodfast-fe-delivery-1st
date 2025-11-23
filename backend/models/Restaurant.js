@@ -94,6 +94,40 @@ const restaurantSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    compliance: {
+      status: {
+        type: String,
+        enum: ["pending", "approved", "rejected"],
+        default: "pending",
+      },
+      submittedAt: {
+        type: Date,
+      },
+      idCard: {
+        number: String,
+        issueDate: Date,
+        issuePlace: String,
+        frontImage: String,
+        backImage: String,
+      },
+      businessLicense: {
+        documentImage: String,
+        filename: String,
+      },
+      tax: {
+        code: String,
+        rate: String,
+        certificateImage: String,
+      },
+      relatedDocuments: [
+        {
+          filename: String,
+          content: String,
+          mimeType: String,
+        },
+      ],
+      notes: String,
+    },
     tags: [String],
   },
   {

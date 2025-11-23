@@ -96,8 +96,13 @@ const authSlice = createSlice({
         localStorage.removeItem("foodfastLastRestaurantId");
       }
     },
+    clearRestaurant: (state) => {
+      state.restaurant = null;
+      localStorage.removeItem("restaurant_data");
+      localStorage.removeItem("foodfastLastRestaurantId");
+    },
   },
 });
 
-export const { login, logout, checkAuth, setRestaurant } = authSlice.actions;
+export const { login, logout, checkAuth, setRestaurant, clearRestaurant } = authSlice.actions;
 export default authSlice.reducer;

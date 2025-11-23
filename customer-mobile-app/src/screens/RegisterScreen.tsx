@@ -11,9 +11,10 @@ import {
 } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { useRoute } from '@react-navigation/native';
-import { addToCart } from '../store/slices/cartSlice';
+import { addToCart, fetchCart } from '../store/slices/cartSlice';
 import { Alert } from 'react-native';
 import { register } from '../store/slices/authSlice';
+import type { AppDispatch } from '../store';
 
 const resolveRestaurantImage = (restaurant: any) =>
   restaurant?.image || restaurant?.coverImage || restaurant?.avatar || '';
@@ -24,38 +25,51 @@ const RegisterScreen = ({ navigation }: any) => {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
 
   const route = useRoute<any>();
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     if (name && email && phone && password && password === confirmPassword) {
-      // Đăng ký với thông tin thật từ form
-      dispatch(register({ name, email, phone, password }));
+      try {
+        await dispatch(register({ name, email, phone, password })).unwrap();
+        try {
+          await dispatch(fetchCart()).unwrap();
+        } catch (cartError) {
+          console.warn('Failed to fetch cart after register:', cartError);
+        }
 
-      const pending = route?.params?.pendingAdd;
-      if (pending && pending.product && pending.restaurant) {
-        const restaurantImage = resolveRestaurantImage(pending.restaurant);
-        const productImageCandidates = Array.isArray(pending.product.images)
-          ? pending.product.images.filter((item: string) => typeof item === 'string' && item.trim().length > 0)
-          : [];
-        const fallbackProductImage = productImageCandidates[0]
-          || pending.product.image
-          || restaurantImage;
-        dispatch(addToCart({
-          id: pending.product.id || pending.product._id || `${Date.now()}`,
-          name: pending.product.name,
-          price: pending.product.price ?? 0,
-          restaurantId: pending.restaurant.id || pending.restaurant._id,
-          restaurantName: pending.restaurant.name,
-          image: fallbackProductImage,
-        }));
-        Alert.alert('Thành công', 'Đã thêm vào giỏ hàng');
-        navigation.navigate('Cart');
-        return;
+        const pending = route?.params?.pendingAdd;
+        if (pending && pending.product && pending.restaurant) {
+          const restaurantImage = resolveRestaurantImage(pending.restaurant);
+          const productImageCandidates = Array.isArray(pending.product.images)
+            ? pending.product.images.filter((item: string) => typeof item === 'string' && item.trim().length > 0)
+            : [];
+          const fallbackProductImage = productImageCandidates[0]
+            || pending.product.image
+            || restaurantImage;
+          try {
+            await dispatch(addToCart({
+              id: pending.product.id || pending.product._id || `${Date.now()}`,
+              productId: pending.product.id || pending.product._id || `${Date.now()}`,
+              name: pending.product.name,
+              price: pending.product.price ?? 0,
+              restaurantId: pending.restaurant.id || pending.restaurant._id,
+              restaurantName: pending.restaurant.name,
+              image: fallbackProductImage,
+            }));
+            Alert.alert('Thành công', 'Đã thêm vào giỏ hàng');
+            navigation.navigate('Cart');
+          } catch (cartError: any) {
+            Alert.alert('Lỗi', cartError?.message || 'Không thể lưu giỏ hàng');
+          }
+          return;
+        }
+
+        navigation.navigate('MainTabs');
+      } catch (error: any) {
+        Alert.alert('Đăng ký thất bại', error?.message || 'Vui lòng kiểm tra lại thông tin');
       }
-
-      navigation.navigate('MainTabs');
     }
   };
 

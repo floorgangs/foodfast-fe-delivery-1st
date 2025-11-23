@@ -102,14 +102,48 @@ function RestaurantSelection() {
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
+  const fileToBase64 = (file) =>
+    new Promise((resolve, reject) => {
+      if (!file) {
+        resolve(null)
+        return
+      }
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result)
+      reader.onerror = () => reject(new Error('Không thể đọc file'))
+      reader.readAsDataURL(file)
+    })
+
+  const convertFileToDocument = async (file) => {
+    if (!file) {
+      return null
+    }
+    const content = await fileToBase64(file)
+    return {
+      filename: file.name,
+      mimeType: file.type,
+      content,
+    }
+  }
+
   const handleSubmitRegistration = async (e) => {
     e.preventDefault()
     setSubmitting(true)
     setSubmitError('')
 
     try {
-      // TODO: Implement file upload to cloud storage (AWS S3, Cloudinary, etc.)
-      // For now, we'll send data without files
+      const [idCardFrontDoc, idCardBackDoc, businessLicenseDoc, taxCertificateDoc] =
+        await Promise.all([
+          convertFileToDocument(formData.idCardFront),
+          convertFileToDocument(formData.idCardBack),
+          convertFileToDocument(formData.businessLicense),
+          convertFileToDocument(formData.taxCertificate),
+        ])
+
+      const relatedDocs = await Promise.all(
+        (formData.relatedDocuments || []).map(convertFileToDocument)
+      )
+
       const payload = {
         name: formData.restaurantName,
         phone: formData.phone,
@@ -132,13 +166,25 @@ function RestaurantSelection() {
         estimatedDeliveryTime: '20-30 phút',
         deliveryFee: 15000,
         minOrder: 50000,
-        isActive: false, // Pending approval
-        metadata: {
-          idCardNumber: formData.idCardNumber,
-          idCardIssueDate: formData.idCardIssueDate,
-          idCardIssuePlace: formData.idCardIssuePlace,
-          taxCode: formData.taxCode,
-          taxRate: formData.taxRate,
+        isActive: false,
+        compliance: {
+          idCard: {
+            number: formData.idCardNumber,
+            issueDate: formData.idCardIssueDate,
+            issuePlace: formData.idCardIssuePlace,
+            frontImage: idCardFrontDoc?.content,
+            backImage: idCardBackDoc?.content,
+          },
+          businessLicense: {
+            documentImage: businessLicenseDoc?.content,
+            filename: businessLicenseDoc?.filename,
+          },
+          tax: {
+            code: formData.taxCode,
+            rate: formData.taxRate,
+            certificateImage: taxCertificateDoc?.content,
+          },
+          relatedDocuments: relatedDocs.filter(Boolean),
         },
       }
 
@@ -150,6 +196,22 @@ function RestaurantSelection() {
 
       alert('Đăng ký nhà hàng thành công! Vui lòng chờ duyệt.')
       setShowRegisterModal(false)
+      setFormData({
+        restaurantName: '',
+        phone: user?.phone || '',
+        address: '',
+        email: user?.email || '',
+        idCardFront: null,
+        idCardBack: null,
+        idCardNumber: '',
+        idCardIssueDate: '',
+        idCardIssuePlace: '',
+        businessLicense: null,
+        taxCode: '',
+        taxRate: '4.5',
+        taxCertificate: null,
+        relatedDocuments: [],
+      })
       loadRestaurants()
     } catch (err) {
       setSubmitError(err?.message || 'Không thể đăng ký nhà hàng')

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -10,72 +10,160 @@ import {
   Alert,
   Modal,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import { RootState } from '../store';
-import { restoreSavedCart, deleteSavedCart } from '../store/slices/cartSlice';
+import { RootState, AppDispatch } from '../store';
 import { Ionicons } from '@expo/vector-icons';
-import { submitOrderReview, Order as OrderType } from '../store/slices/orderSlice';
+import { submitOrderReview, Order as OrderType, setOrders } from '../store/slices/orderSlice';
+import { orderAPI, reviewAPI } from '../services/api';
+import { useFocusEffect } from '@react-navigation/native';
 
 const OrdersScreen = ({ navigation }: any) => {
-  const [activeTab, setActiveTab] = useState<'active' | 'reviews' | 'history' | 'saved'>('active');
+  const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
   const orders = useSelector((state: RootState) => state.orders.orders);
-  const savedCarts = useSelector((state: RootState) => state.cart.savedCarts);
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const [selectedOrder, setSelectedOrder] = useState<OrderType | null>(null);
   const [reviewModalVisible, setReviewModalVisible] = useState(false);
   const [reviewRating, setReviewRating] = useState(0);
   const [reviewComment, setReviewComment] = useState('');
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const isFetchingRef = useRef(false);
+
+  const fetchOrders = useCallback(async () => {
+    const normalizeStatus = (status: string) => {
+      if (status === 'completed') return 'delivered';
+      if (status === 'preparing') return 'confirmed';
+      return status;
+    };
+
+    const formatDeliveryAddress = (address: any) => {
+      if (!address) return '';
+      if (typeof address === 'string') return address;
+      const parts = [
+        address.street || address.address,
+        address.ward,
+        address.district,
+        address.city,
+      ].filter(Boolean);
+      return parts.join(', ');
+    };
+
+    const toNumber = (value: any) => {
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+      }
+      if (typeof value === 'string' && value.trim() !== '') {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : undefined;
+      }
+      return undefined;
+    };
+
+    const normalizeCoordinate = (coordinate: any) => {
+      if (!coordinate) return undefined;
+      const latitude = toNumber(coordinate.latitude ?? coordinate.lat);
+      const longitude = toNumber(coordinate.longitude ?? coordinate.lng);
+      if (latitude == null || longitude == null) {
+        return undefined;
+      }
+      return { latitude, longitude };
+    };
+
+    if (isFetchingRef.current) {
+      return;
+    }
+
+    try {
+      isFetchingRef.current = true;
+      setOrdersLoading(true);
+      const response = await orderAPI.getMyOrders();
+      const payload = response?.data ?? response;
+      const orderList = Array.isArray(payload?.data)
+        ? payload.data
+        : Array.isArray(payload)
+        ? payload
+        : [];
+
+      const transformedOrders = orderList.map((order: any) => {
+        const items = (order.items || []).map((item: any) => {
+          const product =
+            item.product && typeof item.product === 'object' ? item.product : null;
+          const productId =
+            product?._id || product?.id || item.product || item._id;
+          return {
+            id: productId,
+            name: product?.name || item.name || 'Sản phẩm',
+            quantity: item.quantity,
+            price: item.price,
+          };
+        });
+        const customerReview = order.customerReview || order.review;
+        const pickupCoordinate = normalizeCoordinate(order.pickupCoordinate);
+        const dropoffCoordinate =
+          normalizeCoordinate(order.dropoffCoordinate) ??
+          normalizeCoordinate(order.deliveryAddress?.coordinates);
+
+        return {
+          id: order._id,
+          restaurantName: order.restaurant?.name || 'Nhà hàng',
+          items,
+          total: order.total ?? order.totalAmount ?? 0,
+          status: normalizeStatus(order.status),
+          createdAt: order.createdAt,
+          deliveryAddress: formatDeliveryAddress(order.deliveryAddress),
+          pickupCoordinate,
+          dropoffCoordinate,
+          unlockPin: order.unlockPin,
+          isReviewed: Boolean(order.isReviewed || customerReview),
+          rating: customerReview?.rating ?? null,
+          reviewComment: customerReview?.comment ?? '',
+        };
+      });
+
+      dispatch(setOrders(transformedOrders));
+    } catch (error: any) {
+      console.error('Failed to fetch orders:', error);
+    } finally {
+      setOrdersLoading(false);
+      isFetchingRef.current = false;
+    }
+  }, [dispatch]);
+
+  // Fetch orders when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      fetchOrders();
+
+      // Set up interval to refresh orders every 10 seconds when screen is focused
+      const intervalId = setInterval(() => {
+        fetchOrders();
+      }, 10000);
+
+      // Cleanup interval when screen loses focus
+      return () => {
+        clearInterval(intervalId);
+      };
+    }, [fetchOrders])
+  );
 
   const activeOrders = useMemo(
-    () => orders.filter(order => order.status !== 'delivered'),
+    () => orders.filter(order => !['delivered', 'cancelled'].includes(order.status)),
     [orders]
   );
 
-  const reviewOrders = useMemo(
-    () => orders.filter(order => order.status === 'delivered' && !order.isReviewed),
+  const pendingReviewCount = useMemo(
+    () => orders.filter(order => order.status === 'delivered' && !order.isReviewed).length,
     [orders]
   );
 
   const historyOrders = useMemo(
-    () => orders.filter(order => order.status === 'delivered'),
+    () => orders.filter(order => ['delivered', 'cancelled'].includes(order.status)),
     [orders]
   );
 
-  const handleRestoreCart = (index: number) => {
-    Alert.alert(
-      'Khôi phục đơn tạm',
-      'Giỏ hàng hiện tại sẽ được lưu vào đơn tạm. Bạn có muốn tiếp tục?',
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Khôi phục',
-          onPress: () => {
-            dispatch(restoreSavedCart(index));
-            Alert.alert('Thành công', 'Đã khôi phục đơn tạm vào giỏ hàng!');
-            navigation.navigate('Cart');
-          },
-        },
-      ]
-    );
-  };
 
-  const handleDeleteSavedCart = (index: number) => {
-    Alert.alert(
-      'Xóa đơn tạm',
-      'Bạn có chắc muốn xóa đơn tạm này?',
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Xóa',
-          style: 'destructive',
-          onPress: () => {
-            dispatch(deleteSavedCart(index));
-          },
-        },
-      ]
-    );
-  };
 
   const getStatusInfo = (status: OrderType['status'] | string) => {
     switch (status) {
@@ -84,9 +172,13 @@ const OrdersScreen = ({ navigation }: any) => {
       case 'delivering':
       case 'shipping':
         return { label: '🚁 Đang giao', style: styles.statusDelivering };
-      case 'preparing':
-        return { label: '👨‍🍳 Đang chuẩn bị', style: styles.statusPreparing };
+      case 'ready':
+        return { label: '🚚 Sẵn sàng giao', style: styles.statusPreparing };
       case 'confirmed':
+        return { label: '✅ Đã xác nhận', style: styles.statusPreparing };
+      case 'cancelled':
+        return { label: '✕ Đã hủy', style: styles.statusConfirmed };
+      case 'pending':
       default:
         return { label: '⏳ Chờ xác nhận', style: styles.statusConfirmed };
     }
@@ -137,9 +229,10 @@ const OrdersScreen = ({ navigation }: any) => {
     setSelectedOrder(null);
     setReviewRating(0);
     setReviewComment('');
+    setSubmittingReview(false);
   };
 
-  const handleSubmitReview = () => {
+  const handleSubmitReview = async () => {
     if (!selectedOrder) {
       return;
     }
@@ -147,13 +240,44 @@ const OrdersScreen = ({ navigation }: any) => {
       Alert.alert('Thông báo', 'Vui lòng chọn số sao đánh giá.');
       return;
     }
-    dispatch(submitOrderReview({
-      id: selectedOrder.id,
+    const trimmedComment = reviewComment.trim();
+    const payload: {
+      orderId: string;
+      rating: number;
+      comment?: string;
+      productId?: string;
+    } = {
+      orderId: selectedOrder.id,
       rating: reviewRating,
-      comment: reviewComment.trim(),
-    }));
-    Alert.alert('Cảm ơn bạn!', 'Đánh giá đã được ghi nhận.');
-    closeReviewModal();
+    };
+    if (trimmedComment) {
+      payload.comment = trimmedComment;
+    }
+    const primaryProductId = selectedOrder.items?.[0]?.id;
+    if (primaryProductId) {
+      payload.productId = primaryProductId;
+    }
+
+    try {
+      setSubmittingReview(true);
+      await reviewAPI.create(payload);
+      dispatch(
+        submitOrderReview({
+          id: selectedOrder.id,
+          rating: reviewRating,
+          comment: trimmedComment,
+        })
+      );
+      await fetchOrders();
+      Alert.alert('Cảm ơn bạn!', 'Đánh giá đã được ghi nhận.');
+      closeReviewModal();
+    } catch (error: any) {
+      const message = error?.message || 'Không thể gửi đánh giá. Vui lòng thử lại.';
+      Alert.alert('Không thành công', message);
+      console.error('Failed to submit review:', error);
+    } finally {
+      setSubmittingReview(false);
+    }
   };
 
   const renderItemsPreview = (order: OrderType) => (
@@ -198,32 +322,6 @@ const OrdersScreen = ({ navigation }: any) => {
     );
   };
 
-  const renderReviewOrder = ({ item }: { item: OrderType }) => (
-    <View style={styles.orderCard}>
-      <View style={styles.orderHeader}>
-        <Text style={styles.restaurantName}>{item.restaurantName}</Text>
-        <View style={[styles.statusBadge, styles.statusDelivered]}>
-          <Text style={styles.statusText}>✓ Đã giao</Text>
-        </View>
-      </View>
-      {renderItemsPreview(item)}
-      <View style={styles.orderFooter}>
-        <Text style={styles.orderDate}>
-          {`Giao ngày ${new Date(item.createdAt).toLocaleDateString('vi-VN')}`}
-        </Text>
-        <Text style={styles.orderTotal}>{`${item.total.toLocaleString('vi-VN')}đ`}</Text>
-      </View>
-      <TouchableOpacity
-        style={styles.reviewButton}
-        onPress={() => openReviewModal(item)}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.reviewButtonText}>Đánh giá ngay</Text>
-        <Ionicons name="star" size={16} color="#fff" style={styles.reviewButtonIcon} />
-      </TouchableOpacity>
-    </View>
-  );
-
   const renderHistoryOrder = ({ item }: { item: OrderType }) => (
     <View style={styles.orderCard}>
       <View style={styles.orderHeader}>
@@ -252,9 +350,7 @@ const OrdersScreen = ({ navigation }: any) => {
           style={styles.reviewButtonGhost}
           onPress={() => openReviewModal(item)}
         >
-          <Text style={styles.reviewButtonGhostText}>
-            {item.isReviewed ? 'Chỉnh sửa đánh giá' : 'Đánh giá'}
-          </Text>
+          <Text style={styles.reviewButtonGhostText}>Đánh giá</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -279,6 +375,14 @@ const OrdersScreen = ({ navigation }: any) => {
   );
 
   const renderTabContent = () => {
+    if (activeTab !== 'saved' && ordersLoading && orders.length === 0) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#EA5034" />
+        </View>
+      );
+    }
+
     switch (activeTab) {
       case 'active':
         if (activeOrders.length === 0) {
@@ -298,23 +402,6 @@ const OrdersScreen = ({ navigation }: any) => {
             showsVerticalScrollIndicator={false}
           />
         );
-      case 'reviews':
-        if (reviewOrders.length === 0) {
-          return renderEmptyState(
-            '⭐',
-            'Chưa có đơn cần đánh giá',
-            'Đánh giá sẽ giúp món ngon lên top nhanh hơn!'
-          );
-        }
-        return (
-          <FlatList
-            data={reviewOrders}
-            renderItem={renderReviewOrder}
-            keyExtractor={item => `${item.id}-review`}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-          />
-        );
       case 'history':
         if (historyOrders.length === 0) {
           return renderEmptyState(
@@ -330,78 +417,20 @@ const OrdersScreen = ({ navigation }: any) => {
             keyExtractor={item => `${item.id}-history`}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
-          />
-        );
-      case 'saved':
-      default:
-        if (savedCarts.length === 0) {
-          return renderEmptyState(
-            '📋',
-            'Chưa có đơn tạm',
-            'Đơn tạm sẽ tạo khi bạn thêm món từ nhà hàng khác vào giỏ.'
-          );
-        }
-        return (
-          <FlatList
-            data={savedCarts}
-            renderItem={renderSavedCart}
-            keyExtractor={(_item, index) => `saved-${index}`}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
+            ListHeaderComponent={
+              pendingReviewCount > 0 ? (
+                <View style={styles.reviewReminder}>
+                  <Ionicons name="star" size={14} color="#EA5034" style={styles.reviewReminderIcon} />
+                  <Text style={styles.reviewReminderText}>
+                    {`Bạn còn ${pendingReviewCount} đơn chờ đánh giá.`}
+                  </Text>
+                </View>
+              ) : null
+            }
           />
         );
     }
   };
-
-  const renderSavedCart = ({ item, index }: any) => (
-    <View style={styles.savedCartCard}>
-      <View style={styles.savedCartHeader}>
-        <View>
-          <Text style={styles.savedRestaurantName}>{item.restaurantName}</Text>
-          <Text style={styles.savedDate}>
-            Lưu lúc {new Date(item.savedAt).toLocaleTimeString('vi-VN', { 
-              hour: '2-digit', 
-              minute: '2-digit',
-              day: '2-digit',
-              month: '2-digit'
-            })}
-          </Text>
-        </View>
-        <View style={styles.savedCartBadge}>
-          <Text style={styles.savedCartBadgeText}>{item.items.length} món</Text>
-        </View>
-      </View>
-      
-      <View style={styles.savedCartItems}>
-        {item.items.slice(0, 3).map((cartItem: any, idx: number) => (
-          <Text key={idx} style={styles.savedItemText}>
-            {cartItem.quantity}x {cartItem.name}
-          </Text>
-        ))}
-        {item.items.length > 3 && (
-          <Text style={styles.moreItems}>và {item.items.length - 3} món khác</Text>
-        )}
-      </View>
-
-      <View style={styles.savedCartFooter}>
-        <Text style={styles.savedCartTotal}>{`${item.total.toLocaleString('vi-VN')}đ`}</Text>
-        <View style={styles.savedCartActions}>
-          <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={() => handleDeleteSavedCart(index)}
-          >
-            <Text style={styles.deleteButtonText}>Xóa</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.restoreButton}
-            onPress={() => handleRestoreCart(index)}
-          >
-            <Text style={styles.restoreButtonText}>Khôi phục</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
-  );
 
   return (
     <View style={styles.container}>
@@ -426,19 +455,6 @@ const OrdersScreen = ({ navigation }: any) => {
           )}
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'reviews' && styles.tabActive]}
-          onPress={() => setActiveTab('reviews')}
-        >
-          <Text style={[styles.tabText, activeTab === 'reviews' && styles.tabTextActive]}>
-            Đánh giá
-          </Text>
-          {reviewOrders.length > 0 && (
-            <View style={styles.tabBadge}>
-              <Text style={styles.tabBadgeText}>{reviewOrders.length}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity
           style={[styles.tab, activeTab === 'history' && styles.tabActive]}
           onPress={() => setActiveTab('history')}
         >
@@ -451,19 +467,7 @@ const OrdersScreen = ({ navigation }: any) => {
             </View>
           )}
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'saved' && styles.tabActive]}
-          onPress={() => setActiveTab('saved')}
-        >
-          <Text style={[styles.tabText, activeTab === 'saved' && styles.tabTextActive]}>
-            Đơn tạm
-          </Text>
-          {savedCarts.length > 0 && (
-            <View style={styles.tabBadge}>
-              <Text style={styles.tabBadgeText}>{savedCarts.length}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+
       </View>
 
       {/* Content */}
@@ -494,16 +498,30 @@ const OrdersScreen = ({ navigation }: any) => {
             />
             <View style={styles.modalActions}>
               <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonSecondary]}
+                style={[
+                  styles.modalButton,
+                  styles.modalButtonSecondary,
+                  submittingReview && styles.modalButtonDisabled,
+                ]}
                 onPress={closeReviewModal}
+                disabled={submittingReview}
               >
                 <Text style={styles.modalButtonSecondaryText}>Hủy</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonPrimary]}
+                style={[
+                  styles.modalButton,
+                  styles.modalButtonPrimary,
+                  submittingReview && styles.modalButtonDisabled,
+                ]}
                 onPress={handleSubmitReview}
+                disabled={submittingReview}
               >
-                <Text style={styles.modalButtonPrimaryText}>Gửi đánh giá</Text>
+                {submittingReview ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.modalButtonPrimaryText}>Gửi đánh giá</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -581,6 +599,12 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 12,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
   },
   orderCard: {
     backgroundColor: '#fff',
@@ -775,24 +799,22 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
-  reviewButton: {
-    marginTop: 12,
-    backgroundColor: '#EA5034',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+  reviewReminder: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#FFF8E1',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
   },
-  reviewButtonText: {
-    color: '#fff',
-    fontSize: 15,
+  reviewReminderIcon: {
+    marginRight: 8,
+  },
+  reviewReminderText: {
+    fontSize: 13,
+    color: '#9C6F19',
     fontWeight: '600',
-    marginRight: 6,
-  },
-  reviewButtonIcon: {
-    marginTop: -2,
   },
   historyReviewRow: {
     flexDirection: 'row',
@@ -919,6 +941,9 @@ const styles = StyleSheet.create({
   },
   modalButtonPrimary: {
     backgroundColor: '#EA5034',
+  },
+  modalButtonDisabled: {
+    opacity: 0.7,
   },
   modalButtonSecondaryText: {
     fontSize: 15,

@@ -27,7 +27,7 @@ const CheckoutScreen = ({ navigation }: any) => {
   const [applyingVoucher, setApplyingVoucher] = useState(false);
 
   // Addresses - từ user profile hoặc default
-  const [addresses] = useState(() => {
+  const [addresses, setAddresses] = useState(() => {
     if (user?.addresses && user.addresses.length > 0) {
       return user.addresses;
     }
@@ -44,8 +44,8 @@ const CheckoutScreen = ({ navigation }: any) => {
 
   const paymentMethods = PAYMENT_METHODS;
 
-  const [selectedAddress, setSelectedAddress] = useState(addresses[0]?.id || '');
-  const [selectedPayment, setSelectedPayment] = useState('dronepay');
+  const [selectedAddress, setSelectedAddress] = useState(addresses[0]?._id || addresses[0]?.id || '');
+  const [selectedPayment, setSelectedPayment] = useState('momo');
   const [note, setNote] = useState('');
   const [voucherCode, setVoucherCode] = useState('');
   const [discount, setDiscount] = useState(0);
@@ -58,6 +58,18 @@ const CheckoutScreen = ({ navigation }: any) => {
 
   const deliveryFee = 15000; // Fixed drone delivery fee
   const finalTotal = total + deliveryFee - discount;
+
+  // Update addresses when user changes (e.g., after adding new address)
+  useEffect(() => {
+    if (user?.addresses && user.addresses.length > 0) {
+      setAddresses(user.addresses);
+      // If no address is selected or selected address doesn't exist, select the first one
+      const addressId = user.addresses[0]._id || user.addresses[0].id;
+      if (!selectedAddress || !user.addresses.find(a => (a._id || a.id) === selectedAddress)) {
+        setSelectedAddress(addressId);
+      }
+    }
+  }, [user?.addresses]);
 
   const handleGuestInfoChange = (field: keyof typeof guestInfo, value: string) => {
     setGuestInfo((prev) => ({ ...prev, [field]: value }));
@@ -104,30 +116,113 @@ const CheckoutScreen = ({ navigation }: any) => {
         Alert.alert('Thông báo', 'Vui lòng nhập địa chỉ để drone giao hàng.');
         return;
       }
-    } else if (!selectedAddress) {
+    }
+
+    // For authenticated users, validate address exists
+    const selectedAddressData = isAuthenticated ? addresses.find(a => (a._id || a.id) === selectedAddress) : null;
+    if (isAuthenticated && !selectedAddressData) {
       Alert.alert('Thông báo', 'Vui lòng chọn địa chỉ giao hàng');
       return;
     }
 
-    const selectedAddressData = addresses.find(a => a.id === selectedAddress);
     const selectedPaymentData = paymentMethods.find(p => p.id === selectedPayment);
 
     try {
       setLoading(true);
       
+      const normalizeCoordinate = (value: any) => {
+        if (typeof value === 'number') {
+          return value;
+        }
+        if (typeof value === 'string' && value.trim() !== '') {
+          const parsed = Number(value);
+          return Number.isFinite(parsed) ? parsed : undefined;
+        }
+        return undefined;
+      };
+
+      const parseAddressComponents = (fullAddress: string) => {
+        const normalized = fullAddress.toLowerCase().replace(/\s+/g, ' ').trim();
+        
+        const districtPatterns = [
+          { pattern: /quận\s*(\d+|[\w\sàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]+)/i, prefix: 'Quận' },
+          { pattern: /huyện\s*([\w\sàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]+)/i, prefix: 'Huyện' },
+          { pattern: /thành phố\s*([\w\sàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]+)/i, prefix: 'Thành phố' },
+        ];
+        
+        const wardPatterns = [
+          { pattern: /phường\s*(\d+|[\w\sàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]+)/i, prefix: 'Phường' },
+          { pattern: /xã\s*([\w\sàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]+)/i, prefix: 'Xã' },
+          { pattern: /thị trấn\s*([\w\sàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]+)/i, prefix: 'Thị trấn' },
+        ];
+
+        let district = '';
+        let ward = '';
+        let city = '';
+
+        for (const { pattern, prefix } of districtPatterns) {
+          const match = normalized.match(pattern);
+          if (match) {
+            const value = match[1].trim();
+            district = `${prefix} ${value.charAt(0).toUpperCase() + value.slice(1)}`;
+            break;
+          }
+        }
+
+        for (const { pattern, prefix } of wardPatterns) {
+          const match = normalized.match(pattern);
+          if (match) {
+            const value = match[1].trim();
+            ward = `${prefix} ${value.charAt(0).toUpperCase() + value.slice(1)}`;
+            break;
+          }
+        }
+
+        if (/tp\.?\s*hồ chí minh|tp\.?\s*hcm|hồ chí minh|sài gòn|saigon/i.test(normalized)) {
+          city = 'Hồ Chí Minh';
+        } else if (/hà nội|hanoi/i.test(normalized)) {
+          city = 'Hà Nội';
+        } else if (/đà nẵng|da nang/i.test(normalized)) {
+          city = 'Đà Nẵng';
+        } else if (/cần thơ|can tho/i.test(normalized)) {
+          city = 'Cần Thơ';
+        } else if (/hải phòng|hai phong/i.test(normalized)) {
+          city = 'Hải Phòng';
+        }
+
+        return { ward, district, city: city || 'Hồ Chí Minh' };
+      };
+
+      const normalizedCoordinates = selectedAddressData?.coordinates
+        ? {
+            lat: normalizeCoordinate(selectedAddressData.coordinates.lat),
+            lng: normalizeCoordinate(selectedAddressData.coordinates.lng),
+          }
+        : undefined;
+
+      const fullAddressString = selectedAddressData?.address || '';
+      const parsedComponents = parseAddressComponents(fullAddressString);
+
       const deliveryAddressPayload = isAuthenticated
         ? {
-            street: selectedAddressData?.address || '',
-            city: 'TP.HCM',
-            district: 'Quận 1',
-            ward: 'Phường 1',
+            street: selectedAddressData?.street || selectedAddressData?.address || '',
+            address: fullAddressString,
+            city: selectedAddressData?.city || parsedComponents.city,
+            district: selectedAddressData?.district || parsedComponents.district,
+            ward: selectedAddressData?.ward || parsedComponents.ward,
             phone: selectedAddressData?.phone || user?.phone || '',
+            label: selectedAddressData?.label,
+            coordinates:
+              normalizedCoordinates?.lat != null && normalizedCoordinates?.lng != null
+                ? normalizedCoordinates
+                : undefined,
           }
         : {
             street: guestInfo.address,
-            city: 'TP.HCM',
-            district: 'Quận 1',
-            ward: 'Phường 1',
+            address: guestInfo.address,
+            city: DEFAULT_ADDRESS.city,
+            district: DEFAULT_ADDRESS.district,
+            ward: DEFAULT_ADDRESS.ward,
             phone: guestInfo.phone,
             label: 'Khách lẻ',
           };
@@ -135,7 +230,7 @@ const CheckoutScreen = ({ navigation }: any) => {
       const orderData = {
         restaurant: currentRestaurantId,
         items: items.map((item) => ({
-          product: item.id,
+          product: item.productId || item.id,
           quantity: item.quantity,
           price: item.price,
         })),
@@ -150,22 +245,29 @@ const CheckoutScreen = ({ navigation }: any) => {
         customerInfo: isAuthenticated ? undefined : guestInfo,
       };
 
+      console.log('[Checkout] Creating order with data:', orderData);
       const response = await orderAPI.create(orderData);
+      console.log('[Checkout] Order creation response:', response);
 
       if (!response?.data?._id || !response?.paymentSession?.sessionId) {
+        console.error('[Checkout] Invalid response structure:', response);
         throw new Error('Không thể khởi tạo phiên thanh toán. Vui lòng thử lại.');
       }
 
-      navigation.replace('ThirdPartyPayment', {
+      const navigationParams = {
         orderId: response.data._id,
         orderNumber: response.data.orderNumber,
         amount: response.data.total,
         sessionId: response.paymentSession.sessionId,
         providerName: response.paymentSession.providerName,
+        paymentMethod: selectedPayment,
         redirectUrl: response.paymentSession.redirectUrl,
         expiresAt: response.paymentSession.expiresAt,
         restaurantName: items[0]?.restaurantName,
-      });
+      };
+      
+      console.log('[Checkout] Navigating to ThirdPartyPayment with params:', navigationParams);
+      navigation.replace('ThirdPartyPayment', navigationParams);
     } catch (error: any) {
       Alert.alert('Lỗi', error.message || 'Không thể tạo đơn hàng. Vui lòng thử lại!');
     } finally {
@@ -229,25 +331,33 @@ const CheckoutScreen = ({ navigation }: any) => {
                 <Text style={styles.addAddressText}>+ Thêm địa chỉ mới</Text>
               </TouchableOpacity>
             ) : (
-              addresses.map(address => (
-                <TouchableOpacity
-                  key={address.id}
-                  style={[
-                    styles.addressCard,
-                    selectedAddress === address.id && styles.addressCardSelected,
-                  ]}
-                  onPress={() => setSelectedAddress(address.id)}
-                >
-                  <View style={styles.radioButton}>
-                    {selectedAddress === address.id && <View style={styles.radioButtonInner} />}
-                  </View>
+              addresses.map(address => {
+                const addressId = address._id || address.id;
+                return (
+                  <TouchableOpacity
+                    key={addressId}
+                    style={[
+                      styles.addressCard,
+                      selectedAddress === addressId && styles.addressCardSelected,
+                    ]}
+                    onPress={() => setSelectedAddress(addressId)}
+                  >
+                    <View style={styles.radioButton}>
+                      {selectedAddress === addressId && <View style={styles.radioButtonInner} />}
+                    </View>
                   <View style={styles.addressInfo}>
-                    <Text style={styles.addressName}>{address.name}</Text>
-                    <Text style={styles.addressText}>{address.address}</Text>
+                    <Text style={styles.addressName}>{address.name || address.label}</Text>
+                    <Text style={styles.addressText}>
+                      {address.address}
+                      {address.ward && `, ${address.ward}`}
+                      {address.district && `, ${address.district}`}
+                      {address.city && `, ${address.city}`}
+                    </Text>
                     <Text style={styles.addressPhone}>{address.phone}</Text>
                   </View>
                 </TouchableOpacity>
-              ))
+              );
+              })
             )
           ) : (
             <View style={styles.guestForm}>

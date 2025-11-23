@@ -17,7 +17,7 @@ export interface Order {
   restaurantName: string;
   items: OrderItem[];
   total: number;
-  status: 'confirmed' | 'preparing' | 'delivering' | 'delivered';
+  status: 'pending' | 'confirmed' | 'ready' | 'delivering' | 'delivered' | 'cancelled';
   createdAt: string;
   deliveryAddress: string;
   pickupCoordinate?: Coordinate;
@@ -49,7 +49,7 @@ const orderSlice = createSlice({
       const newOrder: Order = {
         ...action.payload,
         id: `ORD${Date.now()}`,
-        status: 'confirmed',
+        status: 'pending',
         createdAt: new Date().toISOString(),
         isReviewed: false,
         rating: null,
@@ -86,8 +86,11 @@ const orderSlice = createSlice({
         state.currentOrder.reviewComment = action.payload.comment ?? '';
       }
     },
+    setOrders: (state, action: PayloadAction<Order[]>) => {
+      state.orders = action.payload;
+    },
   },
 });
 
-export const { createOrder, updateOrderStatus, setCurrentOrder, submitOrderReview } = orderSlice.actions;
+export const { createOrder, updateOrderStatus, setCurrentOrder, submitOrderReview, setOrders } = orderSlice.actions;
 export default orderSlice.reducer;

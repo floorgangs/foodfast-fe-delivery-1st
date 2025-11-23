@@ -25,7 +25,15 @@ const droneSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["available", "busy", "charging", "maintenance", "offline"],
+      enum: [
+        "available",
+        "busy",
+        "delivering",
+        "returning",
+        "charging",
+        "maintenance",
+        "offline",
+      ],
       default: "available",
     },
     batteryLevel: {

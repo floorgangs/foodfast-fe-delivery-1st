@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { useRoute } from '@react-navigation/native';
-import { addToCart } from '../store/slices/cartSlice';
+import { addToCart, fetchCart } from '../store/slices/cartSlice';
 import { Alert } from 'react-native';
 import { login, clearError } from '../store/slices/authSlice';
 import type { AppDispatch, RootState } from '../store';
@@ -37,6 +37,11 @@ const LoginScreen = ({ navigation }: any) => {
 
     try {
       await dispatch(login({ email, password })).unwrap();
+      try {
+        await dispatch(fetchCart()).unwrap();
+      } catch (cartError) {
+        console.warn('Failed to fetch cart after login:', cartError);
+      }
       
       // Nếu có pendingAdd từ màn hình trước, thêm món vào giỏ ngay sau khi đăng nhập
       const pending = route?.params?.pendingAdd;
@@ -48,17 +53,23 @@ const LoginScreen = ({ navigation }: any) => {
         const fallbackProductImage = productImageCandidates[0]
           || pending.product.image
           || restaurantImage;
-        dispatch(addToCart({
-          id: pending.product.id || pending.product._id || `${Date.now()}`,
-          name: pending.product.name,
-          price: pending.product.price ?? 0,
-          restaurantId: pending.restaurant.id || pending.restaurant._id,
-          restaurantName: pending.restaurant.name,
-          image: fallbackProductImage,
-        }));
-        Alert.alert('Thành công', 'Đã thêm vào giỏ hàng');
-        navigation.navigate('Cart');
-        return;
+        try {
+          await dispatch(addToCart({
+            id: pending.product.id || pending.product._id || `${Date.now()}`,
+            productId: pending.product.id || pending.product._id || `${Date.now()}`,
+            name: pending.product.name,
+            price: pending.product.price ?? 0,
+            restaurantId: pending.restaurant.id || pending.restaurant._id,
+            restaurantName: pending.restaurant.name,
+            image: fallbackProductImage,
+          }));
+          Alert.alert('Thành công', 'Đã thêm vào giỏ hàng');
+          navigation.navigate('Cart');
+          return;
+        } catch (cartError: any) {
+          Alert.alert('Lỗi', cartError?.message || 'Không thể lưu giỏ hàng');
+          return;
+        }
       }
 
       // Nếu không có pendingAdd, quay về Home

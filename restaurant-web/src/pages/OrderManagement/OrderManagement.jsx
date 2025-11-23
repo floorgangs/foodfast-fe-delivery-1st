@@ -20,7 +20,6 @@ function OrderManagement() {
     if (restaurantId) {
       console.log("🏪 Restaurant found, loading orders:", restaurantId);
       loadOrders();
-      // Poll mỗi 30 giây để cập nhật đơn hàng mới
       const interval = setInterval(loadOrders, 30000);
       return () => clearInterval(interval);
     } else {
@@ -29,6 +28,11 @@ function OrderManagement() {
       setError("Không tìm thấy thông tin nhà hàng");
     }
   }, [restaurant]);
+
+  const formatDeliveryAddress = (deliveryAddress = {}) => {
+    const { address, street, ward, district, city } = deliveryAddress || {};
+    return [address, street, ward, district, city].filter(Boolean).join(", ");
+  };
 
   const loadOrders = async () => {
     try {
@@ -66,19 +70,21 @@ function OrderManagement() {
             quantity: item.quantity,
             price: item.price,
           })),
-          total: order.totalAmount,
+          subtotal: order.subtotal || 0,
+          deliveryFee: order.deliveryFee || 0,
           discount: order.discount || 0,
           platformFee: Math.round(order.totalAmount * 0.1), // 10% platform fee
           restaurantReceives:
             order.totalAmount - Math.round(order.totalAmount * 0.1),
           distance: order.distance || 2.5,
           status: mapStatus(order.status),
+          customerNote: order.customerNote || "",
+          paymentMethod: mapPaymentMethod(order.paymentMethod),
           time: new Date(order.createdAt).toLocaleTimeString("vi-VN", {
             hour: "2-digit",
             minute: "2-digit",
           }),
-          note: order.note || "",
-          paymentMethod: order.paymentMethod || "Tiền mặt",
+          note: order.customerNote || "",
           droneId: order.drone?._id || null,
         }));
 
@@ -94,14 +100,15 @@ function OrderManagement() {
     }
   };
 
-  // Helper function để map status
   const mapStatus = (status) => {
     const statusMap = {
       pending: "pending",
       confirmed: "confirmed",
-      preparing: "preparing",
+
+      ready: "ready",
       delivering: "delivering",
-      completed: "completed",
+      delivered: "delivered",
+      completed: "delivered",
       cancelled: "cancelled",
     };
     return statusMap[status] || "pending";
@@ -115,6 +122,8 @@ function OrderManagement() {
       momo: "MoMo",
       zalopay: "ZaloPay",
       card: "Thẻ tín dụng",
+      banking: "Chuyển khoản",
+      dronepay: "DronePay",
     };
     return methodMap[method] || method;
   };
@@ -143,11 +152,11 @@ function OrderManagement() {
         return orders.filter((order) => order.status === "pending");
       case "confirmed":
         return orders.filter((order) =>
-          ["confirmed", "preparing", "delivering"].includes(order.status)
+          ["confirmed", "ready", "delivering"].includes(order.status)
         );
       case "history":
         return orders.filter((order) =>
-          ["completed", "cancelled"].includes(order.status)
+          ["delivered", "cancelled"].includes(order.status)
         );
       default:
         return orders;
@@ -206,7 +215,7 @@ function OrderManagement() {
           <span className="tab-count">
             {
               orders.filter((o) =>
-                ["confirmed", "preparing", "delivering"].includes(o.status)
+                ["confirmed", "ready", "delivering"].includes(o.status)
               ).length
             }
           </span>
@@ -219,7 +228,7 @@ function OrderManagement() {
           <span className="tab-count">
             {
               orders.filter((o) =>
-                ["completed", "cancelled"].includes(o.status)
+                ["delivered", "cancelled"].includes(o.status)
               ).length
             }
           </span>
@@ -246,9 +255,10 @@ function OrderManagement() {
                 <span className={`status-badge ${order.status}`}>
                   {order.status === "pending" && "Chờ xác nhận"}
                   {order.status === "confirmed" && "Đã xác nhận"}
-                  {order.status === "preparing" && "Đang chuẩn bị"}
+
+                  {order.status === "ready" && "Sẵn sàng giao"}
                   {order.status === "delivering" && "Đang giao"}
-                  {order.status === "completed" && "Hoàn thành"}
+                  {order.status === "delivered" && "Hoàn thành"}
                   {order.status === "cancelled" && "Đã hủy"}
                 </span>
               </div>
@@ -290,23 +300,23 @@ function OrderManagement() {
                 )}
                 {order.status === "confirmed" && (
                   <button
-                    onClick={() => updateStatus(order.id, "preparing")}
+                    onClick={() => updateStatus(order.id, "ready")}
                     className="prepare-btn btn-small"
                   >
                     Sẵn sàng giao
                   </button>
                 )}
-                {order.status === "preparing" && (
+                {order.status === "ready" && (
                   <button
                     onClick={() => updateStatus(order.id, "delivering")}
                     className="ready-btn btn-small"
                   >
-                    Đang giao
+                    Bắt đầu giao
                   </button>
                 )}
                 {order.status === "delivering" && (
                   <button
-                    onClick={() => updateStatus(order.id, "completed")}
+                    onClick={() => updateStatus(order.id, "delivered")}
                     className="complete-btn btn-small"
                   >
                     Hoàn thành
@@ -374,8 +384,9 @@ function OrderManagement() {
                     {selectedOrder.status === "pending" && "Chờ xác nhận"}
                     {selectedOrder.status === "confirmed" && "Đã xác nhận"}
                     {selectedOrder.status === "preparing" && "Đang chuẩn bị"}
+                    {selectedOrder.status === "ready" && "Sẵn sàng giao"}
                     {selectedOrder.status === "delivering" && "Đang giao"}
-                    {selectedOrder.status === "completed" && "Hoàn thành"}
+                    {selectedOrder.status === "delivered" && "Hoàn thành"}
                     {selectedOrder.status === "cancelled" && "Đã hủy"}
                   </span>
                 </div>
@@ -383,10 +394,12 @@ function OrderManagement() {
                   <span className="label">Phương thức thanh toán:</span>
                   <span className="value">{selectedOrder.paymentMethod}</span>
                 </div>
-                {selectedOrder.note && (
+                {selectedOrder.customerNote && (
                   <div className="info-row">
-                    <span className="label">Ghi chú:</span>
-                    <span className="value">{selectedOrder.note}</span>
+                    <span className="label">🗒️ Ghi chú khách hàng:</span>
+                    <span className="value" style={{ fontStyle: 'italic', color: '#666' }}>
+                      {selectedOrder.customerNote}
+                    </span>
                   </div>
                 )}
               </div>
@@ -409,19 +422,33 @@ function OrderManagement() {
                 </div>
                 <div className="financial-summary">
                   <div className="summary-row">
-                    <span className="summary-label">Tổng tiền:</span>
+                    <span className="summary-label">Tạm tính:</span>
                     <span className="summary-value">
+                      {(selectedOrder.subtotal || 0).toLocaleString("vi-VN")}đ
+                    </span>
+                  </div>
+                  <div className="summary-row">
+                    <span className="summary-label">Phí giao hàng:</span>
+                    <span className="summary-value">
+                      {(selectedOrder.deliveryFee || 0).toLocaleString("vi-VN")}đ
+                    </span>
+                  </div>
+                  {selectedOrder.discount > 0 && (
+                    <div className="summary-row">
+                      <span className="summary-label">Giảm giá:</span>
+                      <span className="summary-value discount">
+                        -{(selectedOrder.discount || 0).toLocaleString("vi-VN")}đ
+                      </span>
+                    </div>
+                  )}
+                  <div className="total-row">
+                    <span className="total-label">Tổng cộng:</span>
+                    <span className="total-value">
                       {(selectedOrder.total || 0).toLocaleString("vi-VN")}đ
                     </span>
                   </div>
-                  <div className="summary-row">
-                    <span className="summary-label">Giảm giá:</span>
-                    <span className="summary-value discount">
-                      -{(selectedOrder.discount || 0).toLocaleString("vi-VN")}đ
-                    </span>
-                  </div>
-                  <div className="summary-row">
-                    <span className="summary-label">Chiết khấu nền tảng:</span>
+                  <div className="summary-row" style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px dashed #ddd' }}>
+                    <span className="summary-label">Chiết khấu nền tảng (5%):</span>
                     <span className="summary-value fee">
                       -
                       {(selectedOrder.platformFee || 0).toLocaleString("vi-VN")}
@@ -471,10 +498,21 @@ function OrderManagement() {
                     }}
                     className="prepare-btn"
                   >
-                    Sẵn sàng giao hàng
+                    Bắt đầu chuẩn bị
                   </button>
                 )}
                 {selectedOrder.status === "preparing" && (
+                  <button
+                    onClick={() => {
+                      updateStatus(selectedOrder.id, "ready");
+                      setShowDetailModal(false);
+                    }}
+                    className="ready-btn"
+                  >
+                    Sẵn sàng giao hàng
+                  </button>
+                )}
+                {selectedOrder.status === "ready" && (
                   <button
                     onClick={() => {
                       updateStatus(selectedOrder.id, "delivering");
@@ -482,13 +520,13 @@ function OrderManagement() {
                     }}
                     className="ready-btn"
                   >
-                    Đang giao hàng
+                    Bắt đầu giao hàng
                   </button>
                 )}
                 {selectedOrder.status === "delivering" && (
                   <button
                     onClick={() => {
-                      updateStatus(selectedOrder.id, "completed");
+                      updateStatus(selectedOrder.id, "delivered");
                       setShowDetailModal(false);
                     }}
                     className="complete-btn"

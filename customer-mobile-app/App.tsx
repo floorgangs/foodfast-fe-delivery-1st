@@ -9,7 +9,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { store, RootState } from './src/store';
 import { setUser } from './src/store/slices/authSlice';
-import { setCart } from './src/store/slices/cartSlice';
+import { fetchCart } from './src/store/slices/cartSlice';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 // Screens
 import LoginScreen from './src/screens/LoginScreen';
@@ -294,21 +295,20 @@ function AppNavigator() {
       }
     };
 
-    // Load cart from AsyncStorage
-    const loadCart = async () => {
+    const loadCartFromServer = async () => {
       try {
-        const cartJson = await AsyncStorage.getItem('cart');
-        if (cartJson) {
-          const cart = JSON.parse(cartJson);
-          store.dispatch(setCart(cart));
+        const token = await AsyncStorage.getItem('token');
+        if (!token) {
+          return;
         }
+        await store.dispatch(fetchCart()).unwrap();
       } catch (error) {
-        console.error('Error loading cart:', error);
+        console.error('Error fetching cart:', error);
       }
     };
 
     loadUser();
-    loadCart();
+    loadCartFromServer();
   }, []);
 
   return (
@@ -379,9 +379,11 @@ export default function App() {
 
   return (
     <Provider store={store}>
-      <RootErrorBoundary>
-        <AppNavigator />
-      </RootErrorBoundary>
+      <SafeAreaProvider>
+        <RootErrorBoundary>
+          <AppNavigator />
+        </RootErrorBoundary>
+      </SafeAreaProvider>
     </Provider>
   );
 }

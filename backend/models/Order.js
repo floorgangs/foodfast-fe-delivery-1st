@@ -85,7 +85,7 @@ const orderSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ["momo", "zalopay", "card", "banking", "dronepay"],
+      enum: ["momo", "vnpay", "zalopay", "card", "banking", "dronepay"],
       required: true,
     },
     paymentProvider: {
@@ -100,15 +100,22 @@ const orderSchema = new mongoose.Schema(
       enum: ["pending", "paid", "failed", "refunded"],
       default: "pending",
     },
+    paymentTransaction: {
+      transactionId: String,
+      paidAt: Date,
+      amount: Number,
+      method: String,
+      provider: String,
+    },
     status: {
       type: String,
       enum: [
         "pending",
         "confirmed",
-        "preparing",
         "ready",
         "delivering",
         "delivered",
+        "completed",
         "cancelled",
       ],
       default: "pending",
@@ -122,6 +129,10 @@ const orderSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Drone",
     },
+    assignedDrone: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Drone",
+    },
     droneDeliveryDetails: {
       assignedAt: Date,
       launchedAt: Date,
@@ -130,6 +141,12 @@ const orderSchema = new mongoose.Schema(
       flightDistance: Number, // km
       flightDuration: Number, // phút
       batteryUsed: Number, // %
+      currentLocation: {
+        lat: Number,
+        lng: Number,
+        heading: Number,
+        updatedAt: Date,
+      },
     },
     timeline: [
       {

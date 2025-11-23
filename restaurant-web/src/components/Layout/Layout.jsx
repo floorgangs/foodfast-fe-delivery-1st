@@ -1,6 +1,6 @@
 import { Outlet, Link, useNavigate } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
-import { logout } from '../../store/slices/authSlice'
+import { logout, clearRestaurant } from '../../store/slices/authSlice'
 import './Layout.css'
 
 function Layout() {
@@ -13,6 +13,11 @@ function Layout() {
     navigate('/login')
   }
 
+  const handleSwitchRestaurant = () => {
+    dispatch(clearRestaurant())
+    navigate('/select-restaurant')
+  }
+
   return (
     <div className="layout">
       <aside className="sidebar">
@@ -23,7 +28,7 @@ function Layout() {
           </div>
           <div className="restaurant-info">
             <p className="restaurant-name">{restaurant?.name || 'Nhà hàng'}</p>
-            <button onClick={() => navigate('/partner-hub')} className="switch-restaurant">
+            <button onClick={handleSwitchRestaurant} className="switch-restaurant">
               ↻ Đổi nhà hàng
             </button>
           </div>

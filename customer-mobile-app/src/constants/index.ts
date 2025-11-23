@@ -1,13 +1,13 @@
 // Payment Methods
 export const PAYMENT_METHODS = [
-  { id: 'dronepay', name: 'DronePay Gateway (bên thứ 3)', icon: '🚀' },
+  { id: 'momo', name: 'Ví MoMo', icon: 'Ⓜ' },
+  { id: 'vnpay', name: 'VNPay', icon: 'Ⓥ' },
 ];
 
 // Order Status
 export const ORDER_STATUS = {
   PENDING: 'pending',
   CONFIRMED: 'confirmed',
-  PREPARING: 'preparing',
   READY: 'ready',
   DELIVERING: 'delivering',
   DELIVERED: 'delivered',
@@ -17,7 +17,6 @@ export const ORDER_STATUS = {
 export const ORDER_STATUS_LABELS = {
   pending: 'Chờ xác nhận',
   confirmed: 'Đã xác nhận',
-  preparing: 'Đang chuẩn bị',
   ready: 'Sẵn sàng',
   delivering: 'Đang giao',
   delivered: 'Đã giao',
@@ -27,7 +26,6 @@ export const ORDER_STATUS_LABELS = {
 export const ORDER_STATUS_COLORS = {
   pending: '#FFA500',
   confirmed: '#4CAF50',
-  preparing: '#2196F3',
   ready: '#9C27B0',
   delivering: '#FF5722',
   delivered: '#4CAF50',
