@@ -241,19 +241,91 @@ export const updateRestaurant = async (req, res) => {
   }
 };
 
+// Restaurant Login
+export const restaurantLogin = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    console.log("🔐 Login attempt:", { email });
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Vui lòng nhập email và mật khẩu",
+      });
+    }
+
+    const restaurant = await Restaurant.findOne({ email }).select("+password");
+
+    console.log("🏪 Restaurant found:", !!restaurant);
+    console.log("🔑 Has password:", !!restaurant?.password);
+
+    if (!restaurant || !(await restaurant.comparePassword(password))) {
+      return res.status(401).json({
+        success: false,
+        message: "Email hoặc mật khẩu không đúng",
+      });
+    }
+
+    if (!restaurant.isActive) {
+      return res.status(401).json({
+        success: false,
+        message: "Tài khoản nhà hàng đã bị khóa",
+      });
+    }
+
+    if (!restaurant.isApproved) {
+      return res.status(401).json({
+        success: false,
+        message: "Tài khoản nhà hàng chưa được duyệt",
+      });
+    }
+
+    const token = generateToken(restaurant._id);
+
+    res.json({
+      success: true,
+      data: {
+        restaurant: {
+          id: restaurant._id,
+          name: restaurant.name,
+          email: restaurant.email,
+          phone: restaurant.phone,
+          avatar: restaurant.avatar,
+          address: restaurant.address,
+          rating: restaurant.rating,
+          totalReviews: restaurant.totalReviews,
+          owner: restaurant.owner, // Include owner ID
+        },
+        token,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Get current restaurant profile (for logged-in restaurant)
 export const getMyRestaurant = async (req, res) => {
   try {
-    // Lấy tất cả nhà hàng của user này
-    const restaurants = await Restaurant.find({ owner: req.user._id });
+    // req.user._id is the USER ID (from auth middleware)
+    // Support multi-restaurant: Find all restaurants owned by this user
+    const restaurants = await Restaurant.find({ owner: req.user._id }).populate(
+      "owner",
+      "name email phone role"
+    );
 
     if (!restaurants || restaurants.length === 0) {
       return res.status(404).json({
         success: false,
-        message: "Bạn chưa có nhà hàng",
+        message: "Không tìm thấy thông tin nhà hàng",
       });
     }
 
-    // Nếu có nhiều nhà hàng, trả về mảng. Nếu có 1, trả về object
+    // If user has 1 restaurant, return object. If multiple, return array
     res.json({
       success: true,
       data: restaurants.length === 1 ? restaurants[0] : restaurants,

@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { restaurants } from "../../data/mockData";
+import axios from "axios";
 import "./Home.css";
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 function Home() {
   const [restaurantList, setRestaurantList] = useState([]);
@@ -12,25 +14,46 @@ function Home() {
   const [maxPrice, setMaxPrice] = useState(500000);
   const [sortBy, setSortBy] = useState("default");
   const [freeShippingOnly, setFreeShippingOnly] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    setRestaurantList(restaurants);
+    fetchRestaurants();
   }, []);
 
+  const fetchRestaurants = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await axios.get(`${API_URL}/restaurants`);
+      if (response.data.success) {
+        setRestaurantList(response.data.data);
+      }
+    } catch (err) {
+      console.error("Error fetching restaurants:", err);
+      setError("Không thể tải danh sách nhà hàng. Vui lòng thử lại sau.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filteredRestaurants = restaurantList.filter((restaurant) => {
+    // Only show active and approved restaurants
+    if (!restaurant.isActive || !restaurant.isApproved) return false;
+
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch =
       restaurant.name.toLowerCase().includes(searchLower) ||
-      restaurant.cuisine.toLowerCase().includes(searchLower) ||
-      (restaurant.dishes &&
-        restaurant.dishes.some((dish) =>
-          dish.toLowerCase().includes(searchLower)
-        ));
+      restaurant.description?.toLowerCase().includes(searchLower) ||
+      (restaurant.cuisine &&
+        restaurant.cuisine.some((c) => c.toLowerCase().includes(searchLower)));
     const matchesCategory =
-      category === "all" || restaurant.category === category;
+      category === "all" || restaurant.cuisine?.includes(category);
     const matchesRating = restaurant.rating >= minRating;
-    const matchesPrice = restaurant.avgPrice <= maxPrice;
-    const matchesShipping = !freeShippingOnly || restaurant.freeShipping;
+    const matchesPrice =
+      maxPrice === 500000 ||
+      (restaurant.minOrder && restaurant.minOrder <= maxPrice);
+    const matchesShipping = !freeShippingOnly || restaurant.deliveryFee === 0;
     return (
       matchesSearch &&
       matchesCategory &&
@@ -41,10 +64,11 @@ function Home() {
   });
 
   const sortedRestaurants = [...filteredRestaurants].sort((a, b) => {
-    if (sortBy === "price-high") return b.avgPrice - a.avgPrice;
-    if (sortBy === "price-low") return a.avgPrice - b.avgPrice;
+    if (sortBy === "price-high") return (b.minOrder || 0) - (a.minOrder || 0);
+    if (sortBy === "price-low") return (a.minOrder || 0) - (b.minOrder || 0);
     if (sortBy === "free-ship")
-      return (b.freeShipping ? 1 : 0) - (a.freeShipping ? 1 : 0);
+      return (a.deliveryFee === 0 ? 1 : 0) - (b.deliveryFee === 0 ? 1 : 0);
+    if (sortBy === "rating") return b.rating - a.rating;
     return 0;
   });
 
@@ -54,6 +78,29 @@ function Home() {
     setSortBy("default");
     setFreeShippingOnly(false);
   };
+
+  if (loading) {
+    return (
+      <div className="home-page">
+        <div className="container">
+          <div className="loading">Đang tải nhà hàng...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="home-page">
+        <div className="container">
+          <div className="error-message">{error}</div>
+          <button onClick={fetchRestaurants} className="retry-btn">
+            Thử lại
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="home-page">
@@ -196,28 +243,56 @@ function Home() {
         <div className="restaurants-grid">
           {sortedRestaurants.map((restaurant) => (
             <Link
-              key={restaurant.id}
-              to={`/restaurant/${restaurant.id}`}
+              key={restaurant._id}
+              to={`/restaurant/${restaurant._id}`}
               className="restaurant-card"
             >
               <div className="restaurant-image">
-                <img src={restaurant.image} alt={restaurant.name} />
-                {restaurant.isOpen ? (
+                <img
+                  src={restaurant.coverImage || restaurant.avatar}
+                  alt={restaurant.name}
+                  onError={(e) => {
+                    e.target.src =
+                      "https://via.placeholder.com/400x200?text=Restaurant";
+                  }}
+                />
+                {restaurant.isActive && !restaurant.isBusy ? (
                   <span className="status-badge open">Đang mở</span>
                 ) : (
-                  <span className="status-badge closed">Đã đóng</span>
+                  <span className="status-badge closed">
+                    {restaurant.isBusy ? "Bận" : "Đã đóng"}
+                  </span>
                 )}
               </div>
               <div className="restaurant-info">
                 <h3>{restaurant.name}</h3>
-                <p className="cuisine">{restaurant.cuisine}</p>
+                <p className="cuisine">
+                  {Array.isArray(restaurant.cuisine)
+                    ? restaurant.cuisine.join(", ")
+                    : restaurant.cuisine}
+                </p>
                 <div className="restaurant-meta">
-                  <span className="rating">⭐ {restaurant.rating}</span>
+                  <span className="rating">
+                    ⭐ {restaurant.rating.toFixed(1)}
+                  </span>
                   <span className="delivery-time">
-                    🚁 {restaurant.deliveryTime}
+                    🚁 {restaurant.estimatedDeliveryTime}
                   </span>
                 </div>
-                <p className="address">{restaurant.address}</p>
+                <p className="address">
+                  {restaurant.address?.street}, {restaurant.address?.district},{" "}
+                  {restaurant.address?.city}
+                </p>
+                <div className="restaurant-footer">
+                  <span className="min-order">
+                    Tối thiểu: {restaurant.minOrder?.toLocaleString()}đ
+                  </span>
+                  <span className="delivery-fee">
+                    {restaurant.deliveryFee === 0
+                      ? "🚀 Miễn phí ship"
+                      : `Phí ship: ${restaurant.deliveryFee?.toLocaleString()}đ`}
+                  </span>
+                </div>
               </div>
             </Link>
           ))}

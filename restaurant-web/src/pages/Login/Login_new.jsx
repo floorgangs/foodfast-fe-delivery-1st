@@ -34,20 +34,13 @@ function Login() {
         loginForm.password
       );
 
-      console.log("🔍 Login response:", response);
-      console.log("🔍 Response data:", response.data);
-
       if (response.success) {
-        const { user, restaurant, token } = response.data;
-
-        console.log("🔍 User data:", user);
-        console.log("🔍 Restaurant data:", restaurant);
-        console.log("🔍 Token:", token);
+        const { restaurant, token } = response.data;
 
         // Dispatch to Redux
         dispatch(
           loginAction({
-            user: user,
+            user: restaurant,
             restaurant: restaurant,
             token: token,
           })

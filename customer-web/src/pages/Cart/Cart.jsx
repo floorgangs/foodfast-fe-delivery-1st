@@ -10,6 +10,7 @@ import "./Cart.css";
 
 function Cart() {
   const { items, total } = useSelector((state) => state.cart);
+  const { isAuthenticated } = useSelector((state) => state.auth);
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
@@ -20,6 +21,12 @@ function Cart() {
   };
 
   const handleCheckout = () => {
+    if (!isAuthenticated) {
+      // Lưu URL hiện tại để redirect sau khi login
+      localStorage.setItem("redirectAfterLogin", "/checkout");
+      navigate("/login");
+      return;
+    }
     navigate("/checkout");
   };
 
@@ -60,12 +67,14 @@ function Cart() {
 
             <div className="cart-items">
               {items.map((item) => (
-                <div key={item.id} className="cart-item">
+                <div key={item._id || item.id} className="cart-item">
                   <img src={item.image} alt={item.name} />
                   <div className="item-details">
                     <h3>{item.name}</h3>
                     <p className="item-restaurant">
-                      {item.restaurant || "Cơm Tấm Sài Gòn"}
+                      {typeof item.restaurant === "object"
+                        ? item.restaurant?.name
+                        : item.restaurant || "Nhà hàng"}
                     </p>
                     <p className="item-price">
                       {item.price.toLocaleString("vi-VN")} đ
@@ -75,7 +84,10 @@ function Cart() {
                     <div className="quantity-controls">
                       <button
                         onClick={() =>
-                          handleUpdateQuantity(item.id, item.quantity - 1)
+                          handleUpdateQuantity(
+                            item._id || item.id,
+                            item.quantity - 1
+                          )
                         }
                         className="qty-btn"
                         disabled={item.quantity <= 1}
@@ -85,7 +97,10 @@ function Cart() {
                       <span className="quantity">{item.quantity}</span>
                       <button
                         onClick={() =>
-                          handleUpdateQuantity(item.id, item.quantity + 1)
+                          handleUpdateQuantity(
+                            item._id || item.id,
+                            item.quantity + 1
+                          )
                         }
                         className="qty-btn"
                       >
@@ -93,7 +108,9 @@ function Cart() {
                       </button>
                     </div>
                     <button
-                      onClick={() => dispatch(removeFromCart(item.id))}
+                      onClick={() =>
+                        dispatch(removeFromCart(item._id || item.id))
+                      }
                       className="remove-btn"
                       title="Xóa sản phẩm"
                     >

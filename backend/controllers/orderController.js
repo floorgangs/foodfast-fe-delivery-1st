@@ -20,13 +20,21 @@ export const createOrder = async (req, res) => {
       customerInfo,
     } = req.body;
 
+    console.log("📝 Order request:", {
+      isAuthenticated: Boolean(req.user?._id),
+      hasCustomer: Boolean(req.body.customer),
+      hasCustomerInfo: Boolean(customerInfo),
+      customerInfo,
+    });
+
     const isRegisteredCustomer = Boolean(req.user?._id);
 
     if (!isRegisteredCustomer) {
-      if (!customerInfo?.name || !customerInfo?.phone || !customerInfo?.email) {
+      if (!customerInfo?.name || !customerInfo?.phone) {
+        console.log("❌ Guest order missing info");
         return res.status(400).json({
           success: false,
-          message: "Vui lòng cung cấp tên, số điện thoại và email để đặt hàng",
+          message: "Vui lòng cung cấp tên và số điện thoại để đặt hàng",
         });
       }
     }
@@ -202,7 +210,9 @@ export const createOrder = async (req, res) => {
 
     // Generate order number
     const orderNumber = `FD${Date.now()}`;
-    const paymentSessionId = `PAY-${Date.now()}-${Math.floor(Math.random() * 9999)}`;
+    const paymentSessionId = `PAY-${Date.now()}-${Math.floor(
+      Math.random() * 9999
+    )}`;
     const paymentSessionExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
     const paymentProvider = paymentProviderMap[normalizedPaymentMethod] || "DronePay Gateway";
 
@@ -489,9 +499,13 @@ export const updateOrderStatus = async (req, res) => {
     // Emit socket event
     if (req.io) {
       if (order.customer) {
-        req.io.to(`customer_${order.customer}`).emit("order_updated", populatedOrder);
+        req.io
+          .to(`customer_${order.customer}`)
+          .emit("order_updated", populatedOrder);
       }
-      req.io.to(`restaurant_${order.restaurant}`).emit("order_updated", populatedOrder);
+      req.io
+        .to(`restaurant_${order.restaurant}`)
+        .emit("order_updated", populatedOrder);
       req.io.to("admin").emit("order_updated", populatedOrder);
     }
 
@@ -878,7 +892,9 @@ export const cancelOrder = async (req, res) => {
       if (order.customer) {
         req.io.to(`customer_${order.customer._id}`).emit("order_cancelled", order);
       }
-      req.io.to(`restaurant_${order.restaurant._id}`).emit("order_cancelled", order);
+      req.io
+        .to(`restaurant_${order.restaurant}`)
+        .emit("order_cancelled", order);
       req.io.to("admin").emit("order_cancelled", order);
     }
 

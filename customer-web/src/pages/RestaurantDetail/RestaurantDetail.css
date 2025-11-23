@@ -63,22 +63,34 @@
 
 .cuisine {
   color: #666;
-  font-size: 1rem;
-  margin-bottom: 1rem;
+  font-size: 1.05rem;
+  margin-bottom: 1.25rem;
+  font-weight: 500;
+  line-height: 1.4;
 }
 
 .meta-info {
   display: flex;
   gap: 2rem;
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
   font-size: 0.95rem;
-  color: #666;
+  color: #444;
+  flex-wrap: wrap;
+}
+
+.meta-info span {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 500;
 }
 
 .address {
-  color: #999;
-  font-size: 0.9rem;
+  color: #666;
+  font-size: 0.95rem;
   margin-bottom: 1rem;
+  line-height: 1.5;
+  font-weight: 500;
 }
 
 .closed-notice {

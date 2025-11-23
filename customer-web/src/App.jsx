@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { checkAuth } from "./store/slices/authSlice";
-import { resumeAutoProgressions } from "./services/orderService";
 import PrivateRoute from "./components/PrivateRoute";
 import Layout from "./components/Layout/Layout";
 import Login from "./pages/Login/Login";
@@ -13,9 +12,11 @@ import Cart from "./pages/Cart/Cart";
 import Checkout from "./pages/Checkout/Checkout";
 import OrderTracking from "./pages/OrderTracking/OrderTracking";
 import PaymentGateway from "./pages/PaymentGateway/PaymentGateway";
+import PaymentReturn from "./pages/PaymentReturn/PaymentReturn";
 import Profile from "./pages/Profile/Profile";
 import Review from "./pages/Review/Review";
 import EditProfile from "./pages/EditProfile/EditProfile";
+import Orders from "./pages/Orders/Orders";
 import "./App.css";
 
 function App() {
@@ -27,15 +28,6 @@ function App() {
 
     // Restore auth state from localStorage on app startup
     dispatch(checkAuth());
-
-    // Resume auto-progression for incomplete orders
-    if (isAuthenticated) {
-      try {
-        resumeAutoProgressions();
-      } catch (error) {
-        console.error("Error resuming auto progressions:", error);
-      }
-    }
   }, [dispatch, isAuthenticated]);
 
   console.log("🎨 App rendering, isAuthenticated:", isAuthenticated);
@@ -52,31 +44,75 @@ function App() {
         element={isAuthenticated ? <Navigate to="/" replace /> : <Register />}
       />
 
-      {/* Private routes - Cần đăng nhập */}
-      <Route
-        path="/"
-        element={
-          <PrivateRoute>
-            <Layout />
-          </PrivateRoute>
-        }
-      >
+      {/* Layout routes - Không cần đăng nhập để xem */}
+      <Route path="/" element={<Layout />}>
         <Route index element={<Home />} />
         <Route path="restaurant/:id" element={<RestaurantDetail />} />
         <Route path="cart" element={<Cart />} />
-        <Route path="checkout" element={<Checkout />} />
-        <Route path="order-tracking/:orderId" element={<OrderTracking />} />
-        <Route path="payment" element={<PaymentGateway />} />
-        <Route path="review/:orderId" element={<Review />} />
-        <Route path="profile" element={<Profile />} />
-        <Route path="edit-profile" element={<EditProfile />} />
+
+        {/* Chỉ các route này mới cần đăng nhập */}
+        <Route
+          path="checkout"
+          element={
+            <PrivateRoute>
+              <Checkout />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="order-tracking/:orderId"
+          element={
+            <PrivateRoute>
+              <OrderTracking />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="payment"
+          element={
+            <PrivateRoute>
+              <PaymentGateway />
+            </PrivateRoute>
+          }
+        />
+        <Route path="payment/vnpay-return" element={<PaymentReturn />} />
+        <Route path="payment/momo-return" element={<PaymentReturn />} />
+        <Route
+          path="review/:orderId"
+          element={
+            <PrivateRoute>
+              <Review />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="profile"
+          element={
+            <PrivateRoute>
+              <Profile />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="orders"
+          element={
+            <PrivateRoute>
+              <Orders />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="edit-profile"
+          element={
+            <PrivateRoute>
+              <EditProfile />
+            </PrivateRoute>
+          }
+        />
       </Route>
 
-      {/* Redirect to login for unknown routes */}
-      <Route
-        path="*"
-        element={<Navigate to={isAuthenticated ? "/" : "/login"} replace />}
-      />
+      {/* Redirect to home for unknown routes */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

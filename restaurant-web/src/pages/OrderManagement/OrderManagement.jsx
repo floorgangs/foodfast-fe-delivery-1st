@@ -10,15 +10,22 @@ function OrderManagement() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  
+
   const restaurant = useSelector((state) => state.auth.restaurant);
 
   // Load orders từ API
   useEffect(() => {
-    if (restaurant?._id) {
+    const restaurantId = restaurant?._id || restaurant?.id;
+
+    if (restaurantId) {
+      console.log("🏪 Restaurant found, loading orders:", restaurantId);
       loadOrders();
       const interval = setInterval(loadOrders, 30000);
       return () => clearInterval(interval);
+    } else {
+      console.log("⚠️ No restaurant ID found, stopping loading");
+      setLoading(false);
+      setError("Không tìm thấy thông tin nhà hàng");
     }
   }, [restaurant]);
 
@@ -32,17 +39,32 @@ function OrderManagement() {
       setLoading(true);
       setError("");
 
+      console.log("🔄 Loading orders for restaurant:", restaurant);
+
+      // Timeout sau 10 giây
+      const timeoutId = setTimeout(() => {
+        setLoading(false);
+        setError("Timeout: Không thể kết nối đến server");
+      }, 10000);
+
+      // Lấy orders của nhà hàng từ API (backend tự động filter theo user)
       const response = await orderAPI.getMyOrders();
+
+      clearTimeout(timeoutId);
+      console.log("📦 Orders response:", response);
 
       if (response?.success) {
         const apiOrders = response.data || [];
 
+        console.log(`✅ Loaded ${apiOrders.length} orders`);
+
+        // Transform data sang format của OrderManagement
         const transformedOrders = apiOrders.map((order) => ({
           id: order._id,
           customer:
-            order.customer?.name || order.guestCustomer?.name || "Khách hàng",
-          phone: order.customer?.phone || order.guestCustomer?.phone || "",
-          address: formatDeliveryAddress(order.deliveryAddress),
+            order.customer?.name || order.deliveryInfo?.name || "Khách hàng",
+          phone: order.customer?.phone || order.deliveryInfo?.phone || "",
+          address: order.deliveryInfo?.address || "",
           items: order.items.map((item) => ({
             name: item.product?.name || item.name,
             quantity: item.quantity,
@@ -51,7 +73,9 @@ function OrderManagement() {
           subtotal: order.subtotal || 0,
           deliveryFee: order.deliveryFee || 0,
           discount: order.discount || 0,
-          total: order.total || 0,
+          platformFee: Math.round(order.totalAmount * 0.1), // 10% platform fee
+          restaurantReceives:
+            order.totalAmount - Math.round(order.totalAmount * 0.1),
           distance: order.distance || 2.5,
           status: mapStatus(order.status),
           customerNote: order.customerNote || "",
@@ -388,7 +412,10 @@ function OrderManagement() {
                       <span className="item-name">{item.name}</span>
                       <span className="item-quantity">x{item.quantity}</span>
                       <span className="item-price">
-                        {((item.price || 0) * (item.quantity || 0)).toLocaleString("vi-VN")}đ
+                        {(
+                          (item.price || 0) * (item.quantity || 0)
+                        ).toLocaleString("vi-VN")}
+                        đ
                       </span>
                     </div>
                   ))}
@@ -423,13 +450,18 @@ function OrderManagement() {
                   <div className="summary-row" style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px dashed #ddd' }}>
                     <span className="summary-label">Chiết khấu nền tảng (5%):</span>
                     <span className="summary-value fee">
-                      -{((selectedOrder.total || 0) * 0.05).toLocaleString("vi-VN")}đ
+                      -
+                      {(selectedOrder.platformFee || 0).toLocaleString("vi-VN")}
+                      đ
                     </span>
                   </div>
-                  <div className="total-row" style={{ backgroundColor: '#f0f9ff', padding: '12px', borderRadius: '8px', marginTop: '8px' }}>
-                    <span className="total-label" style={{ fontWeight: 'bold', color: '#0066cc' }}>Quán nhận được:</span>
-                    <span className="total-value" style={{ fontSize: '24px', color: '#0066cc' }}>
-                      {((selectedOrder.total || 0) * 0.95).toLocaleString("vi-VN")}đ
+                  <div className="total-row">
+                    <span className="total-label">Quán phải thu:</span>
+                    <span className="total-value">
+                      {(selectedOrder.restaurantReceives || 0).toLocaleString(
+                        "vi-VN"
+                      )}
+                      đ
                     </span>
                   </div>
                 </div>

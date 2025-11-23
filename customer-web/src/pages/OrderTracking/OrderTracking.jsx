@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
+import axios from "axios";
 import {
-  getOrderById,
   cancelOrder,
   confirmReceived,
   subscribeToOrderUpdates,
@@ -9,6 +9,8 @@ import {
   getTimeToCancel,
 } from "../../services/orderService";
 import "./OrderTracking.css";
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 function OrderTracking() {
   const navigate = useNavigate();
@@ -18,6 +20,7 @@ function OrderTracking() {
   const orderId = paramOrderId || location.state?.orderId;
 
   const [order, setOrder] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [droneProgress, setDroneProgress] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -26,20 +29,33 @@ function OrderTracking() {
   // Load order data
   useEffect(() => {
     if (!orderId) {
-      console.log("No orderId found, redirecting to home");
-      navigate("/");
+      console.log("No orderId found");
+      setLoading(false);
       return;
     }
 
     console.log("Loading order with ID:", orderId);
 
-    const loadOrder = () => {
-      const orderData = getOrderById(orderId);
-      console.log("Order data loaded:", orderData);
-      if (orderData) {
-        setOrder(orderData);
-      } else {
-        console.error("Order not found with ID:", orderId);
+    const loadOrder = async () => {
+      try {
+        setLoading(true);
+        const token = localStorage.getItem("token");
+        const response = await axios.get(`${API_URL}/orders/${orderId}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+
+        console.log("Order data loaded:", response.data);
+        if (response.data.success) {
+          setOrder(response.data.data);
+        } else {
+          console.error("Order not found");
+          alert("Không tìm thấy đơn hàng");
+        }
+      } catch (error) {
+        console.error("Error loading order:", error);
+        alert("Không thể tải thông tin đơn hàng");
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -73,12 +89,14 @@ function OrderTracking() {
 
   // Simulate drone movement when delivering
   useEffect(() => {
-    if (order?.status === "delivering") {
-      const startTime = order.deliveryStartTime || Date.now();
-      const duration = 15000; // 15 seconds
+    if (order?.status === "delivering" && order?.deliveryStartTime) {
+      const startTime = order.deliveryStartTime;
+      // Calculate duration from estimatedDeliveryTime (e.g., "25-35 phút")
+      const estimatedMinutes = 30; // Default 30 minutes
+      const duration = estimatedMinutes * 60 * 1000; // Convert to milliseconds
 
       const interval = setInterval(() => {
-        const elapsed = Date.now() - startTime;
+        const elapsed = Date.now() - new Date(startTime).getTime();
         const progress = Math.min((elapsed / duration) * 100, 100);
         setDroneProgress(progress);
 
@@ -111,11 +129,28 @@ function OrderTracking() {
     }, 1000);
   };
 
+  if (loading) {
+    return (
+      <div className="order-tracking-page">
+        <div className="container">
+          <div style={{ textAlign: "center", padding: "3rem" }}>
+            <h2>Đang tải thông tin đơn hàng...</h2>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!order) {
     return (
       <div className="order-tracking-page">
         <div className="container">
-          <p>Đang tải thông tin đơn hàng...</p>
+          <div style={{ textAlign: "center", padding: "3rem" }}>
+            <h2>Không tìm thấy đơn hàng</h2>
+            <button onClick={() => navigate("/")} className="btn-primary">
+              Về trang chủ
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -349,11 +384,27 @@ function OrderTracking() {
             <div className="delivery-info">
               <div className="info-row">
                 <span className="label">📍 Địa chỉ giao:</span>
-                <span className="value">{order.deliveryAddress}</span>
+                <span className="value">
+                  {typeof order.deliveryAddress === "string"
+                    ? order.deliveryAddress
+                    : order.deliveryAddress?.address || "Chưa có địa chỉ"}
+                </span>
+              </div>
+              <div className="info-row">
+                <span className="label">📞 Số điện thoại:</span>
+                <span className="value">
+                  {order.deliveryAddress?.phone || "Chưa có SĐT"}
+                </span>
               </div>
               <div className="info-row">
                 <span className="label">💳 Thanh toán:</span>
-                <span className="value">{order.paymentMethod}</span>
+                <span className="value">
+                  {order.paymentMethod === "dronepay"
+                    ? "Thanh toán online"
+                    : order.paymentMethod === "cod"
+                    ? "Tiền mặt"
+                    : order.paymentMethod}
+                </span>
               </div>
               <div className="info-row">
                 <span className="label">🕐 Thời gian đặt:</span>
