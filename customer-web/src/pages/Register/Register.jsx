@@ -93,13 +93,25 @@ function Register() {
   return (
     <div className="register-page">
       <div className="register-card">
-        <div className="register-top">
-          <img src="/logo192.png" alt="logo" className="register-logo" />
-          <h2>Đăng ký</h2>
-          <p>Tạo tài khoản mới để bắt đầu</p>
+        {/* Left Banner */}
+        <div className="register-banner">
+          <div className="banner-content">
+            <div className="banner-icon">🚁</div>
+            <h2>Tham gia FoodFast</h2>
+            <p>Đăng ký để trải nghiệm dịch vụ giao hàng bằng Drone nhanh nhất!</p>
+          </div>
         </div>
 
-        <form className="register-form" onSubmit={handleSubmit}>
+        {/* Right Form */}
+        <div className="register-form-section">
+          <div className="register-top">
+            <div className="logo-text">🚁 FoodFast</div>
+            <h2>Tạo tài khoản mới</h2>
+            <p>Điền thông tin để bắt đầu</p>
+          </div>
+
+          <form className="register-form" onSubmit={handleSubmit}>
+            {error && <div className="error-message">⚠️ {error}</div>}
           <div className="form-group">
             <label>Họ và tên</label>
             <input
@@ -201,7 +213,8 @@ function Register() {
           <p className="have-account">
             Đã có tài khoản? <a href="/login">Đăng nhập ngay</a>
           </p>
-        </form>
+          </form>
+        </div>
       </div>
     </div>
   );

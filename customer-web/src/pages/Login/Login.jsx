@@ -66,53 +66,78 @@ function Login() {
   return (
     <div className="login-page">
       <div className="login-container">
-        <div className="login-header">
-          <h1>🚁 FoodFast</h1>
-          <p>Giao hàng bằng Drone - Nhanh như chớp</p>
+        {/* Left Banner */}
+        <div className="login-banner">
+          <div className="banner-content">
+            <div className="banner-icon">🚁</div>
+            <h2>FoodFast Delivery</h2>
+            <p>Trải nghiệm giao hàng bằng Drone siêu tốc. Đặt món yêu thích và nhận hàng trong vài phút!</p>
+            <ul className="banner-features">
+              <li><span>⚡</span> Giao hàng nhanh chóng</li>
+              <li><span>🎯</span> Định vị chính xác</li>
+              <li><span>💳</span> Thanh toán đa dạng</li>
+              <li><span>🔒</span> An toàn & bảo mật</li>
+            </ul>
+          </div>
         </div>
 
-        <form className="login-form" onSubmit={handleSubmit}>
-          <h2>Đăng nhập</h2>
-
-          <div className="form-group">
-            <label>Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="customer1@gmail.com"
-              required
-              disabled={loading}
-            />
+        {/* Right Form */}
+        <div className="login-form-section">
+          <div className="login-header">
+            <div className="logo-text">🚁 FoodFast</div>
+            <h1>Chào mừng trở lại!</h1>
+            <p>Đăng nhập để tiếp tục đặt món</p>
           </div>
 
-          <div className="form-group">
-            <label>Mật khẩu</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-              disabled={loading}
-            />
-          </div>
+          <form className="login-form" onSubmit={handleSubmit}>
+            {error && <div className="error-message">⚠️ {error}</div>}
 
-          {error && <div className="error-message">{error}</div>}
+            <div className="form-group">
+              <label>Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Nhập email của bạn"
+                required
+                disabled={loading}
+              />
+            </div>
 
-          <button type="submit" className="login-btn" disabled={loading}>
-            {loading ? "Đang đăng nhập..." : "Đăng nhập"}
-          </button>
+            <div className="form-group">
+              <label>Mật khẩu</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Nhập mật khẩu"
+                required
+                disabled={loading}
+              />
+            </div>
 
-          <div className="login-footer">
-            <p>
-              Chưa có tài khoản? <a href="/register">Đăng ký ngay</a>
-            </p>
-            <p className="demo-note">
-              📝 Tài khoản demo: customer1@gmail.com / 123456
-            </p>
-          </div>
-        </form>
+            <button type="submit" className="login-btn" disabled={loading}>
+              {loading ? (
+                <>
+                  <span className="spinner"></span>
+                  Đang đăng nhập...
+                </>
+              ) : (
+                "Đăng nhập"
+              )}
+            </button>
+
+            <div className="login-footer">
+              <p>
+                Chưa có tài khoản? <a href="/register">Đăng ký ngay</a>
+              </p>
+              <div className="demo-note">
+                <strong>📝 Tài khoản demo:</strong>
+                customer1@gmail.com / 123456
+              </div>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );
