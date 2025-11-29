@@ -1,19 +1,91 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { orderAPI } from "../../services/api";
 import "./OrderTracking.css";
 
+// Status steps - customer chỉ thấy đến 'delivered', không thấy 'completed'
 const STATUS_STEPS = [
   { key: 'pending', label: 'Chờ xác nhận', icon: '⏳', description: 'Đơn hàng đang chờ nhà hàng xác nhận' },
   { key: 'confirmed', label: 'Đã xác nhận', icon: '✅', description: 'Nhà hàng đã tiếp nhận và chuẩn bị đơn' },
-  { key: 'preparing', label: 'Chuẩn bị', icon: '👨‍🍳', description: 'Nhà hàng đang chuẩn bị món ăn' },
   { key: 'ready', label: 'Sẵn sàng', icon: '📦', description: 'Đơn đã đóng gói, chờ drone tiếp nhận' },
-  { key: 'delivering', label: 'Đang giao', icon: '🚁', description: 'Drone đang trên đường bay tới vị trí của bạn' },
-  { key: 'delivered', label: 'Hoàn thành', icon: '🎉', description: 'Bạn đã nhận được đơn hàng' },
+  { key: 'delivering', label: 'Drone đang giao', icon: '🚁', description: 'Drone đang trên đường bay tới vị trí của bạn' },
+  { key: 'delivered', label: 'Chờ giao hàng', icon: '📍', description: 'Drone đã đến, vui lòng nhận hàng' },
 ];
 
 const STATUS_SEQUENCE = STATUS_STEPS.map(step => step.key);
-const HCM_CENTER = { lat: 10.7769, lng: 106.7009 };
+
+// Default coordinates (HCM City)
+const FALLBACK_PICKUP = { lat: 10.776923, lng: 106.700981 };
+const FALLBACK_DROPOFF = { lat: 10.782112, lng: 106.70917 };
+
+// Build route coordinates for smooth polyline
+const buildRouteCoordinates = (start, end) => {
+  if (!start || !end) {
+    return [FALLBACK_PICKUP, FALLBACK_DROPOFF];
+  }
+  const points = [];
+  const steps = 30;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    points.push({
+      lat: start.lat + (end.lat - start.lat) * t,
+      lng: start.lng + (end.lng - start.lng) * t,
+    });
+  }
+  return points;
+};
+
+// Calculate bearing for drone rotation
+const toRadians = (degrees) => (degrees * Math.PI) / 180;
+const toDegrees = (radians) => (radians * 180) / Math.PI;
+
+const calculateBearing = (from, to) => {
+  if (from.lat === to.lat && from.lng === to.lng) return 0;
+  const lat1 = toRadians(from.lat);
+  const lat2 = toRadians(to.lat);
+  const deltaLng = toRadians(to.lng - from.lng);
+  const y = Math.sin(deltaLng) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(deltaLng);
+  const bearing = toDegrees(Math.atan2(y, x));
+  return (bearing + 360) % 360;
+};
+
+// Get coordinate at progress
+const getCoordinateAtProgress = (route, progress) => {
+  if (!route.length) return FALLBACK_PICKUP;
+  if (progress <= 0) return route[0];
+  if (progress >= 1) return route[route.length - 1];
+  
+  const clampedProgress = Math.max(0, Math.min(progress, 1));
+  const segments = route.length - 1;
+  const exactIndex = clampedProgress * segments;
+  const segmentIndex = Math.min(Math.floor(exactIndex), segments - 1);
+  const segmentProgress = exactIndex - segmentIndex;
+  const start = route[segmentIndex];
+  const end = route[segmentIndex + 1];
+  
+  return {
+    lat: start.lat + (end.lat - start.lat) * segmentProgress,
+    lng: start.lng + (end.lng - start.lng) * segmentProgress,
+  };
+};
+
+// Normalize status
+const normalizeStatus = (status) => {
+  if (!status) return 'pending';
+  // 'completed' is now a separate step, no conversion needed
+  if (status === 'ready_for_delivery') return 'ready';
+  if (status === 'preparing') return 'confirmed';
+  return status;
+};
+
+// Format timestamp
+const formatTimestamp = (timestamp) => {
+  if (!timestamp) return null;
+  const date = new Date(timestamp);
+  if (isNaN(date.getTime())) return null;
+  return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+};
 
 function OrderTracking() {
   const navigate = useNavigate();
@@ -23,6 +95,9 @@ function OrderTracking() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [acknowledged, setAcknowledged] = useState(false);
+  const [demoProgress, setDemoProgress] = useState(0);
+  const [isDemo, setIsDemo] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
   
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -33,36 +108,43 @@ function OrderTracking() {
     polyline: null,
     progressPolyline: null
   });
+  const animationRef = useRef(null);
+
+  // Set mapReady after component mounts
+  useEffect(() => {
+    const timer = setTimeout(() => setMapReady(true), 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Fetch tracking data
-  useEffect(() => {
+  const fetchTracking = useCallback(async () => {
     if (!orderId) {
       setError('Không tìm thấy mã đơn hàng');
       setLoading(false);
       return;
     }
 
-    const fetchTracking = async () => {
-      try {
-        const response = await orderAPI.track(orderId);
-        if (response?.data) {
-          setTrackingData(response.data);
-          setError(null);
-        } else {
-          setError('Không nhận được dữ liệu theo dõi');
-        }
-      } catch (err) {
-        console.error('[OrderTracking] fetch error:', err);
-        setError(err.message || 'Không thể tải dữ liệu theo dõi');
-      } finally {
-        setLoading(false);
+    try {
+      const response = await orderAPI.track(orderId);
+      if (response?.data) {
+        setTrackingData(response.data);
+        setError(null);
+      } else {
+        setError('Không nhận được dữ liệu theo dõi');
       }
-    };
+    } catch (err) {
+      console.error('[OrderTracking] fetch error:', err);
+      setError(err.message || 'Không thể tải dữ liệu theo dõi');
+    } finally {
+      setLoading(false);
+    }
+  }, [orderId]);
 
+  useEffect(() => {
     fetchTracking();
     const interval = setInterval(fetchTracking, 10000);
     return () => clearInterval(interval);
-  }, [orderId]);
+  }, [fetchTracking]);
 
   // Reset acknowledged when status changes
   useEffect(() => {
@@ -72,203 +154,275 @@ function OrderTracking() {
     }
   }, [trackingData?.order?.status]);
 
-  const handleConfirm = () => {
-    setAcknowledged(true);
-    alert('Cảm ơn bạn! Đơn hàng đã được xác nhận.');
-  };
+  // Computed values
+  const normalizedStatus = useMemo(
+    () => normalizeStatus(trackingData?.order?.status),
+    [trackingData?.order?.status]
+  );
 
-  const normalizeStatus = (status) => {
-    if (!status) return 'pending';
-    if (status === 'completed') return 'delivered';
-    if (status === 'ready_for_delivery') return 'ready';
-    return status;
-  };
+  const statusIndex = useMemo(() => {
+    const idx = STATUS_SEQUENCE.indexOf(normalizedStatus);
+    return idx >= 0 ? idx : 0;
+  }, [normalizedStatus]);
 
-  const formatTimestamp = (timestamp) => {
-    if (!timestamp) return null;
-    const date = new Date(timestamp);
-    if (isNaN(date.getTime())) return null;
-    return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-  };
-
-  // Initialize Google Maps
-  useEffect(() => {
-    const normalizedStatus = normalizeStatus(trackingData?.order?.status);
-    if (normalizedStatus !== 'delivering' || !window.google) return;
-
-    const mapContainer = document.getElementById('tracking-map');
-    if (!mapContainer || mapInstanceRef.current) return;
-
-    // Create map
-    const map = new window.google.maps.Map(mapContainer, {
-      center: HCM_CENTER,
-      zoom: 14,
-      disableDefaultUI: false,
-      zoomControl: true,
-      mapTypeControl: false,
-      streetViewControl: false,
-      fullscreenControl: false,
-      styles: [
-        {
-          featureType: 'poi',
-          elementType: 'labels',
-          stylers: [{ visibility: 'off' }]
-        },
-        {
-          featureType: 'transit',
-          elementType: 'labels',
-          stylers: [{ visibility: 'off' }]
-        }
-      ]
-    });
-
-    mapInstanceRef.current = map;
-    mapRef.current = mapContainer;
-  }, [trackingData?.order?.status]);
-
-  // Update map markers and route
-  useEffect(() => {
-    if (!mapInstanceRef.current || !trackingData?.tracking) return;
-
-    const map = mapInstanceRef.current;
-    const tracking = trackingData.tracking;
-
-    // Clear old markers
-    Object.values(markersRef.current).forEach(marker => {
-      if (marker) marker.setMap(null);
-    });
-
-    // Get coordinates
-    const pickupCoords = tracking.pickupLocation?.coordinates;
-    const deliveryCoords = tracking.deliveryLocation?.coordinates;
-    const droneCoords = tracking.droneLocation;
-
-    const pickupPos = pickupCoords ? { lat: pickupCoords.lat, lng: pickupCoords.lng } : HCM_CENTER;
-    const deliveryPos = deliveryCoords ? { lat: deliveryCoords.lat, lng: deliveryCoords.lng } : { lat: HCM_CENTER.lat + 0.02, lng: HCM_CENTER.lng + 0.02 };
-
-    // Create pickup marker (restaurant)
-    markersRef.current.pickup = new window.google.maps.Marker({
-      position: pickupPos,
-      map: map,
-      title: tracking.pickupLocation?.name || 'Nhà hàng',
-      icon: {
-        url: "data:image/svg+xml;charset=UTF-8," +
-          encodeURIComponent(`
-            <svg width="40" height="40" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="20" cy="20" r="15" fill="#EA5034" stroke="white" stroke-width="3"/>
-              <text x="20" y="27" font-size="18" text-anchor="middle" fill="white">🏪</text>
-            </svg>
-          `)
+  const timelineMap = useMemo(() => {
+    const map = new Map();
+    (trackingData?.order?.timeline || []).forEach((entry) => {
+      if (entry?.status) {
+        map.set(entry.status, entry);
       }
     });
+    return map;
+  }, [trackingData?.order?.timeline]);
 
-    // Create delivery marker (home)
-    markersRef.current.delivery = new window.google.maps.Marker({
-      position: deliveryPos,
-      map: map,
-      title: 'Điểm giao hàng',
-      icon: {
-        url: "data:image/svg+xml;charset=UTF-8," +
-          encodeURIComponent(`
-            <svg width="40" height="40" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="20" cy="20" r="15" fill="#27AE60" stroke="white" stroke-width="3"/>
-              <text x="20" y="27" font-size="18" text-anchor="middle" fill="white">🏠</text>
-            </svg>
-          `)
-      }
+  const timelineStatuses = useMemo(() => new Set(timelineMap.keys()), [timelineMap]);
+
+  const pickupCoordinate = useMemo(() => {
+    const coords = trackingData?.tracking?.pickupLocation?.coordinates;
+    return coords ? { lat: coords.lat, lng: coords.lng } : FALLBACK_PICKUP;
+  }, [trackingData?.tracking?.pickupLocation]);
+
+  const dropoffCoordinate = useMemo(() => {
+    const coords = trackingData?.tracking?.deliveryLocation?.coordinates;
+    return coords ? { lat: coords.lat, lng: coords.lng } : FALLBACK_DROPOFF;
+  }, [trackingData?.tracking?.deliveryLocation]);
+
+  const routeCoordinates = useMemo(
+    () => buildRouteCoordinates(pickupCoordinate, dropoffCoordinate),
+    [pickupCoordinate, dropoffCoordinate]
+  );
+
+  const flightProgress = isDemo ? demoProgress : (trackingData?.tracking?.flightProgress || 0);
+
+  const droneCoordinate = useMemo(() => {
+    const coords = trackingData?.tracking?.droneLocation;
+    if (coords && !isDemo) {
+      return { lat: coords.lat, lng: coords.lng };
+    }
+    return getCoordinateAtProgress(routeCoordinates, flightProgress);
+  }, [trackingData?.tracking?.droneLocation, routeCoordinates, flightProgress, isDemo]);
+
+  const routeHeading = useMemo(() => {
+    const nextPoint = getCoordinateAtProgress(routeCoordinates, Math.min(flightProgress + 0.02, 1));
+    return calculateBearing(droneCoordinate, nextPoint);
+  }, [routeCoordinates, flightProgress, droneCoordinate]);
+
+  // Initialize and update Google Maps
+  useEffect(() => {
+    // Wait for map to be ready and data loaded
+    if (!mapReady || loading || !trackingData) {
+      console.log('[Map] Waiting for prerequisites:', { mapReady, loading, hasTracking: !!trackingData });
+      return;
+    }
+    
+    console.log('[Map] Checking prerequisites:', {
+      hasGoogle: !!window.google,
+      hasTracking: !!trackingData,
+      pickup: pickupCoordinate,
+      dropoff: dropoffCoordinate,
+      drone: droneCoordinate
     });
 
-    // Build route coordinates (30 points for smooth line)
-    const routeCoordinates = [];
-    const steps = 30;
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      routeCoordinates.push({
-        lat: pickupPos.lat + (deliveryPos.lat - pickupPos.lat) * t,
-        lng: pickupPos.lng + (deliveryPos.lng - pickupPos.lng) * t
+    if (!window.google) {
+      console.warn('[Map] Google Maps API not loaded');
+      return;
+    }
+
+    // Small delay to ensure DOM is rendered
+    const timer = setTimeout(() => {
+      const mapContainer = document.getElementById('tracking-map');
+      if (!mapContainer) {
+        console.warn('[Map] Map container not found');
+        return;
+      }
+
+      // Create map if not exists
+      if (!mapInstanceRef.current) {
+        console.log('[Map] Creating new map instance');
+        mapInstanceRef.current = new window.google.maps.Map(mapContainer, {
+          center: pickupCoordinate,
+          zoom: 14,
+          disableDefaultUI: false,
+          zoomControl: true,
+          mapTypeControl: false,
+          streetViewControl: false,
+          fullscreenControl: false,
+          styles: [
+            { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+            { featureType: 'transit', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+            { featureType: 'poi.business', stylers: [{ visibility: 'off' }] },
+          ]
+        });
+      }
+
+      const map = mapInstanceRef.current;
+      console.log('[Map] Updating markers and polylines');
+
+      // Clear old markers
+      Object.values(markersRef.current).forEach(marker => {
+        if (marker) marker.setMap(null);
       });
-    }
 
-    // Create full route polyline (gray)
-    markersRef.current.polyline = new window.google.maps.Polyline({
-      path: routeCoordinates,
-      geodesic: true,
-      strokeColor: '#1B2945',
-      strokeOpacity: 0.3,
-      strokeWeight: 4,
-      map: map
-    });
-
-    // Create drone marker if available
-    const flightProgress = tracking.flightProgress || 0;
-    let dronePos = pickupPos;
-    
-    if (droneCoords) {
-      dronePos = { lat: droneCoords.lat, lng: droneCoords.lng };
-    } else if (flightProgress > 0) {
-      // Calculate position based on progress
-      dronePos = {
-        lat: pickupPos.lat + (deliveryPos.lat - pickupPos.lat) * flightProgress,
-        lng: pickupPos.lng + (deliveryPos.lng - pickupPos.lng) * flightProgress
-      };
-    }
-
-    markersRef.current.drone = new window.google.maps.Marker({
-      position: dronePos,
-      map: map,
-      title: `Drone ${tracking.drone?.droneId || ''}`,
-      icon: {
-        url: "data:image/svg+xml;charset=UTF-8," +
-          encodeURIComponent(`
-            <svg width="50" height="50" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="25" cy="25" r="18" fill="#EA5034" stroke="white" stroke-width="3"/>
-              <text x="25" y="32" font-size="22" text-anchor="middle" fill="white">🚁</text>
+      // Create pickup marker (restaurant)
+      markersRef.current.pickup = new window.google.maps.Marker({
+        position: pickupCoordinate,
+        map: map,
+        title: trackingData?.tracking?.pickupLocation?.name || 'Nhà hàng',
+        icon: {
+          url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(`
+            <svg width="56" height="56" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="28" cy="28" r="24" fill="#FFEAE6" opacity="0.8"/>
+              <circle cx="28" cy="28" r="18" fill="#f97316" stroke="white" stroke-width="3"/>
+              <text x="28" y="34" font-size="16" text-anchor="middle" fill="white">🏪</text>
             </svg>
-          `)
-      },
-      animation: window.google.maps.Animation.BOUNCE
-    });
+          `),
+          scaledSize: new window.google.maps.Size(56, 56),
+          anchor: new window.google.maps.Point(28, 28)
+        },
+        zIndex: 100
+      });
 
-    // Stop bouncing after 2 seconds
-    setTimeout(() => {
-      if (markersRef.current.drone) {
-        markersRef.current.drone.setAnimation(null);
-      }
-    }, 2000);
+      // Create delivery marker (home)
+      markersRef.current.delivery = new window.google.maps.Marker({
+        position: dropoffCoordinate,
+        map: map,
+        title: 'Điểm giao hàng',
+        icon: {
+          url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(`
+            <svg width="56" height="56" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="28" cy="28" r="24" fill="#E8F8EF" opacity="0.8"/>
+              <circle cx="28" cy="28" r="18" fill="#27AE60" stroke="white" stroke-width="3"/>
+              <text x="28" y="34" font-size="16" text-anchor="middle" fill="white">🏠</text>
+            </svg>
+          `),
+          scaledSize: new window.google.maps.Size(56, 56),
+          anchor: new window.google.maps.Point(28, 28)
+        },
+        zIndex: 100
+      });
 
-    // Create progress polyline (red, showing completed path)
-    const progressIndex = Math.floor(flightProgress * routeCoordinates.length);
-    const progressPath = routeCoordinates.slice(0, Math.max(progressIndex, 1));
-    
-    if (progressPath.length > 1) {
-      markersRef.current.progressPolyline = new window.google.maps.Polyline({
-        path: progressPath,
+      // Create route polyline (background - darker)
+      markersRef.current.polyline = new window.google.maps.Polyline({
+        path: routeCoordinates,
         geodesic: true,
-        strokeColor: '#EA5034',
-        strokeOpacity: 1,
-        strokeWeight: 6,
+        strokeColor: '#1B2945',
+        strokeOpacity: 0.4,
+        strokeWeight: 4,
         map: map
       });
+
+      // Create progress polyline (orange - completed path)
+      const progressIndex = Math.max(1, Math.floor(flightProgress * routeCoordinates.length));
+      const progressPath = routeCoordinates.slice(0, progressIndex);
+      
+      if (progressPath.length > 1) {
+        markersRef.current.progressPolyline = new window.google.maps.Polyline({
+          path: progressPath,
+          geodesic: true,
+          strokeColor: '#f97316',
+          strokeOpacity: 1,
+          strokeWeight: 6,
+          map: map
+        });
+      }
+
+      // Create drone marker
+      markersRef.current.drone = new window.google.maps.Marker({
+        position: droneCoordinate,
+        map: map,
+        title: `Drone ${trackingData?.tracking?.drone?.droneId || ''}`,
+        icon: {
+          url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(`
+            <svg width="70" height="70" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="35" cy="35" r="32" fill="#FFF5F1" opacity="0.9"/>
+              <circle cx="35" cy="35" r="22" fill="#f97316" stroke="white" stroke-width="3"/>
+              <text x="35" y="42" font-size="20" text-anchor="middle" fill="white">🚁</text>
+            </svg>
+          `),
+          scaledSize: new window.google.maps.Size(70, 70),
+          anchor: new window.google.maps.Point(35, 35)
+        },
+        zIndex: 200
+      });
+
+      // Fit bounds to show all markers
+      const bounds = new window.google.maps.LatLngBounds();
+      bounds.extend(pickupCoordinate);
+      bounds.extend(dropoffCoordinate);
+      bounds.extend(droneCoordinate);
+      map.fitBounds(bounds);
+
+      // Adjust zoom
+      window.google.maps.event.addListenerOnce(map, 'bounds_changed', () => {
+        if (map.getZoom() > 15) map.setZoom(15);
+      });
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [mapReady, loading, trackingData, pickupCoordinate, dropoffCoordinate, routeCoordinates, droneCoordinate, flightProgress]);
+
+  // Demo animation - When drone arrives, update status to 'delivered'
+  const startDemo = () => {
+    // Only allow demo when status is 'delivering'
+    if (normalizedStatus !== 'delivering') {
+      alert('Demo chỉ khả dụng khi đơn hàng đang được giao');
+      return;
+    }
+    
+    setIsDemo(true);
+    setDemoProgress(0);
+    
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
     }
 
-    // Fit bounds to show all markers
-    const bounds = new window.google.maps.LatLngBounds();
-    bounds.extend(pickupPos);
-    bounds.extend(deliveryPos);
-    if (dronePos) bounds.extend(dronePos);
-    
-    map.fitBounds(bounds);
-    
-    // Adjust zoom after fitting bounds
-    const listener = window.google.maps.event.addListenerOnce(map, 'bounds_changed', () => {
-      if (map.getZoom() > 15) map.setZoom(15);
-    });
+    const duration = 15000; // 15 seconds for full demo
+    const startTime = Date.now();
 
-  }, [trackingData?.tracking]);
+    const animate = async () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      setDemoProgress(progress);
 
-  // Cleanup on unmount
+      if (progress < 1) {
+        animationRef.current = requestAnimationFrame(animate);
+      } else {
+        setIsDemo(false);
+        // Drone has arrived - confirm delivery
+        try {
+          await orderAPI.confirmDelivery(orderId);
+          // Refresh tracking data
+          await fetchTracking();
+          alert('🎉 Drone đã giao hàng thành công!');
+        } catch (err) {
+          console.error('Failed to confirm delivery:', err);
+          alert('Không thể cập nhật trạng thái. Vui lòng thử lại.');
+        }
+      }
+    };
+
+    animationRef.current = requestAnimationFrame(animate);
+  };
+
+  // Auto-start demo drone when status changes to 'delivering'
+  useEffect(() => {
+    if (normalizedStatus === 'delivering' && !isDemo && demoProgress === 0) {
+      console.log('🚁 Auto-starting drone delivery animation');
+      // Delay to ensure map is ready
+      const timer = setTimeout(() => {
+        startDemo();
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [normalizedStatus, isDemo, demoProgress]);
+
+  // Cleanup
   useEffect(() => {
     return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
       Object.values(markersRef.current).forEach(marker => {
         if (marker) marker.setMap(null);
       });
@@ -276,6 +430,23 @@ function OrderTracking() {
     };
   }, []);
 
+  const handleConfirm = async () => {
+    try {
+      // Call API to complete order (customer confirmed receiving)
+      await orderAPI.complete(orderId);
+      setAcknowledged(true);
+      alert('🎉 Cảm ơn bạn! Đơn hàng đã hoàn thành.');
+      // Redirect to profile/history after 1 second
+      setTimeout(() => {
+        navigate('/profile?tab=history');
+      }, 1000);
+    } catch (err) {
+      console.error('Failed to complete order:', err);
+      alert('Không thể xác nhận. Vui lòng thử lại.');
+    }
+  };
+
+  // Loading state
   if (!orderId) {
     return (
       <div className="order-tracking-page">
@@ -307,26 +478,16 @@ function OrderTracking() {
     );
   }
 
-  const normalizedStatus = normalizeStatus(trackingData?.order?.status);
-  const statusIndex = STATUS_SEQUENCE.indexOf(normalizedStatus);
-  const timelineMap = new Map();
-  (trackingData?.order?.timeline || []).forEach((entry) => {
-    if (entry?.status) {
-      timelineMap.set(entry.status, entry);
-    }
-  });
-  const timelineStatuses = new Set(timelineMap.keys());
-
   const orderNumber = trackingData?.order?.orderNumber || trackingData?.order?.id || '---';
   const restaurantName = trackingData?.tracking?.pickupLocation?.name || 'Nhà hàng FoodFast';
-  const restaurantAddress = trackingData?.tracking?.pickupLocation?.address;
   const deliveryAddress = trackingData?.tracking?.deliveryLocation?.address || 'Đang cập nhật địa chỉ giao hàng';
   const droneInfo = trackingData?.tracking?.drone;
   const droneCode = droneInfo?.droneId || droneInfo?.name || orderNumber.slice(0, 6).toUpperCase();
   const items = trackingData?.order?.items || [];
   const totalAmount = items.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0);
   const canConfirm = normalizedStatus === 'delivered';
-  const timelineUpdatedAt = formatTimestamp(trackingData?.order?.updatedAt);
+  // Customer never sees 'completed' status, it's handled on restaurant side
+  
   const etaValue = trackingData?.tracking?.estimatedArrival ? new Date(trackingData.tracking.estimatedArrival) : null;
   let etaText = '--:--';
   if (etaValue && !isNaN(etaValue.getTime())) {
@@ -344,8 +505,8 @@ function OrderTracking() {
         <button className="back-btn" onClick={() => navigate("/orders")}>
           <span>←</span>
         </button>
-        <h1>Theo dõi đơn hàng</h1>
-        <div style={{ width: 22 }}></div>
+        <h1>🚁 Theo dõi đơn hàng</h1>
+        <div style={{ width: 40 }}></div>
       </div>
 
       {/* Error Banner */}
@@ -353,7 +514,7 @@ function OrderTracking() {
         <div className="error-banner">
           <span className="error-icon">⚠️</span>
           <span className="error-text">{error}</span>
-          <button onClick={() => window.location.reload()} className="retry-link">
+          <button onClick={fetchTracking} className="retry-link">
             Thử lại
           </button>
         </div>
@@ -362,45 +523,69 @@ function OrderTracking() {
       {/* Status Banner */}
       <div className="status-banner">
         <div className="banner-left">
-          <div className="banner-label">Mã đơn: #{orderNumber}</div>
+          <div className="banner-label">MÃ ĐƠN: #{orderNumber}</div>
           <div className="banner-text">
-            🚁
-            {normalizedStatus === 'delivering' 
-              ? ' Đang giao hàng' 
-              : ' Drone đang sẵn sàng'}
+            🚁 {normalizedStatus === 'delivering' ? 'Drone đang sẵn sàng' : 'Drone đang sẵn sàng'}
           </div>
           <div className="banner-desc">
-            {normalizedStatus === 'delivering' 
-              ? 'Drone đang giao hàng đến bạn' 
-              : 'Đơn hàng của bạn đang được xử lý'}
+            Đơn hàng của bạn đang được xử lý
           </div>
         </div>
       </div>
 
-      {/* Status Steps */}
-      <div className="status-steps">
-        {STATUS_STEPS.map((step) => {
-          const reached = timelineStatuses.has(step.key) || STATUS_SEQUENCE.indexOf(step.key) <= statusIndex;
-          return (
-            <div key={step.key} className={`status-step ${reached ? 'active' : ''}`}>
-              <div className="step-icon">{step.icon}</div>
-              <div className="step-label">{step.label}</div>
-            </div>
-          );
-        })}
+      {/* Status Steps - Horizontal like mobile */}
+      <div className="status-steps-container">
+        <div className="status-steps">
+          {STATUS_STEPS.map((step, index) => {
+            const reached = timelineStatuses.has(step.key) || index <= statusIndex;
+            const isCurrent = index === statusIndex;
+            return (
+              <div key={step.key} className={`status-step ${reached ? 'active' : ''} ${isCurrent ? 'current' : ''}`}>
+                <div className="step-icon-wrapper">
+                  <div className="step-icon">{step.icon}</div>
+                </div>
+                <div className="step-label">{step.label}</div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Map Section */}
-      {normalizedStatus === 'delivering' && (
-        <div className="map-section">
-          <h3 className="map-title">🚁 Theo dõi drone giao hàng</h3>
-          <div className="map-container" id="tracking-map"></div>
+      {/* Map Section - Always show like mobile */}
+      <div className="map-section">
+        <div className="map-container" id="tracking-map"></div>
+        
+        {/* Map Badge */}
+        <div className="map-badge">
+          <span className="badge-icon">📍</span>
+          <div className="badge-content">
+            <div className="badge-label">Điểm giao</div>
+            <div className="badge-text">{deliveryAddress}</div>
+          </div>
         </div>
-      )}
+
+        {/* Demo Button */}
+        <button className="demo-btn" onClick={startDemo} disabled={isDemo}>
+          {isDemo ? `Demo: ${Math.round(demoProgress * 100)}%` : '🎬 Demo drone bay'}
+        </button>
+      </div>
 
       {/* Main Content */}
       <div className="tracking-content">
-        {/* Timeline */}
+        {/* Order Summary */}
+        <div className="summary-header">
+          <div className="summary-left">
+            <div className="order-code">#{orderNumber}</div>
+            <div className="restaurant-name">{restaurantName}</div>
+            <div className="delivery-address">{deliveryAddress}</div>
+          </div>
+          <div className="eta-pill">
+            <span className="eta-icon">⏱</span>
+            <span className="eta-text">{etaText}</span>
+          </div>
+        </div>
+
+        {/* Timeline - Vertical like mobile */}
         <div className="timeline-section">
           {STATUS_STEPS.map((step, index) => {
             const reached = timelineStatuses.has(step.key) || index <= statusIndex;
@@ -412,7 +597,7 @@ function OrderTracking() {
               <div key={step.key} className="timeline-row">
                 <div className="timeline-rail">
                   <div className={`timeline-dot ${reached ? 'active' : ''}`}>
-                    {reached ? <span>✓</span> : <span className="dot-empty">○</span>}
+                    {reached ? <span>✓</span> : <span className="dot-empty"></span>}
                   </div>
                   {index < STATUS_STEPS.length - 1 && (
                     <div className={`timeline-connector ${nextReached ? 'active' : ''}`}></div>
@@ -424,7 +609,7 @@ function OrderTracking() {
                     {step.label}
                   </div>
                   <div className="timeline-description">{step.description}</div>
-                  {timestamp && <div className="timeline-timestamp">{timestamp}</div>}
+                  {timestamp && <div className="timeline-timestamp">⏰ {timestamp}</div>}
                   {event?.note && <div className="timeline-note">{event.note}</div>}
                 </div>
               </div>
@@ -439,68 +624,49 @@ function OrderTracking() {
             <p className="empty-order-text">Đang cập nhật danh sách món.</p>
           ) : (
             <>
-              {items.slice(0, 10).map((item, index) => (
+              {items.slice(0, 5).map((item, index) => (
                 <div key={item.id || item.product || index} className="order-row">
                   <span className="order-row-text">
-                    {item.name || 'Món ăn'} x{item.quantity}
+                    {item.quantity}x {item.name || 'Món ăn'}
                   </span>
                   <span className="order-row-price">
                     {((item.price || 0) * item.quantity).toLocaleString('vi-VN')}đ
                   </span>
                 </div>
               ))}
-              <div className="order-summary">
-                <div className="summary-row">
-                  <span className="summary-label">Tạm tính:</span>
-                  <span className="summary-value">{totalAmount.toLocaleString('vi-VN')}đ</span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">Phí giao hàng:</span>
-                  <span className="summary-value">
-                    {(trackingData?.order?.shippingFee || 15000).toLocaleString('vi-VN')}đ
-                  </span>
-                </div>
-                <div className="summary-row total">
-                  <span className="summary-label">Tổng cộng:</span>
-                  <span className="summary-value">
-                    {(totalAmount + (trackingData?.order?.shippingFee || 15000)).toLocaleString('vi-VN')}đ
-                  </span>
-                </div>
+              {items.length > 5 && (
+                <div className="more-items">và {items.length - 5} món khác</div>
+              )}
+              <div className="total-row">
+                <span className="total-label">Tổng cộng</span>
+                <span className="total-value">{totalAmount.toLocaleString('vi-VN')}đ</span>
               </div>
             </>
           )}
         </div>
 
-        {/* Delivery Info */}
-        <div className="delivery-info-section">
-          <div className="info-row">
-            <span className="info-label">📍 Địa chỉ giao:</span>
-            <span className="info-value">{deliveryAddress}</span>
+        {/* Handover Card */}
+        <div className="handover-card">
+          <div className="handover-header">
+            <span className="handover-icon">🛡️</span>
+            <h3 className="section-heading">Xác nhận nhận hàng</h3>
           </div>
-          <div className="info-row">
-            <span className="info-label">📞 Số điện thoại:</span>
-            <span className="info-value">{trackingData?.tracking?.deliveryLocation?.phone || '---'}</span>
-          </div>
-          <div className="info-row">
-            <span className="info-label">💳 Thanh toán:</span>
-            <span className="info-value">
-              {trackingData?.order?.paymentMethod === 'cod' ? 'Tiền mặt' : 'Thanh toán online'}
-            </span>
-          </div>
-          <div className="info-row">
-            <span className="info-label">🕐 Thời gian đặt:</span>
-            <span className="info-value">
-              {trackingData?.order?.createdAt ? 
-                new Date(trackingData.order.createdAt).toLocaleString('vi-VN') : 
-                '---'}
-            </span>
-          </div>
+          <p className="handover-text">
+            Khi drone hạ cánh, hãy kiểm tra khoang chứa. Nhấn "Tôi đã nhận hàng" để xác nhận với hệ thống.
+          </p>
+          <button
+            className={`confirm-btn ${(!canConfirm || acknowledged) ? 'disabled' : ''}`}
+            disabled={!canConfirm || acknowledged}
+            onClick={handleConfirm}
+          >
+            {acknowledged ? '✓ Đã xác nhận' : 'Tôi đã nhận hàng'}
+          </button>
+          <p className="pin-note">
+            {canConfirm 
+              ? 'Nhấn nút trên để xác nhận bạn đã nhận hàng từ drone.' 
+              : 'Nút xác nhận sẽ xuất hiện khi drone đã giao hàng.'}
+          </p>
         </div>
-      </div>
-
-      {/* Footer */}
-      <div className="tracking-footer">
-        © 2025 FoodFast - Giao hàng bằng Drone
       </div>
     </div>
   );

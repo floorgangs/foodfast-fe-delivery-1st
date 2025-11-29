@@ -1,6 +1,6 @@
 import { Outlet, Link, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { logout } from "../../store/slices/authSlice";
 import { getAllOrders } from "../../services/orderService";
 import ActiveOrderBanner from "../ActiveOrderBanner/ActiveOrderBanner";
@@ -12,6 +12,8 @@ function Layout() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [hasActiveOrder, setHasActiveOrder] = useState(false);
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
+  const accountMenuRef = useRef(null);
 
   useEffect(() => {
     const checkActiveOrders = () => {
@@ -29,8 +31,21 @@ function Layout() {
     return () => clearInterval(interval);
   }, []);
 
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (accountMenuRef.current && !accountMenuRef.current.contains(event.target)) {
+        setShowAccountMenu(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const handleLogout = () => {
     dispatch(logout());
+    setShowAccountMenu(false);
     navigate("/login");
   };
 
@@ -53,8 +68,8 @@ function Layout() {
                 <Link to="/notifications">
                   <span>Thông báo</span>
                 </Link>
-                <Link to="/vouchers">
-                  <span>Voucher</span>
+                <Link to="/orders">
+                  <span>Đơn hàng</span>
                 </Link>
               </>
             )}
@@ -63,17 +78,36 @@ function Layout() {
               {items.length > 0 && <span className="cart-badge">{items.length}</span>}
             </Link>
             {isAuthenticated ? (
-              <>
-                <Link to="/orders">
-                  <span>Đơn hàng</span>
-                </Link>
-                <Link to="/profile">
+              <div className="account-dropdown" ref={accountMenuRef}>
+                <button 
+                  className="account-btn"
+                  onClick={() => setShowAccountMenu(!showAccountMenu)}
+                >
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                  </svg>
                   <span>{user?.name || "Tài khoản"}</span>
-                </Link>
-                <button onClick={handleLogout} className="logout-btn">
-                  <span>Đăng xuất</span>
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14" className="arrow-icon">
+                    <path d="M7 10l5 5 5-5z"/>
+                  </svg>
                 </button>
-              </>
+                {showAccountMenu && (
+                  <div className="account-menu">
+                    <Link to="/profile" onClick={() => setShowAccountMenu(false)}>
+                      <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                      </svg>
+                      Tài khoản của tôi
+                    </Link>
+                    <button onClick={handleLogout} className="logout-menu-btn">
+                      <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                        <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/>
+                      </svg>
+                      Đăng xuất
+                    </button>
+                  </div>
+                )}
+              </div>
             ) : (
               <>
                 <Link to="/register" className="auth-link">

@@ -15,12 +15,15 @@ import OrderTracking from "./pages/OrderTracking/OrderTracking";
 import PaymentGateway from "./pages/PaymentGateway/PaymentGateway";
 import PaymentReturn from "./pages/PaymentReturn/PaymentReturn";
 import PayPalPayment from "./pages/PayPalPayment/PayPalPayment";
+import PayPalReturn from "./pages/PayPalReturn/PayPalReturn";
 import Profile from "./pages/Profile/Profile";
 import Review from "./pages/Review/Review";
 import EditProfile from "./pages/EditProfile/EditProfile";
 import Orders from "./pages/Orders/Orders";
 import Notifications from "./pages/Notifications/Notifications";
 import Vouchers from "./pages/Vouchers/Vouchers";
+import DeliveryAddresses from "./pages/DeliveryAddresses/DeliveryAddresses";
+import PaymentMethods from "./pages/PaymentMethods/PaymentMethods";
 import "./App.css";
 
 function App() {
@@ -103,6 +106,7 @@ function App() {
         />
         <Route path="payment/vnpay-return" element={<PaymentReturn />} />
         <Route path="payment/momo-return" element={<PaymentReturn />} />
+        <Route path="payment/paypal-return" element={<PayPalReturn />} />
         <Route path="payment-return/:provider" element={<PaymentReturn />} />
         <Route
           path="paypal-payment/:orderId"
@@ -157,6 +161,22 @@ function App() {
           element={
             <PrivateRoute>
               <Vouchers />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="delivery-addresses"
+          element={
+            <PrivateRoute>
+              <DeliveryAddresses />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="payment-methods"
+          element={
+            <PrivateRoute>
+              <PaymentMethods />
             </PrivateRoute>
           }
         />

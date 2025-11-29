@@ -1059,3 +1059,89 @@ export const completeOrder = async (req, res) => {
     });
   }
 };
+
+// Customer confirms drone delivery (delivered status)
+export const confirmDelivery = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy đơn hàng",
+      });
+    }
+
+    // Only customer can confirm delivery of their own order
+    if (order.customer.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "Bạn không có quyền xác nhận đơn hàng này",
+      });
+    }
+
+    // Order must be in delivering status
+    if (order.status !== "delivering") {
+      return res.status(400).json({
+        success: false,
+        message: "Chỉ có thể xác nhận khi đơn hàng đang được giao",
+      });
+    }
+
+    order.status = "delivered";
+    order.actualDeliveryTime = new Date();
+    order.timeline.push({
+      status: "delivered",
+      note: "Drone đã giao hàng thành công",
+    });
+
+    // Free up the drone
+    if (order.drone) {
+      const Drone = (await import("../models/Drone.js")).default;
+      const drone = await Drone.findById(order.drone);
+      if (drone) {
+        drone.status = "available";
+        drone.currentOrder = null;
+        await drone.save();
+      }
+    }
+
+    await order.save();
+
+    const populatedOrder = await Order.findById(order._id)
+      .populate("customer", "name phone")
+      .populate("restaurant", "name phone address")
+      .populate("items.product", "name image");
+
+    // Create notification for customer
+    const Notification = (await import("../models/Notification.js")).default;
+    if (order.customer) {
+      await Notification.create({
+        recipient: order.customer,
+        recipientRole: "customer",
+        type: "order_delivered",
+        title: "Đơn hàng đã giao thành công",
+        message: `Đơn hàng #${order.orderNumber}: Drone đã giao hàng thành công`,
+        relatedOrder: order._id,
+      });
+    }
+
+    // Emit socket event
+    if (req.io) {
+      req.io
+        .to(`restaurant_${order.restaurant}`)
+        .emit("order_delivered", populatedOrder);
+      req.io.to("admin").emit("order_delivered", populatedOrder);
+    }
+
+    res.json({
+      success: true,
+      data: populatedOrder,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};

@@ -125,7 +125,7 @@ function Dashboard() {
           id: order.orderNumber || order._id,
           customer:
             order.customer?.name || order.deliveryInfo?.name || "Khách hàng",
-          total: order.totalAmount,
+          total: order.totalAmount || 0,
           status: order.status,
           time: new Date(order.createdAt).toLocaleTimeString("vi-VN", {
             hour: "2-digit",
@@ -367,7 +367,7 @@ function Dashboard() {
                 <td className="customer-name">{order.customer}</td>
                 <td>{order.items} món</td>
                 <td className="order-total">
-                  {order.total.toLocaleString("vi-VN")}đ
+                  {(order.total || 0).toLocaleString("vi-VN")}đ
                 </td>
                 <td>
                   <span className={`status-badge ${order.status}`}>

@@ -48,6 +48,9 @@ export const authAPI = {
   register: (data) => api.post("/auth/register", data),
   getProfile: () => api.get("/auth/me"),
   updateProfile: (data) => api.put("/auth/profile", data),
+  addAddress: (addressData) => api.post("/auth/addresses", addressData),
+  updateAddress: (addressId, addressData) => api.put(`/auth/addresses/${addressId}`, addressData),
+  deleteAddress: (addressId) => api.delete(`/auth/addresses/${addressId}`),
 };
 
 // Restaurant APIs
@@ -71,6 +74,9 @@ export const orderAPI = {
   getById: (id) => api.get(`/orders/${id}`),
   cancel: (id, reason) => api.put(`/orders/${id}/cancel`, { reason }),
   track: (id) => api.get(`/orders/${id}/track`),
+  updateStatus: (id, status) => api.put(`/orders/${id}/status`, { status }),
+  confirmDelivery: (id) => api.put(`/orders/${id}/confirm-delivery`),
+  complete: (id) => api.patch(`/orders/${id}/complete`),
 };
 
 // Voucher APIs

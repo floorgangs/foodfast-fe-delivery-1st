@@ -8,6 +8,7 @@ import {
   confirmThirdPartyPayment,
   trackOrder,
   completeOrder,
+  confirmDelivery,
 } from "../controllers/orderController.js";
 import { protect, restrictTo, optionalProtect } from "../middleware/auth.js";
 
@@ -19,6 +20,8 @@ router.get("/:id", protect, getOrder);
 router.get("/:id/track", protect, trackOrder);
 router.post("/confirm-payment", optionalProtect, confirmThirdPartyPayment);
 router.patch("/:id/complete", protect, completeOrder);
+// Customer can confirm delivery (drone arrived)
+router.put("/:id/confirm-delivery", protect, confirmDelivery);
 router.put(
   "/:id/status",
   protect,

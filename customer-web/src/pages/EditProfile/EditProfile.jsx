@@ -12,7 +12,6 @@ function EditProfile() {
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
-    address: "",
   });
 
   const [errors, setErrors] = useState({});
@@ -23,7 +22,6 @@ function EditProfile() {
       setFormData({
         name: user.name || "",
         phone: user.phone || "",
-        address: user.address || "",
       });
     }
   }, [user]);
@@ -55,10 +53,6 @@ function EditProfile() {
       newErrors.phone = "Vui lòng nhập số điện thoại";
     } else if (!/^[0-9]{10,11}$/.test(formData.phone.replace(/\s/g, ""))) {
       newErrors.phone = "Số điện thoại không hợp lệ (10-11 số)";
-    }
-
-    if (!formData.address.trim()) {
-      newErrors.address = "Vui lòng nhập địa chỉ giao hàng";
     }
 
     setErrors(newErrors);
@@ -144,24 +138,6 @@ function EditProfile() {
               />
               {errors.phone && (
                 <span className="error-message">{errors.phone}</span>
-              )}
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="address">
-                Địa chỉ giao hàng <span className="required">*</span>
-              </label>
-              <textarea
-                id="address"
-                name="address"
-                value={formData.address}
-                onChange={handleChange}
-                placeholder="Số nhà, tên đường, phường/xã, quận/huyện, thành phố"
-                rows="3"
-                className={errors.address ? "error" : ""}
-              />
-              {errors.address && (
-                <span className="error-message">{errors.address}</span>
               )}
             </div>
 

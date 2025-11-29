@@ -19,12 +19,13 @@ import { orderAPI } from '../services/api';
 const { height } = Dimensions.get('window');
 const MAP_HEIGHT = height * 0.42;
 
+// Customer chỉ thấy đến 'delivered', không thấy 'completed' (restaurant xử lý)
 const STATUS_STEPS = [
   { key: 'pending', label: 'Chờ xác nhận', description: 'Đơn hàng đang chờ nhà hàng xác nhận' },
   { key: 'confirmed', label: 'Đã xác nhận', description: 'Nhà hàng đã tiếp nhận và chuẩn bị đơn' },
   { key: 'ready', label: 'Sẵn sàng giao', description: 'Đơn đã đóng gói, chờ drone tiếp nhận' },
   { key: 'delivering', label: 'Drone đang giao', description: 'Drone đang trên đường bay tới vị trí của bạn' },
-  { key: 'delivered', label: 'Đã giao', description: 'Bạn đã nhận được đơn hàng' },
+  { key: 'delivered', label: 'Chờ giao hàng', description: 'Drone đã đến, vui lòng nhận hàng' },
 ] as const;
 
 const STATUS_SEQUENCE = STATUS_STEPS.map(step => step.key);
@@ -277,7 +278,7 @@ interface TrackingPayload {
 
 const normalizeStatus = (status?: string): string => {
   if (!status) return 'pending';
-  if (status === 'completed') return 'delivered';
+  // Now we have 'completed' as a separate step, no need to convert
   return status;
 };
 
@@ -311,6 +312,9 @@ const OrderTrackingScreen = ({ navigation, route }: any) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [acknowledged, setAcknowledged] = useState(false);
+  const [demoProgress, setDemoProgress] = useState(0);
+  const [isDemo, setIsDemo] = useState(false);
+  const animationRef = useRef<number | null>(null);
 
   const fetchTracking = useCallback(async () => {
     if (!orderId) {
@@ -392,15 +396,20 @@ const OrderTrackingScreen = ({ navigation, route }: any) => {
 
   const mapRegion = useMemo(() => computeRegionFromRoute(routeCoordinates), [routeCoordinates]);
 
+  const flightProgress = isDemo ? demoProgress : (trackingData?.tracking?.flightProgress ?? 0);
+
   const droneCoordinate = useMemo(() => {
+    // When demo is running, calculate position along route
+    if (isDemo || flightProgress > 0) {
+      return getCoordinateAtProgress(routeCoordinates, flightProgress);
+    }
+    // Otherwise use tracking data or fallback
     const coordinate = toLatLng(trackingData?.tracking?.droneLocation);
     if (coordinate) {
       return coordinate;
     }
     return normalizedStatus === 'delivered' ? dropoffCoordinate : pickupCoordinate;
-  }, [trackingData?.tracking?.droneLocation, normalizedStatus, dropoffCoordinate, pickupCoordinate]);
-
-  const flightProgress = trackingData?.tracking?.flightProgress ?? 0;
+  }, [isDemo, flightProgress, routeCoordinates, trackingData?.tracking?.droneLocation, normalizedStatus, dropoffCoordinate, pickupCoordinate]);
 
   const progressPolyline = useMemo(
     () => buildProgressPolyline(routeCoordinates, flightProgress),
@@ -468,12 +477,91 @@ const OrderTrackingScreen = ({ navigation, route }: any) => {
   const canConfirm = normalizedStatus === 'delivered';
   const timelineUpdatedAt = formatTimestamp(trackingData?.order?.updatedAt);
 
-  const handleConfirm = () => {
-    setAcknowledged(true);
-    if (Platform.OS === 'web') {
-      alert('Cảm ơn bạn! Đơn hàng đã được xác nhận.');
-    } else {
-      Alert.alert('Hoàn tất', 'Cảm ơn bạn! Đơn hàng đã được xác nhận.');
+  const startDroneDemo = () => {
+    if (isDemo) return; // Already running
+    setIsDemo(true);
+    setDemoProgress(0);
+    
+    const duration = 30000; // 30 seconds
+    const startTime = Date.now();
+
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      setDemoProgress(progress);
+
+      if (progress < 1) {
+        animationRef.current = requestAnimationFrame(animate);
+      } else {
+        setIsDemo(false);
+        // Drone has arrived - confirm delivery
+        orderAPI.confirmDelivery(orderId)
+          .then(() => {
+            fetchTracking();
+            if (Platform.OS === 'web') {
+              alert('🎉 Drone đã giao hàng thành công!');
+            } else {
+              Alert.alert('Thành công', '🎉 Drone đã giao hàng thành công!');
+            }
+          })
+          .catch(err => {
+            console.error('Failed to confirm delivery:', err);
+            if (Platform.OS !== 'web') {
+              Alert.alert('Lỗi', 'Không thể cập nhật trạng thái. Vui lòng thử lại.');
+            }
+          });
+      }
+    };
+
+    animationRef.current = requestAnimationFrame(animate);
+  };
+
+  // Auto-start demo drone when status changes to 'delivering'
+  useEffect(() => {
+    if (normalizedStatus === 'delivering' && !isDemo && demoProgress === 0) {
+      console.log('🚁 Auto-starting drone delivery animation');
+      // Delay to ensure map is ready
+      const timer = setTimeout(() => {
+        startDroneDemo();
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [normalizedStatus, isDemo, demoProgress]);
+
+  // Cleanup animation on unmount
+  useEffect(() => {
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, []);
+
+  const handleConfirm = async () => {
+    try {
+      await orderAPI.complete(orderId);
+      setAcknowledged(true);
+      if (Platform.OS === 'web') {
+        alert('Cảm ơn bạn! Đơn hàng đã hoàn thành.');
+      } else {
+        Alert.alert('Hoàn tất', 'Cảm ơn bạn! Đơn hàng đã hoàn thành.', [
+          {
+            text: 'OK',
+            onPress: () => navigation.navigate('Orders'),
+          },
+        ]);
+      }
+      // Navigate back to orders after completion
+      setTimeout(() => {
+        navigation.navigate('Orders');
+      }, 1500);
+    } catch (error: any) {
+      if (Platform.OS === 'web') {
+        alert(error.message || 'Không thể xác nhận đơn hàng');
+      } else {
+        Alert.alert('Lỗi', error.message || 'Không thể xác nhận đơn hàng');
+      }
     }
   };
 

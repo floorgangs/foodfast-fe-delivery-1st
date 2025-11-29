@@ -17,17 +17,19 @@
   width: 100%;
   max-width: 1500px;
   margin: 0 auto;
-  padding: 2px 10px;
+  padding: 0 10px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 6px;
+  height: 38px;
 }
 
 @media (min-width: 768px) {
   .header .container {
-    padding: 3px 12px;
+    padding: 0 12px;
     gap: 12px;
+    height: 42px;
   }
 }
 
@@ -158,6 +160,87 @@
 
 .logout-btn:hover {
   border-color: white;
+}
+
+/* Account Dropdown */
+.account-dropdown {
+  position: relative;
+}
+
+.account-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: white;
+  padding: 3px 6px;
+  border-radius: 2px;
+  cursor: pointer;
+  font-weight: 400;
+  font-size: 0.75rem;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.account-btn:hover {
+  border-color: white;
+}
+
+.account-btn .arrow-icon {
+  transition: transform 0.2s ease;
+}
+
+.account-dropdown:hover .account-btn .arrow-icon {
+  transform: rotate(180deg);
+}
+
+.account-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: white;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  min-width: 160px;
+  z-index: 1001;
+  overflow: hidden;
+}
+
+.account-menu a,
+.account-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  color: #232f3e;
+  text-decoration: none;
+  font-size: 0.8rem;
+  font-weight: 400;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  text-align: left;
+}
+
+.account-menu a:hover,
+.account-menu button:hover {
+  background: #f5f5f5;
+}
+
+.account-menu svg {
+  color: #666;
+}
+
+.logout-menu-btn {
+  border-top: 1px solid #eee !important;
+  color: #d32f2f !important;
+}
+
+.logout-menu-btn svg {
+  color: #d32f2f !important;
 }
 
 .auth-link {

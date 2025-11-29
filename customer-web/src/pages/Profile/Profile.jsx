@@ -1,44 +1,58 @@
 import { useSelector } from "react-redux";
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import {
-  getAllOrders,
-  subscribeToOrderUpdates,
-} from "../../services/orderService";
+import { useState, useEffect, useCallback } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { orderAPI } from "../../services/api";
 import "./Profile.css";
 
 function Profile() {
-  const { user } = useSelector((state) => state.auth);
+  const { user, isAuthenticated } = useSelector((state) => state.auth);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("current"); // current or history
 
+  // Check for tab query parameter
   useEffect(() => {
-    loadOrders();
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'history') {
+      setActiveTab('history');
+    }
+  }, [searchParams]);
 
-    // Subscribe to real-time updates
-    const unsubscribe = subscribeToOrderUpdates(() => {
-      loadOrders();
-    });
+  const fetchOrders = useCallback(async () => {
+    if (!isAuthenticated) return;
+    
+    try {
+      setLoading(true);
+      const response = await orderAPI.getMyOrders();
+      const data = response?.data ?? response;
+      // Sort by created date (newest first)
+      const sorted = (Array.isArray(data) ? data : []).sort(
+        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+      );
+      setOrders(sorted);
+    } catch (error) {
+      console.error("Error fetching orders:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [isAuthenticated]);
 
-    return unsubscribe;
-  }, []);
-
-  const loadOrders = () => {
-    const allOrders = getAllOrders();
-    // Sort by created date (newest first)
-    const sorted = allOrders.sort(
-      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-    );
-    setOrders(sorted);
-  };
+  useEffect(() => {
+    fetchOrders();
+    
+    // Poll for updates every 10 seconds
+    const interval = setInterval(fetchOrders, 10000);
+    return () => clearInterval(interval);
+  }, [fetchOrders]);
 
   const currentOrders = orders.filter(
-    (order) => order.status !== "completed" && order.status !== "cancelled"
+    (order) => !["delivered", "completed", "cancelled"].includes(order.status)
   );
 
   const historyOrders = orders.filter(
-    (order) => order.status === "completed" || order.status === "cancelled"
+    (order) => ["delivered", "completed", "cancelled"].includes(order.status)
   );
 
   const getStatusText = (status) => {
@@ -46,9 +60,11 @@ function Profile() {
       pending: "⏳ Chờ xác nhận",
       confirmed: "✅ Đã xác nhận",
       preparing: "👨‍🍳 Đang chuẩn bị",
+      ready: "📦 Sẵn sàng giao",
       ready_for_delivery: "📦 Sẵn sàng giao",
       delivering: "🚁 Đang giao hàng",
-      completed: "✔️ Hoàn thành",
+      delivered: "✔️ Đã giao",
+      completed: "✔️ Đã giao", // Customer sees this as 'delivered'
       cancelled: "❌ Đã hủy",
     };
     return statusMap[status] || status;
@@ -67,6 +83,7 @@ function Profile() {
               </div>
               <h2>{user?.name}</h2>
               <p className="user-email">{user?.email}</p>
+              <p className="user-phone">{user?.phone || ""}</p>
             </div>
 
             <nav className="profile-menu">
@@ -79,31 +96,26 @@ function Profile() {
               </button>
               <button
                 className="menu-item"
+                onClick={() => navigate("/delivery-addresses")}
+              >
+                <span className="menu-icon">📍</span>
+                <span className="menu-text">Địa chỉ giao hàng</span>
+              </button>
+              <button
+                className="menu-item"
+                onClick={() => navigate("/payment-methods")}
+              >
+                <span className="menu-icon">💳</span>
+                <span className="menu-text">Phương thức thanh toán</span>
+              </button>
+              <button
+                className="menu-item"
                 onClick={() => navigate("/notifications")}
               >
                 <span className="menu-icon">🔔</span>
                 <span className="menu-text">Thông báo</span>
               </button>
-              <button
-                className="menu-item"
-                onClick={() => navigate("/vouchers")}
-              >
-                <span className="menu-icon">🎫</span>
-                <span className="menu-text">Voucher</span>
-              </button>
             </nav>
-
-            <div className="profile-info-card">
-              <h3>Liên hệ</h3>
-              <div className="info-item">
-                <span className="label">Số điện thoại</span>
-                <span className="value">{user?.phone || "Chưa cập nhật"}</span>
-              </div>
-              <div className="info-item">
-                <span className="label">Địa chỉ</span>
-                <span className="value">{user?.address || "Chưa cập nhật"}</span>
-              </div>
-            </div>
           </aside>
 
           <main className="profile-main">
@@ -130,7 +142,11 @@ function Profile() {
               </div>
             </div>
 
-            {displayOrders.length === 0 ? (
+            {loading ? (
+              <div className="no-orders">
+                <p>Đang tải đơn hàng...</p>
+              </div>
+            ) : displayOrders.length === 0 ? (
               <div className="no-orders">
                 <p>
                   {activeTab === "current"
@@ -141,26 +157,28 @@ function Profile() {
             ) : (
               <div className="orders-list">
                 {displayOrders.map((order) => (
-                  <div key={order.id} className="order-item">
+                  <div key={order._id} className="order-item">
                     <div className="order-header">
                       <span className="order-id">
-                        #{order.id.substring(3, 10)}
+                        #{order.orderNumber || order._id?.slice(-7)}
                       </span>
                       <span className={`order-status ${order.status}`}>
                         {getStatusText(order.status)}
                       </span>
                     </div>
                     <div className="restaurant-name">
-                      {order.restaurantName}
+                      {typeof order.restaurant === "object" 
+                        ? order.restaurant?.name 
+                        : "Nhà hàng"}
                     </div>
                     <div className="order-items">
-                      {order.items.map((item) => (
-                        <div key={item.id} className="item">
+                      {order.items?.map((item, idx) => (
+                        <div key={idx} className="item">
                           <span>
                             {item.name} x{item.quantity}
                           </span>
                           <span>
-                            {(item.price * item.quantity).toLocaleString(
+                            {((item.price || 0) * (item.quantity || 1)).toLocaleString(
                               "vi-VN"
                             )}
                             đ
@@ -171,28 +189,27 @@ function Profile() {
                     <div className="order-total">
                       <span>Tổng cộng:</span>
                       <span className="total-price">
-                        {order.total.toLocaleString("vi-VN")}đ
+                        {(order.total || 0).toLocaleString("vi-VN")}đ
                       </span>
                     </div>
                     <div className="order-date">
                       {new Date(order.createdAt).toLocaleString("vi-VN")}
                     </div>
                     <div className="order-actions">
-                      {order.status !== "completed" &&
-                        order.status !== "cancelled" && (
+                      {!["delivered", "completed", "cancelled"].includes(order.status) && (
                           <button
                             className="track-order-btn"
                             onClick={() =>
-                              navigate(`/order-tracking/${order.id}`)
+                              navigate(`/order-tracking/${order._id}`)
                             }
                           >
                             Theo dõi đơn hàng
                           </button>
                         )}
-                      {order.status === "completed" && !order.review && (
+                      {(order.status === "completed" || order.status === "delivered") && !order.review && (
                         <button
                           className="review-btn"
-                          onClick={() => navigate(`/review/${order.id}`)}
+                          onClick={() => navigate(`/review/${order._id}`)}
                         >
                           Đánh giá
                         </button>

@@ -3,156 +3,126 @@ import { useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { clearCart } from "../../store/slices/cartSlice";
 import { loadUser } from "../../store/slices/authSlice";
-import { vietnamLocations } from "../../data/vietnamLocations";
-import { orderAPI, voucherAPI, restaurantAPI } from "../../services/api";
-import api from "../../services/api";
+import { orderAPI, voucherAPI, authAPI } from "../../services/api";
 import "./Checkout.css";
+
+// Danh sách gợi ý địa chỉ có sẵn (giống mobile app)
+const ADDRESS_SUGGESTIONS = [
+  {
+    id: 'vincom-dongkhoi',
+    label: 'Vincom Đồng Khởi',
+    address: '72 Lê Thánh Tôn, Bến Nghé, Quận 1, TP.HCM',
+  },
+  {
+    id: 'landmark81',
+    label: 'Landmark 81',
+    address: '720A Điện Biên Phủ, Phường 22, Bình Thạnh, TP.HCM',
+  },
+  {
+    id: 'saigoncentre',
+    label: 'Saigon Centre',
+    address: '65 Lê Lợi, Bến Nghé, Quận 1, TP.HCM',
+  },
+  {
+    id: 'cresentmall',
+    label: 'Crescent Mall',
+    address: '101 Tôn Dật Tiên, Tân Phú, Quận 7, TP.HCM',
+  },
+  {
+    id: 'citiho',
+    label: 'Chung cư CitiHome',
+    address: 'Cát Lái, Thành phố Thủ Đức, TP.HCM',
+  },
+  {
+    id: 'vinhomegrandpark',
+    label: 'Vinhomes Grand Park',
+    address: 'Nguyễn Xiển, Long Thạnh Mỹ, TP.Thủ Đức, TP.HCM',
+  },
+  {
+    id: 'aeonmall-tanphu',
+    label: 'Aeon Mall Tân Phú',
+    address: '30 Bờ Bao Tân Thắng, Sơn Kỳ, Tân Phú, TP.HCM',
+  },
+  {
+    id: 'gigamall',
+    label: 'Giga Mall Thủ Đức',
+    address: '240 Phạm Văn Đồng, Hiệp Bình Chánh, Thủ Đức, TP.HCM',
+  },
+  {
+    id: 'parkson-hungthanh',
+    label: 'Parkson Hùng Vương',
+    address: '126 Hùng Vương, Quận 5, TP.HCM',
+  },
+  {
+    id: 'sunwah',
+    label: 'Sunwah Tower',
+    address: '115 Nguyễn Huệ, Bến Nghé, Quận 1, TP.HCM',
+  },
+];
+
+const QUICK_ADDRESS_TAGS = ['Nhà riêng', 'Văn phòng', 'Chung cư', 'Sảnh bảo vệ'];
 
 function Checkout() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { user, isAuthenticated } = useSelector((state) => state.auth);
-  const { items, currentRestaurantId: cartRestaurantId } = useSelector(
+  const { items, currentRestaurantId: cartRestaurantId, currentRestaurantName } = useSelector(
     (state) => state.cart
   );
 
   // Form state
-  const [name, setName] = useState(user?.name || "");
-  const [phone, setPhone] = useState(user?.phone || "");
-  const [streetAddress, setStreetAddress] = useState("");
   const [note, setNote] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("cod");
-  const [useOldAddress, setUseOldAddress] = useState(false);
-
-  // Location selection state
-  const [selectedCity, setSelectedCity] = useState("");
-  const [selectedDistrict, setSelectedDistrict] = useState("");
-  const [selectedWard, setSelectedWard] = useState("");
-
-  // Dropdown visibility
-  const [showCityDropdown, setShowCityDropdown] = useState(false);
-  const [showDistrictDropdown, setShowDistrictDropdown] = useState(false);
-  const [showWardDropdown, setShowWardDropdown] = useState(false);
-
-  // Search filters
-  const [citySearch, setCitySearch] = useState("");
-  const [districtSearch, setDistrictSearch] = useState("");
-  const [wardSearch, setWardSearch] = useState("");
-
-  const cityRef = useRef(null);
-  const districtRef = useRef(null);
-  const wardRef = useRef(null);
-
-  // Voucher state
-  const [showVoucherModal, setShowVoucherModal] = useState(false);
-  const [selectedVoucher, setSelectedVoucher] = useState(null);
   const [voucherCode, setVoucherCode] = useState("");
-  const [availableVouchers, setAvailableVouchers] = useState([]);
-  const [loadingVouchers, setLoadingVouchers] = useState(false);
+  const [discount, setDiscount] = useState(0);
+  const [applyingVoucher, setApplyingVoucher] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  // Saved addresses from user profile
-  const [savedAddresses] = useState(
-    [
-      user?.address
-        ? { id: 1, label: "Địa chỉ mặc định", address: user.address }
-        : null,
-    ].filter(Boolean)
-  );
+  // Addresses state
+  const [addresses, setAddresses] = useState([]);
+  const [selectedAddressId, setSelectedAddressId] = useState("");
+  const [showAddressModal, setShowAddressModal] = useState(false);
+  
+  // New address form
+  const [newAddress, setNewAddress] = useState({
+    label: "",
+    address: "",
+    phone: ""
+  });
+  const [savingAddress, setSavingAddress] = useState(false);
+  
+  // Address suggestions
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const suggestionsRef = useRef(null);
 
-  // Get districts and wards based on selections
-  const getDistricts = () => {
-    const city = vietnamLocations.cities.find((c) => c.id === selectedCity);
-    return city ? city.districts : [];
-  };
-
-  const getWards = () => {
-    const city = vietnamLocations.cities.find((c) => c.id === selectedCity);
-    const district = city?.districts.find((d) => d.id === selectedDistrict);
-    return district ? district.wards : [];
-  };
-
-  // Filter locations based on search
-  const filteredCities = vietnamLocations.cities.filter((city) =>
-    city.name.toLowerCase().includes(citySearch.toLowerCase())
-  );
-
-  const filteredDistricts = getDistricts().filter((district) =>
-    district.name.toLowerCase().includes(districtSearch.toLowerCase())
-  );
-
-  const filteredWards = getWards().filter((ward) =>
-    ward.name.toLowerCase().includes(wardSearch.toLowerCase())
-  );
-
-  // Handle selections
-  const handleCitySelect = (city) => {
-    setSelectedCity(city.id);
-    setCitySearch(city.name);
-    setShowCityDropdown(false);
-    setSelectedDistrict("");
-    setSelectedWard("");
-    setDistrictSearch("");
-    setWardSearch("");
-  };
-
-  const handleDistrictSelect = (district) => {
-    setSelectedDistrict(district.id);
-    setDistrictSearch(district.name);
-    setShowDistrictDropdown(false);
-    setSelectedWard("");
-    setWardSearch("");
-  };
-
-  const handleWardSelect = (ward) => {
-    setSelectedWard(ward.id);
-    setWardSearch(ward.name);
-    setShowWardDropdown(false);
-  };
-
-  // Close dropdowns on outside click
+  // Load user data
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (cityRef.current && !cityRef.current.contains(event.target)) {
-        setShowCityDropdown(false);
-      }
-      if (districtRef.current && !districtRef.current.contains(event.target)) {
-        setShowDistrictDropdown(false);
-      }
-      if (wardRef.current && !wardRef.current.contains(event.target)) {
-        setShowWardDropdown(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  // Fetch vouchers from API
-  useEffect(() => {
-    const fetchVouchers = async () => {
-      try {
-        setLoadingVouchers(true);
-        const response = await voucherAPI.getAll();
-        const data = response?.data ?? response;
-        setAvailableVouchers(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error("Error fetching vouchers:", error);
-      } finally {
-        setLoadingVouchers(false);
-      }
-    };
-    fetchVouchers();
-  }, []);
-
-  useEffect(() => {
-    // Check localStorage first on mount
     const token = localStorage.getItem("token");
     if (!token) {
       navigate("/login");
       return;
     }
-    // Load user data
     dispatch(loadUser());
   }, [dispatch, navigate]);
+
+  // Load addresses from user profile
+  useEffect(() => {
+    if (user?.addresses && user.addresses.length > 0) {
+      setAddresses(user.addresses);
+      // Select first address by default or the default one
+      const defaultAddr = user.addresses.find(a => a.isDefault) || user.addresses[0];
+      setSelectedAddressId(defaultAddr._id || defaultAddr.id || "0");
+    } else if (user?.address) {
+      // Fallback to single address
+      const fallbackAddr = {
+        _id: "default",
+        label: "Nhà",
+        address: user.address,
+        contactPhone: user.phone || ""
+      };
+      setAddresses([fallbackAddr]);
+      setSelectedAddressId("default");
+    }
+  }, [user]);
 
   useEffect(() => {
     if (items.length === 0 && isAuthenticated) {
@@ -160,97 +130,118 @@ function Checkout() {
     }
   }, [items, navigate, isAuthenticated]);
 
-  useEffect(() => {
-    if (useOldAddress && savedAddresses.length > 0) {
-      setStreetAddress(savedAddresses[0].address);
-    } else {
-      setStreetAddress("");
-    }
-  }, [useOldAddress, savedAddresses]);
+  // Filter suggestions based on input
+  const filteredSuggestions = ADDRESS_SUGGESTIONS.filter((item) => {
+    const keyword = newAddress.address.trim().toLowerCase();
+    if (!keyword) return true; // Show all when empty
+    return `${item.label} ${item.address}`.toLowerCase().includes(keyword);
+  }).slice(0, 6);
 
-  const calculateTotal = () => {
-    return items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  // Handle select suggestion
+  const handleSelectSuggestion = (suggestion) => {
+    setNewAddress({
+      ...newAddress,
+      address: `${suggestion.label}, ${suggestion.address}`,
+      label: newAddress.label || suggestion.label,
+    });
+    setShowSuggestions(false);
   };
 
-  const shippingFee = 15000;
-  const subtotal = calculateTotal();
+  // Handle quick tag click
+  const handleQuickTagClick = (tag) => {
+    setNewAddress({
+      ...newAddress,
+      address: newAddress.address ? `${tag} • ${newAddress.address}` : tag,
+    });
+  };
 
-  // Calculate discount
-  const discount = selectedVoucher
-    ? selectedVoucher.discount || selectedVoucher.discountAmount || 0
-    : 0;
-  const total = subtotal + shippingFee - discount;
+  const deliveryFee = 15000;
+  const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const total = subtotal + deliveryFee - discount;
 
-  const handleApplyVoucher = (voucher) => {
-    const minRequired = voucher.minPurchase || voucher.minOrder || 0;
-    if (minRequired > subtotal) {
-      alert(
-        `Đơn hàng tối thiểu ${minRequired.toLocaleString()}đ để áp dụng mã này`
+  const selectedAddress = addresses.find(a => (a._id || a.id || addresses.indexOf(a).toString()) === selectedAddressId);
+
+  const handleApplyVoucher = async () => {
+    if (!voucherCode.trim()) {
+      alert("Vui lòng nhập mã voucher");
+      return;
+    }
+
+    try {
+      setApplyingVoucher(true);
+      const response = await voucherAPI.apply(
+        voucherCode.toUpperCase(),
+        subtotal + deliveryFee,
+        cartRestaurantId
       );
-      return;
+      setDiscount(response.data?.discount || 0);
+      alert(`Áp dụng thành công! Giảm ${(response.data?.discount || 0).toLocaleString()}đ`);
+    } catch (error) {
+      alert(error.message || "Mã voucher không hợp lệ");
+      setDiscount(0);
+    } finally {
+      setApplyingVoucher(false);
     }
-    setSelectedVoucher(voucher);
-    setShowVoucherModal(false);
   };
 
-  const handleRemoveVoucher = () => {
-    setSelectedVoucher(null);
-    setVoucherCode("");
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    // Validate with detailed messages
-    const errors = [];
-    if (!name) errors.push("Họ và tên");
-    if (!phone) errors.push("Số điện thoại");
-    if (!streetAddress) errors.push("Địa chỉ (trước số nhà)");
-    if (!selectedCity) errors.push("Thành phố");
-    if (!selectedDistrict) errors.push("Quận/Huyện");
-    if (!selectedWard) errors.push("Phường/Xã");
-
-    if (errors.length > 0) {
-      alert(`Vui lòng nhập: ${errors.join(", ")}`);
+  const handleSaveNewAddress = async () => {
+    if (!newAddress.label.trim() || !newAddress.address.trim()) {
+      alert("Vui lòng nhập đầy đủ thông tin địa chỉ");
       return;
     }
 
-    // Build full address
-    const cityName = vietnamLocations.cities.find(
-      (c) => c.id === selectedCity
-    )?.name;
-    const districtName = getDistricts().find(
-      (d) => d.id === selectedDistrict
-    )?.name;
-    const wardName = getWards().find((w) => w.id === selectedWard)?.name;
-    const fullAddress = `${streetAddress}, ${wardName}, ${districtName}, ${cityName}`;
+    try {
+      setSavingAddress(true);
+      
+      // Add new address to existing addresses array
+      const updatedAddresses = [
+        ...addresses,
+        {
+          label: newAddress.label,
+          address: newAddress.address,
+          contactPhone: newAddress.phone || user?.phone || "",
+          isDefault: addresses.length === 0
+        }
+      ];
+      
+      // Call API to update profile with new addresses
+      await authAPI.updateProfile({ addresses: updatedAddresses });
+      
+      // Refresh user data
+      dispatch(loadUser());
+      
+      // Close modal and reset form
+      setShowAddressModal(false);
+      setNewAddress({ label: "", address: "", phone: "" });
+      alert("Đã thêm địa chỉ mới!");
+    } catch (error) {
+      alert(error.message || "Không thể thêm địa chỉ");
+    } finally {
+      setSavingAddress(false);
+    }
+  };
 
-    // Get restaurant info - ALWAYS use cartRestaurantId first
+  const handleSelectAddress = (addrId) => {
+    setSelectedAddressId(addrId);
+    setShowAddressModal(false);
+  };
+
+  const handlePlaceOrder = async () => {
+    if (!selectedAddress) {
+      alert("Vui lòng chọn địa chỉ giao hàng");
+      return;
+    }
+
     const restaurantId = cartRestaurantId || items[0]?.restaurantId;
-
     if (!restaurantId) {
       alert("Không tìm thấy thông tin nhà hàng!");
       return;
     }
 
-    // Fetch restaurant details from API
-    let restaurantName = "Nhà hàng";
-    let restaurantAddress = "";
-
     try {
-      const res = await restaurantAPI.getById(restaurantId);
-      const restaurantData = res?.data ?? res;
-      restaurantName = restaurantData.name;
-      restaurantAddress = `${restaurantData.address?.street}, ${restaurantData.address?.district}, ${restaurantData.address?.city}`;
-    } catch (error) {
-      console.error("Error fetching restaurant:", error);
-    }
+      setLoading(true);
 
-    console.log("=== Creating order with restaurantId:", restaurantId);
-
-    try {
-      // Create order first (for all payment methods)
-      const orderPayload = {
+      const orderData = {
         restaurant: restaurantId,
         items: items.map((item) => ({
           product: item.productId || item._id || item.id,
@@ -259,586 +250,355 @@ function Checkout() {
           quantity: item.quantity,
         })),
         deliveryAddress: {
-          address: fullAddress,
-          phone: phone,
+          address: selectedAddress.address,
+          phone: selectedAddress.contactPhone || selectedAddress.phone || user?.phone || "",
           note: note || "",
         },
-        paymentMethod: paymentMethod === "vnpay" ? "banking" : paymentMethod,
+        paymentMethod: "paypal",
         subtotal: subtotal,
-        deliveryFee: shippingFee,
-        discount: selectedVoucher?.discount || 0,
+        deliveryFee: deliveryFee,
+        discount: discount,
         total: total,
         customerNote: note || "",
       };
 
-      // Add customer if authenticated
       if (user?.id || user?._id) {
-        orderPayload.customer = user.id || user._id;
-      } else {
-        // Guest order
-        orderPayload.customerInfo = {
-          name: name,
-          phone: phone,
-          email: user?.email || `${phone}@guest.foodfast.vn`,
-        };
+        orderData.customer = user.id || user._id;
       }
 
-      console.log("📦 Creating order:", orderPayload);
-
-      const orderResponse = await orderAPI.create(orderPayload);
+      console.log("Creating order:", orderData);
+      const orderResponse = await orderAPI.create(orderData);
       const createdOrder = orderResponse?.data ?? orderResponse;
-      
+
       if (!createdOrder) {
         throw new Error("Không thể tạo đơn hàng");
       }
 
-      console.log("✅ Order created:", createdOrder);
+      console.log("Order created:", createdOrder);
 
-      // Handle payment based on method
-      if (paymentMethod === "vnpay") {
-        // Create VNPay payment
-        const paymentResponse = await api.post('/payments/vnpay/create', {
-          orderId: createdOrder._id || createdOrder.id,
-          amount: total,
-          orderInfo: `Thanh toán đơn hàng ${createdOrder.orderNumber}`,
-        });
+      // Navigate to PayPal payment
+      const paypalParams = new URLSearchParams({
+        amount: total.toString(),
+        description: `Đơn hàng FoodFast #${createdOrder.orderNumber || createdOrder._id}`,
+      });
+      navigate(`/paypal-payment/${createdOrder._id || createdOrder.id}?${paypalParams.toString()}`);
 
-        const paymentData = paymentResponse?.data ?? paymentResponse;
-        if (paymentData?.paymentUrl) {
-          // Redirect to VNPay
-          window.location.href = paymentData.paymentUrl;
-        } else {
-          throw new Error("Không thể tạo thanh toán VNPay");
-        }
-      } else if (paymentMethod === "momo") {
-        // Create MoMo payment
-        const paymentResponse = await api.post('/payments/momo/create', {
-          orderId: createdOrder._id || createdOrder.id,
-          amount: total,
-          orderInfo: `Thanh toán đơn hàng ${createdOrder.orderNumber}`,
-        });
-
-        const paymentData = paymentResponse?.data ?? paymentResponse;
-        if (paymentData?.paymentUrl) {
-          // Redirect to MoMo
-          window.location.href = paymentData.paymentUrl;
-        } else {
-          throw new Error("Không thể tạo thanh toán MoMo");
-        }
-      } else if (paymentMethod === "paypal") {
-        // Navigate to PayPal payment page
-        const paypalParams = new URLSearchParams({
-          amount: total.toString(),
-          description: `Đơn hàng FoodFast #${createdOrder.orderNumber || createdOrder._id}`,
-        });
-        navigate(`/paypal-payment/${createdOrder._id || createdOrder.id}?${paypalParams.toString()}`);
-      } else {
-        // COD: Navigate to order tracking immediately
-        await dispatch(clearCart());
-        navigate(`/order-tracking/${createdOrder._id || createdOrder.id}`);
-      }
     } catch (error) {
-      console.error("❌ Error creating order:", error);
-      alert(
-        error.message ||
-          "Có lỗi xảy ra khi đặt hàng"
-      );
+      console.error("Error creating order:", error);
+      alert(error.message || "Có lỗi xảy ra khi đặt hàng");
+    } finally {
+      setLoading(false);
     }
   };
 
+  if (items.length === 0) {
+    return (
+      <div className="checkout-page">
+        <div className="checkout-container">
+          <div className="empty-checkout">
+            <div className="empty-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="80" height="80">
+                <path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            </div>
+            <h2>Giỏ hàng trống</h2>
+            <p>Hãy thêm món ăn vào giỏ hàng trước khi thanh toán</p>
+            <button onClick={() => navigate("/")} className="browse-btn">
+              Khám phá món ăn
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="checkout-page">
-      <div className="container">
+      <div className="checkout-container">
         <h1 className="page-title">Thanh toán</h1>
 
         <div className="checkout-grid">
-          {/* Left: Shipping Info */}
-          <div className="checkout-left">
-            <form onSubmit={handleSubmit}>
-              <div className="checkout-section">
-                <h2>Thông tin giao hàng</h2>
-
-                <div className="form-group">
-                  <label>
-                    Họ và tên<span className="required">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Họ và tên"
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>
-                    Số điện thoại<span className="required">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="Số điện thoại"
-                    required
-                  />
-                </div>
-
-                {savedAddresses.length > 0 && (
-                  <div className="saved-addresses">
-                    <label className="checkbox-label">
-                      <input
-                        type="checkbox"
-                        checked={useOldAddress}
-                        onChange={(e) => setUseOldAddress(e.target.checked)}
-                      />
-                      <span>Sử dụng địa chỉ đã lưu</span>
-                    </label>
-                    {useOldAddress && (
-                      <div className="address-list">
-                        {savedAddresses.map((addr) => (
-                          <div key={addr.id} className="address-item">
-                            <strong>{addr.label}</strong>
-                            <p>{addr.address}</p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className="form-group">
-                  <label>
-                    Địa chỉ (trước sáp nhập)<span className="required">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={streetAddress}
-                    onChange={(e) => setStreetAddress(e.target.value)}
-                    placeholder="Nhập địa chỉ"
-                    required
-                    disabled={useOldAddress}
-                  />
-                </div>
-
-                <div className="address-row">
-                  <div className="form-group location-select" ref={cityRef}>
-                    <input
-                      type="text"
-                      value={citySearch}
-                      onFocus={() => {
-                        setCitySearch("");
-                        setShowCityDropdown(true);
-                      }}
-                      onChange={(e) => setCitySearch(e.target.value)}
-                      placeholder="Thành phố"
-                      disabled={useOldAddress}
-                      autoComplete="off"
-                    />
-                    {showCityDropdown && (
-                      <div className="location-dropdown">
-                        {filteredCities.map((city) => (
-                          <div
-                            key={city.id}
-                            className={`dropdown-item ${
-                              selectedCity === city.id ? "selected" : ""
-                            }`}
-                            onClick={() => handleCitySelect(city)}
-                          >
-                            {city.name}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="form-group location-select" ref={districtRef}>
-                    <input
-                      type="text"
-                      value={districtSearch}
-                      onFocus={() => {
-                        if (selectedCity) {
-                          setDistrictSearch("");
-                          setShowDistrictDropdown(true);
-                        }
-                      }}
-                      onChange={(e) => setDistrictSearch(e.target.value)}
-                      placeholder="Quận/Huyện"
-                      disabled={!selectedCity || useOldAddress}
-                      autoComplete="off"
-                    />
-                    {showDistrictDropdown && selectedCity && (
-                      <div className="location-dropdown">
-                        {filteredDistricts.map((district) => (
-                          <div
-                            key={district.id}
-                            className={`dropdown-item ${
-                              selectedDistrict === district.id ? "selected" : ""
-                            }`}
-                            onClick={() => handleDistrictSelect(district)}
-                          >
-                            {district.name}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="form-group location-select" ref={wardRef}>
-                    <input
-                      type="text"
-                      value={wardSearch}
-                      onFocus={() => {
-                        if (selectedDistrict) {
-                          setWardSearch("");
-                          setShowWardDropdown(true);
-                        }
-                      }}
-                      onChange={(e) => setWardSearch(e.target.value)}
-                      placeholder="Phường/Xã"
-                      disabled={!selectedDistrict || useOldAddress}
-                      autoComplete="off"
-                    />
-                    {showWardDropdown && selectedDistrict && (
-                      <div className="location-dropdown">
-                        {filteredWards.map((ward) => (
-                          <div
-                            key={ward.id}
-                            className={`dropdown-item ${
-                              selectedWard === ward.id ? "selected" : ""
-                            }`}
-                            onClick={() => handleWardSelect(ward)}
-                          >
-                            {ward.name}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label>Ghi chú (không bắt buộc)</label>
-                  <textarea
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    placeholder="Ghi chú cho người giao hàng..."
-                    rows="3"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Mã khuyến mãi</label>
-                  {!selectedVoucher ? (
-                    <button
-                      type="button"
-                      className="voucher-select-btn"
-                      onClick={() => setShowVoucherModal(true)}
-                    >
-                      <svg
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                      >
-                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                        <circle cx="12" cy="10" r="3" />
-                      </svg>
-                      Chọn mã khuyến mãi
-                    </button>
-                  ) : (
-                    <div className="selected-voucher">
-                      <div className="voucher-info">
-                        <strong>{selectedVoucher.title}</strong>
-                        <p>{selectedVoucher.description}</p>
-                      </div>
-                      <button
-                        type="button"
-                        className="remove-voucher-btn"
-                        onClick={handleRemoveVoucher}
-                      >
-                        ✕
-                      </button>
-                    </div>
+          {/* Left Column - Form */}
+          <div className="checkout-main">
+            {/* Section 1: Địa chỉ giao hàng */}
+            <div className="checkout-card">
+              <div className="card-header">
+                <h2>Địa chỉ giao hàng</h2>
+                <button className="change-btn" onClick={() => setShowAddressModal(true)}>
+                  Thay đổi
+                </button>
+              </div>
+              
+              {selectedAddress ? (
+                <div className="selected-address">
+                  <div className="address-label">{selectedAddress.label || "Địa chỉ"}</div>
+                  <div className="address-text">{selectedAddress.address}</div>
+                  {(selectedAddress.contactPhone || selectedAddress.phone) && (
+                    <div className="address-phone">SĐT: {selectedAddress.contactPhone || selectedAddress.phone}</div>
                   )}
                 </div>
-              </div>
-
-              <div className="checkout-section">
-                <h2>Phương thức thanh toán</h2>
-
-                <div className="payment-methods">
-                  <label className="payment-option">
-                    <input
-                      type="radio"
-                      name="payment"
-                      value="cod"
-                      checked={paymentMethod === "cod"}
-                      onChange={(e) => setPaymentMethod(e.target.value)}
-                    />
-                    <div className="payment-icon">
-                      <svg
-                        width="40"
-                        height="40"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#10B981"
-                        strokeWidth="2"
-                      >
-                        <rect x="2" y="5" width="20" height="14" rx="2" />
-                        <line x1="2" y1="10" x2="22" y2="10" />
-                      </svg>
-                    </div>
-                    <div className="payment-details">
-                      <strong className="payment-title">
-                        Thanh toán khi nhận hàng (COD)
-                      </strong>
-                      <p className="payment-desc">
-                        Thanh toán bằng tiền mặt khi nhận hàng
-                      </p>
-                    </div>
-                  </label>
-
-                  <label className="payment-option">
-                    <input
-                      type="radio"
-                      name="payment"
-                      value="vnpay"
-                      checked={paymentMethod === "vnpay"}
-                      onChange={(e) => setPaymentMethod(e.target.value)}
-                    />
-                    <div className="payment-icon">
-                      <img
-                        src="https://upload.wikimedia.org/wikipedia/commons/5/5f/VNPAY_logo.png"
-                        alt="VNPay"
-                        className="pay-logo"
-                      />
-                    </div>
-                    <div className="payment-details">
-                      <strong className="payment-title">VNPay</strong>
-                      <p className="payment-desc">Thanh toán qua VNPay</p>
-                    </div>
-                  </label>
-
-                  <label className="payment-option">
-                    <input
-                      type="radio"
-                      name="payment"
-                      value="momo"
-                      checked={paymentMethod === "momo"}
-                      onChange={(e) => setPaymentMethod(e.target.value)}
-                    />
-                    <div className="payment-icon">
-                      <img
-                        src="https://upload.wikimedia.org/wikipedia/commons/6/62/MoMo_Logo.png"
-                        alt="MoMo"
-                        className="pay-logo"
-                      />
-                    </div>
-                    <div className="payment-details">
-                      <strong className="payment-title">Momo</strong>
-                      <p className="payment-desc">Thanh toán qua ví Momo</p>
-                    </div>
-                  </label>
-
-                  <label className="payment-option">
-                    <input
-                      type="radio"
-                      name="payment"
-                      value="paypal"
-                      checked={paymentMethod === "paypal"}
-                      onChange={(e) => setPaymentMethod(e.target.value)}
-                    />
-                    <div className="payment-icon">
-                      <img
-                        src="https://www.paypalobjects.com/webstatic/mktg/Logo/pp-logo-100px.png"
-                        alt="PayPal"
-                        className="pay-logo"
-                      />
-                    </div>
-                    <div className="payment-details">
-                      <strong className="payment-title">PayPal</strong>
-                      <p className="payment-desc">Thanh toán quốc tế qua PayPal</p>
-                    </div>
-                  </label>
+              ) : (
+                <div className="no-address">
+                  <p>Bạn chưa có địa chỉ giao hàng</p>
+                  <button onClick={() => setShowAddressModal(true)} className="add-address-btn">
+                    + Thêm địa chỉ
+                  </button>
                 </div>
+              )}
+            </div>
+
+            {/* Section 2: Đơn hàng */}
+            <div className="checkout-card">
+              <div className="card-header">
+                <h2>Đơn hàng</h2>
+                <span className="restaurant-badge">{currentRestaurantName || "Nhà hàng"}</span>
               </div>
-
-              <button type="submit" className="checkout-btn">
-                Đặt hàng ngay
-              </button>
-            </form>
-          </div>
-
-          {/* Right: Order Summary */}
-          <div className="checkout-right">
-            <div className="order-summary">
-              <h2>Đơn hàng</h2>
-
               <div className="order-items">
-                {items.map((item) => (
-                  <div key={item._id || item.id} className="order-item">
-                    <div className="item-info">
-                      <strong>{item.name}</strong>
-                      <p>
-                        {item.quantity} x {item.price.toLocaleString("vi-VN")}đ
-                      </p>
+                {items.map((item, index) => (
+                  <div key={item.id || item._id || index} className="order-item">
+                    <div className="item-qty">{item.quantity}x</div>
+                    <div className="item-details">
+                      <span className="item-name">{item.name}</span>
                     </div>
-                    <div className="item-total">
+                    <div className="item-price">
                       {(item.price * item.quantity).toLocaleString("vi-VN")}đ
                     </div>
                   </div>
                 ))}
               </div>
+            </div>
 
-              <div className="order-totals">
-                <div className="total-row">
-                  <span>Tạm tính:</span>
-                  <strong>{subtotal.toLocaleString("vi-VN")}đ</strong>
+            {/* Section 3: Mã giảm giá */}
+            <div className="checkout-card">
+              <h2>Mã giảm giá</h2>
+              <div className="voucher-row">
+                <input
+                  type="text"
+                  placeholder="Nhập mã voucher"
+                  value={voucherCode}
+                  onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
+                  className="voucher-input"
+                />
+                <button
+                  className="apply-btn"
+                  onClick={handleApplyVoucher}
+                  disabled={applyingVoucher}
+                >
+                  {applyingVoucher ? "Đang áp dụng..." : "Áp dụng"}
+                </button>
+              </div>
+              {discount > 0 && (
+                <div className="discount-success">
+                  Đã giảm: -{discount.toLocaleString("vi-VN")}đ
                 </div>
-                <div className="total-row">
-                  <span>Phí giao hàng:</span>
-                  <strong>{shippingFee.toLocaleString("vi-VN")}đ</strong>
+              )}
+            </div>
+
+            {/* Section 4: Phương thức thanh toán */}
+            <div className="checkout-card">
+              <h2>Phương thức thanh toán</h2>
+              <div className="payment-info-note">
+                Chỉ hỗ trợ thanh toán online để đảm bảo giao hàng nhanh bằng drone
+              </div>
+              <div className="payment-method selected">
+                <img
+                  src="https://www.paypalobjects.com/webstatic/icon/pp258.png"
+                  alt="PayPal"
+                  className="payment-logo"
+                />
+                <div className="payment-details">
+                  <span className="payment-name">PayPal</span>
+                  <span className="payment-desc">Thanh toán an toàn qua PayPal</span>
                 </div>
-                {selectedVoucher && (
-                  <div className="total-row discount-row">
-                    <span>Giảm giá ({selectedVoucher.code}):</span>
-                    <strong className="discount-amount">
-                      -{discount.toLocaleString("vi-VN")}đ
-                    </strong>
+                <div className="check-icon">✓</div>
+              </div>
+            </div>
+
+            {/* Section 5: Ghi chú */}
+            <div className="checkout-card">
+              <h2>Ghi chú cho đơn hàng</h2>
+              <textarea
+                placeholder="Nhập ghi chú cho nhà hàng hoặc người giao hàng..."
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                className="note-textarea"
+                rows={3}
+              />
+            </div>
+          </div>
+
+          {/* Right Column - Summary */}
+          <div className="checkout-sidebar">
+            <div className="summary-card">
+              <h2>Tổng đơn hàng</h2>
+              
+              <div className="summary-rows">
+                <div className="summary-row">
+                  <span>Tạm tính ({items.length} món)</span>
+                  <span>{subtotal.toLocaleString("vi-VN")}đ</span>
+                </div>
+                <div className="summary-row">
+                  <span>Phí giao hàng (Drone)</span>
+                  <span>{deliveryFee.toLocaleString("vi-VN")}đ</span>
+                </div>
+                {discount > 0 && (
+                  <div className="summary-row discount">
+                    <span>Giảm giá</span>
+                    <span>-{discount.toLocaleString("vi-VN")}đ</span>
                   </div>
                 )}
-                <div className="total-row grand-total">
-                  <span>Tổng cộng:</span>
-                  <strong className="total-amount">
-                    {total.toLocaleString("vi-VN")}đ
-                  </strong>
-                </div>
               </div>
+
+              <div className="summary-total">
+                <span>Tổng thanh toán</span>
+                <span className="total-amount">{total.toLocaleString("vi-VN")}đ</span>
+              </div>
+
+              <button
+                className="place-order-btn"
+                onClick={handlePlaceOrder}
+                disabled={loading || !selectedAddress}
+              >
+                {loading ? "Đang xử lý..." : "Đặt hàng"}
+              </button>
+
+              <p className="order-note">
+                Bằng việc đặt hàng, bạn đồng ý với điều khoản sử dụng của FoodFast
+              </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Voucher Modal */}
-      {showVoucherModal && (
-        <div
-          className="modal-overlay"
-          onClick={() => setShowVoucherModal(false)}
-        >
-          <div className="voucher-modal" onClick={(e) => e.stopPropagation()}>
+      {/* Address Modal */}
+      {showAddressModal && (
+        <div className="modal-overlay" onClick={() => setShowAddressModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>
-                <svg
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                  <circle cx="12" cy="10" r="3" />
-                </svg>
-                Chọn mã khuyến mãi
-              </h3>
-              <button
-                className="modal-close-btn"
-                onClick={() => setShowVoucherModal(false)}
-              >
-                ✕
-              </button>
+              <h3>Chọn địa chỉ giao hàng</h3>
+              <button className="modal-close" onClick={() => setShowAddressModal(false)}>×</button>
             </div>
-
+            
             <div className="modal-body">
-              <div className="voucher-input-section">
-                <input
-                  type="text"
-                  placeholder="Nhập mã khuyến mãi"
-                  value={voucherCode}
-                  onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
-                />
-                <button
-                  className="apply-code-btn"
-                  onClick={() => {
-                    const voucher = availableVouchers.find(
-                      (v) => v.code === voucherCode
-                    );
-                    if (voucher) {
-                      handleApplyVoucher(voucher);
-                    } else {
-                      alert("Mã khuyến mãi không hợp lệ");
-                    }
-                  }}
-                >
-                  Áp dụng
-                </button>
+              {/* Existing addresses */}
+              <div className="address-list">
+                {addresses.map((addr, index) => {
+                  const addrId = addr._id || addr.id || index.toString();
+                  const isSelected = selectedAddressId === addrId;
+                  return (
+                    <div
+                      key={addrId}
+                      className={`address-option ${isSelected ? "selected" : ""}`}
+                      onClick={() => handleSelectAddress(addrId)}
+                    >
+                      <div className="radio-circle">
+                        {isSelected && <div className="radio-dot"></div>}
+                      </div>
+                      <div className="address-content">
+                        <div className="address-label">{addr.label || "Địa chỉ"}</div>
+                        <div className="address-text">{addr.address}</div>
+                        {(addr.contactPhone || addr.phone) && <div className="address-phone">{addr.contactPhone || addr.phone}</div>}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
 
-              {loadingVouchers ? (
-                <div className="voucher-loading">
-                  <p>Đang tải mã khuyến mãi...</p>
+              {/* Add new address form */}
+              <div className="add-address-section">
+                <h4>Thêm địa chỉ mới</h4>
+                <div className="form-group">
+                  <label>Tên địa chỉ</label>
+                  <input
+                    type="text"
+                    placeholder="VD: Nhà riêng, Văn phòng..."
+                    value={newAddress.label}
+                    onChange={(e) => setNewAddress({ ...newAddress, label: e.target.value })}
+                  />
                 </div>
-              ) : availableVouchers.length > 0 ? (
-                <div className="voucher-list">
-                  {availableVouchers.map((voucher) => (
-                    <div
-                      key={voucher._id || voucher.id}
-                      className="voucher-item"
-                    >
-                      <div className="voucher-item-content">
-                        <div className="voucher-icon">🎟️</div>
-                        <div className="voucher-details">
-                          <strong>{voucher.name || voucher.title}</strong>
-                          <p>{voucher.description}</p>
-                          <small>
-                            Giảm:{" "}
-                            {(
-                              voucher.discount ||
-                              voucher.discountAmount ||
-                              0
-                            ).toLocaleString()}
-                            đ
-                            {voucher.minPurchase > 0
-                              ? ` - Đơn tối thiểu ${voucher.minPurchase.toLocaleString()}đ`
-                              : ""}
-                          </small>
-                        </div>
-                      </div>
+                <div className="form-group">
+                  <label>Số điện thoại</label>
+                  <input
+                    type="text"
+                    placeholder="Số điện thoại nhận hàng"
+                    value={newAddress.phone}
+                    onChange={(e) => setNewAddress({ ...newAddress, phone: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Địa chỉ chi tiết</label>
+                  <textarea
+                    placeholder="Số nhà, tên đường, phường, quận, thành phố"
+                    value={newAddress.address}
+                    onChange={(e) => {
+                      setNewAddress({ ...newAddress, address: e.target.value });
+                      setShowSuggestions(true);
+                    }}
+                    onFocus={() => setShowSuggestions(true)}
+                    rows={3}
+                  />
+                  
+                  {/* Quick tags */}
+                  <div className="quick-tags">
+                    {QUICK_ADDRESS_TAGS.map((tag) => (
                       <button
-                        className="select-voucher-btn"
-                        onClick={() => handleApplyVoucher(voucher)}
-                        disabled={
-                          (voucher.minPurchase || voucher.minOrder || 0) >
-                          subtotal
-                        }
+                        key={tag}
+                        type="button"
+                        className="quick-tag"
+                        onClick={() => handleQuickTagClick(tag)}
                       >
-                        {(voucher.minPurchase || voucher.minOrder || 0) >
-                        subtotal
-                          ? "Không đủ điều kiện"
-                          : "Chọn"}
+                        {tag}
                       </button>
+                    ))}
+                  </div>
+
+                  {/* Address suggestions */}
+                  {showSuggestions && (
+                    <div className="suggestions-list" ref={suggestionsRef}>
+                      {filteredSuggestions.length > 0 ? (
+                        <>
+                          {filteredSuggestions.map((suggestion) => (
+                            <div
+                              key={suggestion.id}
+                              className="suggestion-item"
+                              onClick={() => handleSelectSuggestion(suggestion)}
+                            >
+                              <div className="suggestion-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+                                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                                  <circle cx="12" cy="10" r="3" />
+                                </svg>
+                              </div>
+                              <div className="suggestion-content">
+                                <div className="suggestion-title">{suggestion.label}</div>
+                                <div className="suggestion-subtitle">{suggestion.address}</div>
+                              </div>
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            className="hide-suggestions-btn"
+                            onClick={() => setShowSuggestions(false)}
+                          >
+                            Ẩn gợi ý
+                          </button>
+                        </>
+                      ) : (
+                        <div className="no-suggestions">
+                          Không tìm thấy địa chỉ phù hợp, hãy nhập chi tiết hơn.
+                        </div>
+                      )}
                     </div>
-                  ))}
+                  )}
                 </div>
-              ) : (
-                <div className="no-vouchers">
-                  <svg
-                    width="80"
-                    height="80"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1"
-                  >
-                    <rect x="3" y="7" width="18" height="13" rx="2" />
-                    <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                  </svg>
-                  <p>Không có voucher khả dụng</p>
-                </div>
-              )}
+                <button
+                  className="save-address-btn"
+                  onClick={handleSaveNewAddress}
+                  disabled={savingAddress}
+                >
+                  {savingAddress ? "Đang lưu..." : "Lưu địa chỉ"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

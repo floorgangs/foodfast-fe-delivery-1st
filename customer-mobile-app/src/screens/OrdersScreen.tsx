@@ -40,7 +40,7 @@ const OrdersScreen = ({ navigation }: any) => {
     }
 
     const normalizeStatus = (status: string) => {
-      if (status === 'completed') return 'delivered';
+      // Keep completed as-is now
       if (status === 'preparing') return 'confirmed';
       return status;
     };
@@ -159,7 +159,7 @@ const OrdersScreen = ({ navigation }: any) => {
   );
 
   const activeOrders = useMemo(
-    () => orders.filter(order => !['delivered', 'cancelled'].includes(order.status)),
+    () => orders.filter(order => !['delivered', 'completed', 'cancelled'].includes(order.status)),
     [orders]
   );
 
@@ -169,7 +169,7 @@ const OrdersScreen = ({ navigation }: any) => {
   );
 
   const historyOrders = useMemo(
-    () => orders.filter(order => ['delivered', 'cancelled'].includes(order.status)),
+    () => orders.filter(order => ['delivered', 'completed', 'cancelled'].includes(order.status)),
     [orders]
   );
 
@@ -177,6 +177,7 @@ const OrdersScreen = ({ navigation }: any) => {
 
   const getStatusInfo = (status: OrderType['status'] | string) => {
     switch (status) {
+      case 'completed':
       case 'delivered':
         return { label: '✓ Đã giao', style: styles.statusDelivered };
       case 'delivering':

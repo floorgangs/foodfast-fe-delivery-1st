@@ -128,6 +128,13 @@
   position: relative;
 }
 
+.user-phone {
+  font-size: 0.875rem;
+  color: #9ca3af;
+  margin: 0.25rem 0 0;
+  position: relative;
+}
+
 /* Profile Menu */
 .profile-menu {
   background: white;
