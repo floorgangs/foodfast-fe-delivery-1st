@@ -29,8 +29,6 @@ function RestaurantSelection() {
     idCardIssuePlace: '',
     businessLicense: null,
     taxCode: '',
-    taxRate: '4.5',
-    taxCertificate: null,
     relatedDocuments: [],
   })
 
@@ -60,9 +58,11 @@ function RestaurantSelection() {
         setRestaurants([])
       }
     } catch (err) {
-      // Nếu lỗi "Bạn chưa có nhà hàng", đó là trường hợp bình thường
-      if (err?.message === 'Bạn chưa có nhà hàng') {
+      // Nếu 404 hoặc "không tìm thấy nhà hàng", đó là trường hợp user chưa có nhà hàng
+      const errorMsg = err?.message?.toLowerCase() || ''
+      if (errorMsg.includes('không tìm thấy') || errorMsg.includes('chưa có nhà hàng')) {
         setRestaurants([])
+        setError('') // Clear error - đây là trường hợp bình thường
       } else {
         setError(err?.message || 'Đã xảy ra lỗi khi tải nhà hàng')
       }
@@ -132,12 +132,11 @@ function RestaurantSelection() {
     setSubmitError('')
 
     try {
-      const [idCardFrontDoc, idCardBackDoc, businessLicenseDoc, taxCertificateDoc] =
+      const [idCardFrontDoc, idCardBackDoc, businessLicenseDoc] =
         await Promise.all([
           convertFileToDocument(formData.idCardFront),
           convertFileToDocument(formData.idCardBack),
           convertFileToDocument(formData.businessLicense),
-          convertFileToDocument(formData.taxCertificate),
         ])
 
       const relatedDocs = await Promise.all(
@@ -181,8 +180,6 @@ function RestaurantSelection() {
           },
           tax: {
             code: formData.taxCode,
-            rate: formData.taxRate,
-            certificateImage: taxCertificateDoc?.content,
           },
           relatedDocuments: relatedDocs.filter(Boolean),
         },
@@ -208,8 +205,6 @@ function RestaurantSelection() {
         idCardIssuePlace: '',
         businessLicense: null,
         taxCode: '',
-        taxRate: '4.5',
-        taxCertificate: null,
         relatedDocuments: [],
       })
       loadRestaurants()
@@ -479,38 +474,6 @@ function RestaurantSelection() {
                       required
                       disabled={submitting}
                     />
-                  </label>
-                  <label>
-                    Thuế suất <span className="required">*</span>
-                    <select
-                      name="taxRate"
-                      value={formData.taxRate}
-                      onChange={handleInputChange}
-                      required
-                      disabled={submitting}
-                    >
-                      <option value="4.5">4.5%</option>
-                      <option value="5">5%</option>
-                      <option value="8">8%</option>
-                      <option value="10">10%</option>
-                    </select>
-                  </label>
-                </div>
-
-                <div className="form-row">
-                  <label>
-                    Ảnh chứng nhận thuế <span className="required">*</span>
-                    <input
-                      type="file"
-                      name="taxCertificate"
-                      accept="image/*"
-                      onChange={handleFileChange}
-                      required
-                      disabled={submitting}
-                    />
-                    {formData.taxCertificate && (
-                      <span className="file-name">📄 {formData.taxCertificate.name}</span>
-                    )}
                   </label>
                 </div>
               </div>

@@ -1,9 +1,5 @@
 import { useState, useEffect } from "react";
-import {
-  getAllOrders,
-  updateOrderStatus,
-  subscribeToOrderUpdates,
-} from "../../services/orderService";
+import { orderAPI, restaurantAPI } from "../../services/api";
 import "./OrderManagement.css";
 
 function OrderManagement() {
@@ -11,107 +7,102 @@ function OrderManagement() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [orders, setOrders] = useState([]);
+  const [restaurants, setRestaurants] = useState([]);
   const [selectedRestaurant, setSelectedRestaurant] = useState("all");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Mock data nhà hàng (giống StaffManagement)
-  const restaurants = [
-    { id: "1", name: "Cơm Tấm Sườn Bì Chả" },
-    { id: "2", name: "Bún Bò Huế Ngon" },
-    { id: "3", name: "KFC Vietnam" },
-  ];
+  // Load restaurants từ API
+  useEffect(() => {
+    loadRestaurants();
+  }, []);
 
-  // Load orders từ localStorage
+  // Load orders từ API
   useEffect(() => {
     loadOrders();
   }, []);
 
-  // Subscribe to real-time order updates
-  useEffect(() => {
-    const unsubscribe = subscribeToOrderUpdates(() => {
-      console.log("Order update received in admin-web");
-      loadOrders();
-    });
-
-    return unsubscribe;
-  }, []);
-
-  const loadOrders = () => {
+  const loadRestaurants = async () => {
     try {
-      console.log("=== Loading all orders for admin");
-
-      // Admin lấy tất cả orders
-      const allOrders = getAllOrders();
-      console.log("All orders loaded:", allOrders);
-      console.log("Total orders found:", allOrders.length);
-
-      // Transform data sang format của OrderManagement
-      const transformedOrders = allOrders.map((order) => {
-        console.log("Transforming order:", order.id, order.status);
-
-        // Tìm tên nhà hàng
-        const restaurant = restaurants.find((r) => r.id === order.restaurantId);
-
-        return {
-          id: order.id,
-          restaurantId: order.restaurantId,
-          restaurantName: restaurant
-            ? restaurant.name
-            : "Nhà hàng không xác định",
-          customer: order.customerName,
-          phone: order.customerPhone,
-          address: order.deliveryAddress,
-          items: order.items.map((item) => ({
-            name: item.name,
-            quantity: item.quantity,
-            price: item.price,
-          })),
-          total: order.total,
-          discount: order.discount || 0,
-          platformFee: Math.round(order.total * 0.1), // 10% platform fee
-          restaurantReceives: order.total - Math.round(order.total * 0.1),
-          distance: 2.5, // Mock distance
-          status: mapStatus(order.status),
-          time: new Date(order.createdAt).toLocaleTimeString("vi-VN", {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-          date: new Date(order.createdAt).toLocaleDateString("vi-VN"),
-          note: order.note || "",
-          paymentMethod: order.paymentMethod || "Tiền mặt",
-        };
-      });
-
-      console.log("Transformed orders:", transformedOrders.length);
-      setOrders(transformedOrders);
+      const response = await restaurantAPI.getAllRestaurants();
+      if (response.success && response.data) {
+        setRestaurants(response.data);
+      }
     } catch (error) {
-      console.error("Error loading orders:", error);
+      console.error("Error loading restaurants:", error);
     }
   };
 
-  // Helper function để map status
-  const mapStatus = (status) => {
-    const statusMap = {
-      pending: "pending",
-      confirmed: "confirmed",
-      preparing: "preparing",
-      delivering: "delivering",
-      completed: "completed",
-      cancelled: "cancelled",
-    };
-    return statusMap[status] || "pending";
+  const loadOrders = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      console.log("=== Loading all orders from API for admin");
+
+      // Admin lấy tất cả orders từ backend
+      const response = await orderAPI.getAllOrders();
+      console.log("API response:", response);
+
+      if (response.success && response.data) {
+        // Transform data sang format của OrderManagement
+        const transformedOrders = response.data.map((order) => {
+          const restaurantName = order.restaurant?.name || "Nhà hàng không xác định";
+          const totalAmount = order.totalAmount || 0;
+
+          return {
+            id: order._id,
+            restaurantId: order.restaurant?._id || "",
+            restaurantName: restaurantName,
+            customer: order.customer?.name || order.guestInfo?.name || "Khách vãng lai",
+            phone: order.customer?.phone || order.guestInfo?.phone || "",
+            address: order.deliveryAddress || "",
+            items: order.items?.map((item) => ({
+              name: item.product?.name || item.name || "Sản phẩm",
+              quantity: item.quantity || 1,
+              price: item.price || 0,
+            })) || [],
+            total: totalAmount,
+            discount: order.discount || 0,
+            platformFee: Math.round(totalAmount * 0.1), // 10% platform fee
+            restaurantReceives: totalAmount - Math.round(totalAmount * 0.1),
+            distance: order.distance || 0,
+            status: order.status || "pending",
+            time: new Date(order.createdAt).toLocaleTimeString("vi-VN", {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            date: new Date(order.createdAt).toLocaleDateString("vi-VN"),
+            note: order.note || "",
+            paymentMethod: order.paymentMethod || "PayPal",
+            paymentStatus: order.paymentStatus || "pending",
+          };
+        });
+
+        console.log("Transformed orders:", transformedOrders.length);
+        setOrders(transformedOrders);
+      }
+    } catch (error) {
+      console.error("Error loading orders:", error);
+      setError("Không thể tải đơn hàng. Vui lòng thử lại.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const updateStatus = (id, newStatus) => {
+  const updateStatus = async (id, newStatus) => {
     console.log("Updating order status:", id, newStatus);
 
-    // Update in shared localStorage via orderService
-    const updatedOrder = updateOrderStatus(id, newStatus);
+    try {
+      const response = await orderAPI.updateOrderStatus(id, newStatus);
 
-    if (updatedOrder) {
-      // Update local state
-      loadOrders();
-    } else {
-      console.error("Failed to update order status");
+      if (response.success) {
+        // Reload orders
+        loadOrders();
+      } else {
+        console.error("Failed to update order status");
+      }
+    } catch (error) {
+      console.error("Error updating order status:", error);
     }
   };
 
@@ -174,6 +165,37 @@ function OrderManagement() {
 
   const tabCounts = getTabCounts();
 
+  if (loading) {
+    return (
+      <div className="order-management-page">
+        <div className="page-header">
+          <h1>Quản lý đơn hàng</h1>
+          <p className="subtitle">Đang tải dữ liệu...</p>
+        </div>
+        <div className="loading-state">
+          <div className="loading-spinner"></div>
+          <p>Đang tải đơn hàng...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="order-management-page">
+        <div className="page-header">
+          <h1>Quản lý đơn hàng</h1>
+        </div>
+        <div className="error-state">
+          <p>{error}</p>
+          <button onClick={loadOrders} className="retry-btn">
+            Thử lại
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="order-management-page">
       <div className="page-header">
@@ -192,12 +214,15 @@ function OrderManagement() {
           >
             <option value="all">Tất cả nhà hàng</option>
             {restaurants.map((restaurant) => (
-              <option key={restaurant.id} value={restaurant.id}>
+              <option key={restaurant._id} value={restaurant._id}>
                 {restaurant.name}
               </option>
             ))}
           </select>
         </div>
+        <button onClick={loadOrders} className="refresh-btn">
+          🔄 Làm mới
+        </button>
       </div>
 
       <div className="order-tabs">

@@ -48,13 +48,13 @@ function Login() {
         dispatch(
           loginAction({
             user: user,
-            restaurant: restaurant,
+            restaurant: null, // Không set restaurant ngay, để user chọn ở trang select-restaurant
             token: token,
           })
         );
 
-        // Navigate to dashboard
-        navigate("/");
+        // Navigate to select restaurant page (không phải dashboard)
+        navigate("/select-restaurant");
       } else {
         setLoginError(response.message || "Đăng nhập thất bại");
       }

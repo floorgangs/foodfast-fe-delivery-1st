@@ -39,30 +39,18 @@ export const createOrder = async (req, res) => {
       }
     }
 
-    const supportedPaymentMethods = [
-      "cod",
-      "cash",
-      "momo",
-      "vnpay",
-      "zalopay",
-      "card",
-      "banking",
-      "dronepay",
-    ];
-    const normalizedPaymentMethod = supportedPaymentMethods.includes(
-      paymentMethod
-    )
-      ? paymentMethod
-      : "cod"; // Default to COD instead of momo
+    const supportedPaymentMethods = ["paypal"];
+    
+    if (!supportedPaymentMethods.includes(paymentMethod)) {
+      return res.status(400).json({
+        success: false,
+        message: "Chỉ hỗ trợ thanh toán qua PayPal",
+      });
+    }
+    
+    const normalizedPaymentMethod = paymentMethod;
     const paymentProviderMap = {
-      cod: "Tiền mặt",
-      cash: "Tiền mặt",
-      momo: "MoMo",
-      vnpay: "VNPay",
-      zalopay: "ZaloPay",
-      card: "Thẻ tín dụng",
-      banking: "Chuyển khoản",
-      dronepay: "DronePay Gateway",
+      paypal: "PayPal",
     };
 
     // Validate restaurant
@@ -246,13 +234,11 @@ export const createOrder = async (req, res) => {
       Math.random() * 9999
     )}`;
     const paymentSessionExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
-    const paymentProvider =
-      paymentProviderMap[normalizedPaymentMethod] || "DronePay Gateway";
+    const paymentProvider = paymentProviderMap[normalizedPaymentMethod] || "PayPal";
 
-    // For COD, set paymentStatus to paid immediately but status stays pending for restaurant confirmation
-    const isCOD = paymentMethod === "cod" || paymentMethod === "cash";
-    const initialPaymentStatus = isCOD ? "paid" : "pending";
-    const initialOrderStatus = "pending"; // Always pending, waiting for restaurant confirmation
+    // All orders require online payment via PayPal
+    const initialPaymentStatus = "pending";
+    const initialOrderStatus = "pending";
 
     const order = await Order.create({
       orderNumber,
@@ -272,8 +258,8 @@ export const createOrder = async (req, res) => {
       discount,
       total,
       deliveryAddress: normalizedDeliveryAddress,
-      paymentMethod: isCOD ? "cod" : normalizedPaymentMethod,
-      paymentProvider: isCOD ? "Tiền mặt" : paymentProvider,
+      paymentMethod: normalizedPaymentMethod,
+      paymentProvider: paymentProvider,
       paymentStatus: initialPaymentStatus,
       paymentSessionId,
       paymentSessionExpiresAt,
@@ -283,9 +269,7 @@ export const createOrder = async (req, res) => {
       timeline: [
         {
           status: initialOrderStatus,
-          note: isCOD
-            ? "Đơn hàng COD đã được tạo, chờ nhà hàng xác nhận"
-            : "Đơn hàng đã được tạo, chờ thanh toán",
+          note: "Đơn hàng đã được tạo, chờ thanh toán PayPal",
           timestamp: new Date(),
         },
       ],
@@ -301,32 +285,20 @@ export const createOrder = async (req, res) => {
 
     const populatedOrder = await orderQuery;
 
-    // Emit socket event for COD orders (already paid)
-    if (isCOD) {
-      const io = req.app.get("io");
-      if (io) {
-        io.to(`restaurant_${restaurantId}`).emit("new_order", {
-          order: populatedOrder,
-          message: "Có đơn hàng mới COD!",
-        });
-        console.log(`🔔 Emitted new_order event to restaurant_${restaurantId}`);
-      }
-    }
+    // No socket event here - only after payment is confirmed
 
     res.status(201).json({
       success: true,
       data: populatedOrder,
-      paymentSession: isCOD
-        ? null
-        : {
-            sessionId: paymentSessionId,
-            providerName: paymentProvider,
-            amount: total,
-            expiresAt: paymentSessionExpiresAt,
-            redirectUrl:
-              process.env.THIRD_PARTY_PAYMENT_URL ||
-              `https://dronepay.foodfast.dev/session/${paymentSessionId}`,
-          },
+      paymentSession: {
+        sessionId: paymentSessionId,
+        providerName: paymentProvider,
+        amount: total,
+        expiresAt: paymentSessionExpiresAt,
+        redirectUrl:
+          process.env.THIRD_PARTY_PAYMENT_URL ||
+          `https://dronepay.foodfast.dev/session/${paymentSessionId}`,
+      },
     });
   } catch (error) {
     res.status(500).json({
@@ -615,6 +587,16 @@ export const confirmThirdPartyPayment = async (req, res) => {
     });
 
     if (status === "success") {
+      // Check if order is already paid
+      if (order.paymentStatus === 'paid') {
+         console.log(`[confirmThirdPartyPayment] Order ${order.orderNumber} already paid, returning success`);
+         return res.json({
+            success: true,
+            message: "Thanh toán thành công (đã ghi nhận trước đó)",
+            data: order,
+         });
+      }
+
       const paidAt = new Date();
 
       order.paymentStatus = "paid";
@@ -632,19 +614,26 @@ export const confirmThirdPartyPayment = async (req, res) => {
       });
 
       // Tạo bản ghi Payment riêng cho thống kê/đối soát
-      await Payment.create({
-        paymentId: sessionId,
-        order: order._id,
-        customer: order.customer?._id,
-        amount: order.total,
-        currency: "VND",
-        method: order.paymentMethod || "momo",
-        provider: order.paymentProvider,
-        status: "completed",
-        transactionId: sessionId,
-        paidAt,
-        rawData: rawData || {},
-      });
+      // Check if payment already exists to avoid duplicate key error
+      const existingPayment = await Payment.findOne({ paymentId: sessionId });
+      
+      if (!existingPayment) {
+        await Payment.create({
+          paymentId: sessionId,
+          order: order._id,
+          customer: order.customer?._id,
+          amount: order.total,
+          currency: "VND",
+          method: order.paymentMethod || "momo",
+          provider: order.paymentProvider,
+          status: "completed",
+          transactionId: sessionId,
+          paidAt,
+          rawData: rawData || {},
+        });
+      } else {
+        console.log(`[confirmThirdPartyPayment] Payment record already exists for session ${sessionId}`);
+      }
 
       // Create notification for customer
       const Notification = (await import("../models/Notification.js")).default;

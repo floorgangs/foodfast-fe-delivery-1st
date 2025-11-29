@@ -246,18 +246,61 @@
 }
 
 .summary-card h3 {
-  font-size: 14px;
+  font-size: 12px;
   color: #64748b;
   font-weight: 600;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .summary-number {
-  font-size: 36px;
+  font-size: 28px;
   font-weight: 800;
   color: #1a1f2e;
+}
+
+/* Stats Row */
+.stats-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stats-row .stat-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: white;
+  padding: 16px 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  min-width: 160px;
+}
+
+.stats-row .stat-icon {
+  font-size: 28px;
+  color: #667eea;
+}
+
+.stats-row .stat-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.stats-row .stat-number {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1a1f2e;
+}
+
+.stats-row .stat-number.active {
+  color: #059669;
+}
+
+.stats-row .stat-label {
+  font-size: 12px;
+  color: #64748b;
 }
 
 .summary-number.active {

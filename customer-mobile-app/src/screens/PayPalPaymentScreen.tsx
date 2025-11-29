@@ -32,6 +32,7 @@ const PayPalPaymentScreen: React.FC<PayPalPaymentScreenProps> = ({
   const [processing, setProcessing] = useState(false);
   const [paypalUrl, setPaypalUrl] = useState<string | null>(null);
   const [paypalOrderId, setPaypalOrderId] = useState<string | null>(null);
+  const [captured, setCaptured] = useState(false); // Flag để ngăn capture nhiều lần
   const webViewRef = useRef<WebView>(null);
 
   React.useEffect(() => {
@@ -52,7 +53,7 @@ const PayPalPaymentScreen: React.FC<PayPalPaymentScreenProps> = ({
         description,
       });
 
-      const response = await paypalAPI.createOrder({
+      const response: any = await paypalAPI.createOrder({
         amount: parseFloat(amountUSD),
         orderId: orderId,
         description: description || `FoodFast Order #${orderId}`,
@@ -86,31 +87,41 @@ const PayPalPaymentScreen: React.FC<PayPalPaymentScreenProps> = ({
     const { url } = navState;
     console.log('[PayPal] Navigation to:', url);
 
-    // Kiểm tra return URL (thanh toán thành công)
-    if (url.includes('/payment/paypal-return')) {
-      console.log('[PayPal] Payment return detected');
+    // Chỉ detect return URL khi user đã approve thanh toán
+    // PayPal redirect về return_url với PayerID param khi thành công
+    if (url.includes('PayerID=')) {
+      console.log('[PayPal] Payment approved - PayerID found in URL:', url);
+      const payerIdMatch = url.match(/PayerID=([^&]+)/);
+      const payerId = payerIdMatch ? payerIdMatch[1] : 'unknown';
+      console.log('[PayPal] Extracted PayerID:', payerId);
+      
       await handlePaymentSuccess();
+      return;
     }
 
     // Kiểm tra cancel URL (hủy thanh toán)
     if (url.includes('/payment/paypal-cancel')) {
       console.log('[PayPal] Payment cancelled');
       handlePaymentCancel();
+      return;
     }
   };
 
   const handlePaymentSuccess = async () => {
-    if (processing || !paypalOrderId) {
+    // Ngăn gọi nhiều lần
+    if (processing || !paypalOrderId || captured) {
+      console.log('[PayPal] Skipping duplicate capture call');
       return;
     }
 
     try {
       setProcessing(true);
+      setCaptured(true); // Đánh dấu đã capture
 
       console.log('[PayPal] Capturing order:', paypalOrderId);
 
       // Capture PayPal order
-      const captureResponse = await paypalAPI.captureOrder({
+      const captureResponse: any = await paypalAPI.captureOrder({
         paypalOrderId: paypalOrderId,
         orderId: orderId,
       });
@@ -154,13 +165,21 @@ const PayPalPaymentScreen: React.FC<PayPalPaymentScreenProps> = ({
       }
     } catch (error: any) {
       console.error('[PayPal] Success handler error:', error);
+      setCaptured(false); // Reset flag nếu lỗi
       Alert.alert(
         'Lỗi xác nhận thanh toán',
-        'Không thể xác nhận thanh toán. Vui lòng liên hệ hỗ trợ.',
+        error.message || 'Không thể xác nhận thanh toán. Vui lòng liên hệ hỗ trợ.',
         [
           {
-            text: 'OK',
+            text: 'Thử lại',
+            onPress: () => {
+              // Cho phép thử lại
+            }
+          },
+          {
+            text: 'Hủy',
             onPress: () => navigation.goBack(),
+            style: 'cancel'
           },
         ]
       );
@@ -252,6 +271,15 @@ const PayPalPaymentScreen: React.FC<PayPalPaymentScreenProps> = ({
         ref={webViewRef}
         source={{ uri: paypalUrl }}
         onNavigationStateChange={handleNavigationStateChange}
+        onError={(syntheticEvent) => {
+          const { nativeEvent } = syntheticEvent;
+          console.warn('[PayPal] WebView error:', nativeEvent);
+          // Chỉ xử lý như success nếu URL có PayerID (user đã approve)
+          if (nativeEvent.url?.includes('PayerID=')) {
+             console.log('[PayPal] WebView error but PayerID found, treating as success');
+             handlePaymentSuccess();
+          }
+        }}
         startInLoadingState={true}
         renderLoading={() => (
           <View style={styles.webViewLoading}>

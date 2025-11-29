@@ -86,3 +86,14 @@ export const authorize = (...roles) => {
     next();
   };
 };
+
+// Admin only middleware
+export const admin = (req, res, next) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({
+      success: false,
+      message: "Chỉ admin mới có quyền thực hiện hành động này",
+    });
+  }
+  next();
+};

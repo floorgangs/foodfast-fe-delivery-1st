@@ -1,87 +1,86 @@
 import { useEffect, useState } from "react";
+import axios from "axios";
 import "./Dashboard.css";
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 function Dashboard() {
   const [stats, setStats] = useState({
-    totalRestaurants: 156,
-    activeRestaurants: 142,
-    totalOrders: 2847,
-    todayOrders: 318,
-    totalRevenue: 1845000000,
-    todayRevenue: 42500000,
-    totalStaff: 128,
-    activeStaff: 115,
-    totalCustomers: 15420,
-    activeCustomers: 8943,
-    pendingApprovals: 12,
+    totalRestaurants: 0,
+    activeRestaurants: 0,
+    totalOrders: 0,
+    todayOrders: 0,
+    totalRevenue: 0,
+    todayRevenue: 0,
+    totalStaff: 0,
+    totalCustomers: 0,
+    pendingApprovals: 0,
+    totalProducts: 0,
   });
 
-  const [recentOrders, setRecentOrders] = useState([
-    {
-      id: "FF10234",
-      restaurant: "Cơm Tấm Sài Gòn",
-      customer: "Nguyễn Văn A",
-      total: 125000,
-      status: "delivering",
-      time: "10:30",
-    },
-    {
-      id: "FF10235",
-      restaurant: "Bún Bò Huế 24H",
-      customer: "Trần Thị B",
-      total: 85000,
-      status: "preparing",
-      time: "10:25",
-    },
-    {
-      id: "FF10236",
-      restaurant: "KFC Hồ Chí Minh",
-      customer: "Lê Văn C",
-      total: 250000,
-      status: "completed",
-      time: "10:20",
-    },
-    {
-      id: "FF10237",
-      restaurant: "Phở Hà Nội",
-      customer: "Phạm Thị D",
-      total: 95000,
-      status: "pending",
-      time: "10:15",
-    },
-  ]);
+  const [recentOrders, setRecentOrders] = useState([]);
+  const [pendingRestaurants, setPendingRestaurants] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const [pendingRestaurants, setPendingRestaurants] = useState([
-    {
-      id: "R001",
-      name: "Quán Ăn Ngon 123",
-      owner: "Nguyễn Minh A",
-      submitted: "2 giờ trước",
-      status: "pending",
-    },
-    {
-      id: "R002",
-      name: "Bánh Mì Huỳnh Hoa",
-      owner: "Trần Văn B",
-      submitted: "5 giờ trước",
-      status: "pending",
-    },
-    {
-      id: "R003",
-      name: "Lẩu Thái Tom Yum",
-      owner: "Lê Thị C",
-      submitted: "1 ngày trước",
-      status: "pending",
-    },
-  ]);
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      const token =
+        localStorage.getItem("admin_token") || localStorage.getItem("token");
+      
+      if (!token) {
+        console.error("No token found");
+        setLoading(false);
+        return;
+      }
+
+      const headers = { Authorization: `Bearer ${token}` };
+
+      // Fetch stats
+      const statsRes = await axios.get(`${API_URL}/dashboard/stats`, {
+        headers,
+      });
+      if (statsRes.data.success) {
+        setStats(statsRes.data.data);
+      }
+
+      // Fetch recent orders
+      const ordersRes = await axios.get(
+        `${API_URL}/dashboard/recent-orders?limit=5`,
+        { headers }
+      );
+      if (ordersRes.data.success) {
+        setRecentOrders(ordersRes.data.data);
+      }
+
+      // Fetch pending restaurants
+      const restaurantsRes = await axios.get(
+        `${API_URL}/dashboard/pending-restaurants?limit=5`,
+        { headers }
+      );
+      if (restaurantsRes.data.success) {
+        setPendingRestaurants(restaurantsRes.data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getStatusText = (status) => {
     const statusMap = {
-      pending: "⏳ Chờ xác nhận",
-      preparing: "👨‍🍳 Đang chuẩn bị",
-      delivering: "🚁 Đang giao",
-      completed: "✅ Hoàn thành",
-      cancelled: "❌ Đã hủy",
+      pending: "Chờ xác nhận",
+      confirmed: "Đã xác nhận",
+      preparing: "Đang chuẩn bị",
+      delivering: "Đang giao",
+      delivered: "Đã giao",
+      completed: "Hoàn thành",
+      cancelled: "Đã hủy",
     };
     return statusMap[status] || status;
   };
@@ -89,6 +88,37 @@ function Dashboard() {
   const getStatusClass = (status) => {
     return `status-badge ${status}`;
   };
+
+  const formatTime = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const formatTimeAgo = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 60) return `${diffMins} phút trước`;
+    if (diffHours < 24) return `${diffHours} giờ trước`;
+    return `${diffDays} ngày trước`;
+  };
+
+  if (loading) {
+    return (
+      <div className="dashboard-page">
+        <div style={{ textAlign: "center", padding: "50px" }}>
+          <p>Đang tải...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="dashboard-page">
@@ -110,8 +140,7 @@ function Dashboard() {
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-header">
-            <span className="stat-icon">🏪</span>
-            <span className="stat-trend up">+12%</span>
+            <span className="stat-icon material-icons">store</span>
           </div>
           <div className="stat-content">
             <div className="stat-number">{stats.totalRestaurants}</div>
@@ -124,7 +153,7 @@ function Dashboard() {
 
         <div className="stat-card today">
           <div className="stat-header">
-            <span className="stat-icon">📦</span>
+            <span className="stat-icon material-icons">shopping_cart</span>
             <span className="stat-badge">Hôm nay</span>
           </div>
           <div className="stat-content">
@@ -134,49 +163,46 @@ function Dashboard() {
           </div>
         </div>
 
-        <div className="stat-card">
+        <div className="stat-card revenue">
           <div className="stat-header">
-            <span className="stat-icon">💰</span>
-            <span className="stat-trend up">+8.5%</span>
+            <span className="stat-icon material-icons">payments</span>
           </div>
           <div className="stat-content">
             <div className="stat-number">
-              {(stats.todayRevenue / 1000000).toFixed(1)}M
+              {(stats.todayRevenue / 1000).toFixed(0)}K
             </div>
             <h3>Doanh thu hôm nay</h3>
             <p className="stat-detail">
-              Tổng: {(stats.totalRevenue / 1000000).toFixed(0)}M VNĐ
+              Tổng: {(stats.totalRevenue / 1000000).toFixed(1)}M VNĐ
             </p>
           </div>
         </div>
 
         <div className="stat-card">
           <div className="stat-header">
-            <span className="stat-icon">👨‍💼</span>
-            <span className="stat-trend up">+5.2%</span>
+            <span className="stat-icon material-icons">badge</span>
           </div>
           <div className="stat-content">
             <div className="stat-number">{stats.totalStaff}</div>
             <h3>Nhân viên</h3>
-            <p className="stat-detail">{stats.activeStaff} đang làm việc</p>
+            <p className="stat-detail">Admin & Nhà hàng</p>
           </div>
         </div>
 
         <div className="stat-card">
           <div className="stat-header">
-            <span className="stat-icon">👥</span>
-            <span className="stat-trend up">+15.3%</span>
+            <span className="stat-icon material-icons">people</span>
           </div>
           <div className="stat-content">
             <div className="stat-number">{stats.totalCustomers}</div>
             <h3>Khách hàng</h3>
-            <p className="stat-detail">{stats.activeCustomers} hoạt động</p>
+            <p className="stat-detail">{stats.totalProducts} sản phẩm</p>
           </div>
         </div>
 
         <div className="stat-card alert">
           <div className="stat-header">
-            <span className="stat-icon">⚠️</span>
+            <span className="stat-icon material-icons">pending</span>
             <span className="stat-badge">Cần xử lý</span>
           </div>
           <div className="stat-content">
@@ -207,21 +233,28 @@ function Dashboard() {
               </thead>
               <tbody>
                 {recentOrders.map((order) => (
-                  <tr key={order.id}>
+                  <tr key={order._id}>
                     <td>
-                      <strong>#{order.id}</strong>
+                      <strong>#{order.orderNumber}</strong>
                     </td>
-                    <td>{order.restaurant}</td>
-                    <td>{order.customer}</td>
-                    <td>{order.total.toLocaleString("vi-VN")}đ</td>
+                    <td>{order.restaurant?.name || "N/A"}</td>
+                    <td>{order.user?.name || "N/A"}</td>
+                    <td>{order.totalAmount.toLocaleString("vi-VN")}đ</td>
                     <td>
                       <span className={getStatusClass(order.status)}>
                         {getStatusText(order.status)}
                       </span>
                     </td>
-                    <td>{order.time}</td>
+                    <td>{formatTime(order.createdAt)}</td>
                   </tr>
                 ))}
+                {recentOrders.length === 0 && (
+                  <tr>
+                    <td colSpan="6" style={{ textAlign: "center" }}>
+                      Chưa có đơn hàng nào
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -234,11 +267,13 @@ function Dashboard() {
           </div>
           <div className="pending-list">
             {pendingRestaurants.map((restaurant) => (
-              <div key={restaurant.id} className="pending-item">
+              <div key={restaurant._id} className="pending-item">
                 <div className="pending-info">
                   <h4>{restaurant.name}</h4>
-                  <p>Chủ quán: {restaurant.owner}</p>
-                  <span className="time-ago">Gửi {restaurant.submitted}</span>
+                  <p>Chủ quán: {restaurant.owner?.name || "N/A"}</p>
+                  <span className="time-ago">
+                    Gửi {formatTimeAgo(restaurant.createdAt)}
+                  </span>
                 </div>
                 <div className="pending-actions">
                   <button className="approve-btn">✓ Duyệt</button>
@@ -246,6 +281,11 @@ function Dashboard() {
                 </div>
               </div>
             ))}
+            {pendingRestaurants.length === 0 && (
+              <p style={{ textAlign: "center", padding: "20px" }}>
+                Không có nhà hàng nào chờ duyệt
+              </p>
+            )}
           </div>
         </div>
       </div>

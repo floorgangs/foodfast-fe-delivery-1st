@@ -85,16 +85,7 @@ const orderSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: [
-        "cod",
-        "cash",
-        "momo",
-        "vnpay",
-        "zalopay",
-        "card",
-        "banking",
-        "dronepay",
-      ],
+      enum: ["paypal"],
       required: true,
     },
     paymentProvider: {

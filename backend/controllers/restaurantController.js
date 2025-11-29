@@ -337,3 +337,195 @@ export const getMyRestaurant = async (req, res) => {
     });
   }
 };
+
+// ==================== ADMIN APPROVAL FUNCTIONS ====================
+
+// Get all pending restaurants (for admin)
+export const getPendingRestaurants = async (req, res) => {
+  try {
+    const restaurants = await Restaurant.find({
+      $or: [
+        { isApproved: false },
+        { "compliance.status": "pending" }
+      ]
+    })
+      .populate("owner", "name email phone")
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      count: restaurants.length,
+      data: restaurants,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Get all restaurants for admin (including unapproved)
+export const getAllRestaurantsAdmin = async (req, res) => {
+  try {
+    const { status, search } = req.query;
+
+    let query = {};
+
+    // Filter by approval status
+    if (status === "pending") {
+      query.isApproved = false;
+      query["compliance.status"] = "pending";
+    } else if (status === "approved") {
+      query.isApproved = true;
+    } else if (status === "rejected") {
+      query["compliance.status"] = "rejected";
+    }
+
+    // Search by name
+    if (search) {
+      query.name = { $regex: search, $options: "i" };
+    }
+
+    const restaurants = await Restaurant.find(query)
+      .populate("owner", "name email phone")
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      count: restaurants.length,
+      data: restaurants,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Approve restaurant (admin only)
+export const approveRestaurant = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { notes } = req.body;
+
+    const restaurant = await Restaurant.findById(id);
+
+    if (!restaurant) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy nhà hàng",
+      });
+    }
+
+    // Update approval status
+    restaurant.isApproved = true;
+    restaurant.isActive = true;
+    restaurant.compliance.status = "approved";
+    restaurant.compliance.approvedAt = new Date();
+    restaurant.compliance.approvedBy = req.user._id;
+    if (notes) {
+      restaurant.compliance.notes = notes;
+    }
+
+    await restaurant.save();
+
+    // TODO: Send notification/email to restaurant owner
+
+    res.json({
+      success: true,
+      message: "Nhà hàng đã được duyệt thành công",
+      data: restaurant,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Reject restaurant (admin only)
+export const rejectRestaurant = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    if (!reason) {
+      return res.status(400).json({
+        success: false,
+        message: "Vui lòng cung cấp lý do từ chối",
+      });
+    }
+
+    const restaurant = await Restaurant.findById(id);
+
+    if (!restaurant) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy nhà hàng",
+      });
+    }
+
+    // Update rejection status
+    restaurant.isApproved = false;
+    restaurant.compliance.status = "rejected";
+    restaurant.compliance.rejectedAt = new Date();
+    restaurant.compliance.rejectedBy = req.user._id;
+    restaurant.compliance.rejectionReason = reason;
+
+    await restaurant.save();
+
+    // TODO: Send notification/email to restaurant owner with rejection reason
+
+    res.json({
+      success: true,
+      message: "Đã từ chối nhà hàng",
+      data: restaurant,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Get restaurant compliance details (admin only)
+export const getRestaurantCompliance = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const restaurant = await Restaurant.findById(id)
+      .populate("owner", "name email phone")
+      .select("+compliance");
+
+    if (!restaurant) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy nhà hàng",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        _id: restaurant._id,
+        name: restaurant.name,
+        owner: restaurant.owner,
+        phone: restaurant.phone,
+        address: restaurant.address,
+        isApproved: restaurant.isApproved,
+        isActive: restaurant.isActive,
+        compliance: restaurant.compliance,
+        createdAt: restaurant.createdAt,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};

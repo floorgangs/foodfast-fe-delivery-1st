@@ -6,10 +6,10 @@ import { Platform } from 'react-native';
 // Windows: Chạy ipconfig trong CMD để xem IPv4 Address
 // Mac/Linux: Chạy ifconfig để xem IP
 // Choose a sensible default for development depending on platform:
-// - Android emulator should use 10.0.2.2 to reach host machine
-// - iOS simulator / physical device should use your machine LAN IP (adjust below)
-const DEFAULT_LAN_IP = '192.168.1.201'; // <-- adjust this if your machine IP is different
-const DEV_HOST = Platform.OS === 'android' ? '10.0.2.2' : DEFAULT_LAN_IP;
+// - Android emulator: use your machine LAN IP (NOT 10.0.2.2 if having issues)
+// - iOS simulator / physical device: use your machine LAN IP
+const DEFAULT_LAN_IP = '192.168.1.85'; // <-- Backend is accessible on this IP
+const DEV_HOST = DEFAULT_LAN_IP; // Use LAN IP for both Android and iOS
 const API_URL = __DEV__
   ? `http://${DEV_HOST}:5000/api`
   : 'https://your-production-api.com/api';
@@ -200,7 +200,15 @@ export const paypalAPI = {
         message: error.message,
         response: error.response?.data,
         status: error.response?.status,
+        fullError: JSON.stringify(error),
       });
+      // Nếu đã capture rồi, coi như thành công
+      if (error.response?.data?.error?.details?.[0]?.issue === 'ORDER_ALREADY_CAPTURED') {
+        return {
+          success: true,
+          data: { status: 'COMPLETED', alreadyCaptured: true }
+        };
+      }
       throw error;
     }
   },

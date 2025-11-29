@@ -1,111 +1,114 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import axios from "axios";
 import "./UserManagement.css";
 
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+
 function UserManagement() {
-  const [selectedRestaurant, setSelectedRestaurant] = useState("all");
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedUser, setSelectedUser] = useState(null);
+  const [filter, setFilter] = useState("all");
   const [showViewModal, setShowViewModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
 
-  const [users, setUsers] = useState([
-    {
-      id: "1",
-      name: "Nguyễn Văn A",
-      email: "nguyenvana@email.com",
-      phone: "0901234567",
-      status: "active",
-      orders: 45,
-      restaurantId: 1,
-      restaurantName: "Cơm Tấm Sài Gòn",
-    },
-    {
-      id: "2",
-      name: "Trần Thị B",
-      email: "tranthib@email.com",
-      phone: "0912345678",
-      status: "active",
-      orders: 32,
-      restaurantId: 1,
-      restaurantName: "Cơm Tấm Sài Gòn",
-    },
-    {
-      id: "3",
-      name: "Lê Văn C",
-      email: "levanc@email.com",
-      phone: "0923456789",
-      status: "inactive",
-      orders: 15,
-      restaurantId: 2,
-      restaurantName: "Bún Bò Huế 24H",
-    },
-    {
-      id: "4",
-      name: "Phạm Thị D",
-      email: "phamthid@email.com",
-      phone: "0934567890",
-      status: "active",
-      orders: 28,
-      restaurantId: 2,
-      restaurantName: "Bún Bò Huế 24H",
-    },
-    {
-      id: "5",
-      name: "Hoàng Văn E",
-      email: "hoangvane@email.com",
-      phone: "0945678901",
-      status: "active",
-      orders: 52,
-      restaurantId: 3,
-      restaurantName: "KFC Hồ Chí Minh",
-    },
-    {
-      id: "6",
-      name: "Võ Thị F",
-      email: "vothif@email.com",
-      phone: "0956789012",
-      status: "active",
-      orders: 18,
-      restaurantId: 1,
-      restaurantName: "Cơm Tấm Sài Gòn",
-    },
-  ]);
+  useEffect(() => {
+    loadUsers();
+  }, []);
 
-  const [restaurants] = useState([
-    { id: 1, name: "Cơm Tấm Sài Gòn" },
-    { id: 2, name: "Bún Bò Huế 24H" },
-    { id: 3, name: "KFC Hồ Chí Minh" },
-  ]);
+  const loadUsers = async () => {
+    try {
+      setLoading(true);
+      const token =
+        localStorage.getItem("admin_token") || localStorage.getItem("token");
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
-  let filteredUsers =
-    selectedRestaurant === "all"
-      ? users
-      : users.filter((u) => u.restaurantId === parseInt(selectedRestaurant));
+      const response = await axios.get(`${API_URL}/auth/users?role=customer`, {
+        headers,
+      });
+
+      if (response.data.success) {
+        setUsers(response.data.data || []);
+      }
+    } catch (error) {
+      console.error("Error loading users:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStatusText = (isActive) => {
+    return isActive !== false ? "✓ Hoạt động" : "✗ Đã khóa";
+  };
+
+  const getStatusClass = (isActive) => {
+    return `status-badge ${isActive !== false ? "active" : "inactive"}`;
+  };
+
+  let filteredUsers = users;
+
+  if (filter === "active") {
+    filteredUsers = filteredUsers.filter((u) => u.isActive !== false);
+  } else if (filter === "inactive") {
+    filteredUsers = filteredUsers.filter((u) => u.isActive === false);
+  }
 
   if (searchTerm) {
     filteredUsers = filteredUsers.filter(
       (u) =>
-        u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        u.phone.includes(searchTerm)
+        u.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        u.phone?.includes(searchTerm) ||
+        u.email?.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }
 
-  const handleViewUser = (user) => {
+  const activeUsers = users.filter((u) => u.isActive !== false);
+
+  const handleView = (user) => {
     setSelectedUser(user);
     setShowViewModal(true);
   };
 
-  const handleEditUser = (user) => {
-    setSelectedUser(user);
-    setShowEditModal(true);
+  const handleToggleStatus = async (userId, currentStatus) => {
+    if (!confirm(`Bạn có chắc muốn ${currentStatus !== false ? "khóa" : "mở khóa"} tài khoản này?`)) {
+      return;
+    }
+
+    try {
+      const token =
+        localStorage.getItem("admin_token") || localStorage.getItem("token");
+      await axios.put(
+        `${API_URL}/auth/users/${userId}/status`,
+        { isActive: currentStatus === false },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      await loadUsers();
+      alert("Đã cập nhật trạng thái!");
+    } catch (error) {
+      console.error("Error updating status:", error);
+      alert("Không thể cập nhật trạng thái");
+    }
   };
 
-  const handleSaveUser = () => {
-    setUsers(users.map((u) => (u.id === selectedUser.id ? selectedUser : u)));
-    setShowEditModal(false);
-    setSelectedUser(null);
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    return new Date(dateString).toLocaleDateString("vi-VN");
   };
+
+  const getAddressCount = (user) => {
+    return user.addresses?.length || 0;
+  };
+
+  if (loading) {
+    return (
+      <div className="user-management-page">
+        <div className="loading-state">
+          <div className="spinner"></div>
+          <p>Đang tải dữ liệu...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="user-management-page">
@@ -113,260 +116,186 @@ function UserManagement() {
         <div>
           <h1>Quản lý Khách hàng</h1>
           <p className="page-description">
-            Quản lý khách hàng của các nhà hàng trong hệ thống
+            Quản lý tài khoản khách hàng sử dụng ứng dụng
           </p>
         </div>
       </div>
 
+      <div className="stats-row">
+        <div className="stat-card">
+          <span className="stat-icon material-icons">people</span>
+          <div className="stat-info">
+            <div className="stat-number">{users.length}</div>
+            <div className="stat-label">Tổng khách hàng</div>
+          </div>
+        </div>
+        <div className="stat-card">
+          <span className="stat-icon material-icons">check_circle</span>
+          <div className="stat-info">
+            <div className="stat-number active">{activeUsers.length}</div>
+            <div className="stat-label">Đang hoạt động</div>
+          </div>
+        </div>
+        <div className="stat-card">
+          <span className="stat-icon material-icons">block</span>
+          <div className="stat-info">
+            <div className="stat-number inactive">
+              {users.length - activeUsers.length}
+            </div>
+            <div className="stat-label">Đã khóa</div>
+          </div>
+        </div>
+      </div>
+
       <div className="filter-bar">
-        <div className="filter-section">
-          <label>Lọc theo nhà hàng:</label>
-          <select
-            value={selectedRestaurant}
-            onChange={(e) => setSelectedRestaurant(e.target.value)}
-            className="restaurant-select"
+        <div className="filter-buttons">
+          <button
+            className={`filter-btn ${filter === "all" ? "active" : ""}`}
+            onClick={() => setFilter("all")}
           >
-            <option value="all">Tất cả nhà hàng ({users.length})</option>
-            {restaurants.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name} ({users.filter((u) => u.restaurantId === r.id).length})
-              </option>
-            ))}
-          </select>
+            Tất cả ({users.length})
+          </button>
+          <button
+            className={`filter-btn ${filter === "active" ? "active" : ""}`}
+            onClick={() => setFilter("active")}
+          >
+            Hoạt động ({activeUsers.length})
+          </button>
+          <button
+            className={`filter-btn ${filter === "inactive" ? "active" : ""}`}
+            onClick={() => setFilter("inactive")}
+          >
+            Đã khóa ({users.length - activeUsers.length})
+          </button>
         </div>
         <div className="search-box">
           <input
             type="text"
-            placeholder="Tìm kiếm khách hàng..."
+            placeholder="Tìm kiếm theo tên, SĐT, email..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
       </div>
 
-      <div className="users-table-wrapper">
-        <table className="users-table">
+      <div className="users-table">
+        <table>
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Họ và tên</th>
-              <th>Nhà hàng</th>
+              <th>Tên khách hàng</th>
               <th>Email</th>
               <th>Số điện thoại</th>
-              <th>Số đơn hàng</th>
+              <th>Địa chỉ</th>
+              <th>Ngày tạo</th>
               <th>Trạng thái</th>
               <th>Hành động</th>
             </tr>
           </thead>
           <tbody>
             {filteredUsers.map((user) => (
-              <tr key={user.id}>
-                <td>
-                  <strong>#{user.id}</strong>
-                </td>
+              <tr key={user._id}>
                 <td>
                   <strong>{user.name}</strong>
                 </td>
-                <td>{user.restaurantName}</td>
                 <td>{user.email}</td>
-                <td>{user.phone}</td>
+                <td>{user.phone || "N/A"}</td>
+                <td>{getAddressCount(user)} địa chỉ</td>
+                <td>{formatDate(user.createdAt)}</td>
                 <td>
-                  <span className="order-badge">{user.orders}</span>
-                </td>
-                <td>
-                  <span className={`status-badge ${user.status}`}>
-                    {user.status === "active"
-                      ? "✅ Hoạt động"
-                      : "❌ Không hoạt động"}
+                  <span className={getStatusClass(user.isActive)}>
+                    {getStatusText(user.isActive)}
                   </span>
                 </td>
                 <td>
                   <div className="action-buttons">
                     <button
                       className="action-btn view"
-                      onClick={() => handleViewUser(user)}
+                      onClick={() => handleView(user)}
                     >
-                      👁 Xem
+                      Chi tiết
                     </button>
-                    <button
-                      className="action-btn edit"
-                      onClick={() => handleEditUser(user)}
-                    >
-                      ✏️ Sửa
-                    </button>
+                    {user.isActive !== false ? (
+                      <button
+                        className="action-btn deactivate"
+                        onClick={() => handleToggleStatus(user._id, user.isActive)}
+                      >
+                        Tạm khóa
+                      </button>
+                    ) : (
+                      <button
+                        className="action-btn activate"
+                        onClick={() => handleToggleStatus(user._id, user.isActive)}
+                      >
+                        Kích hoạt
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
             ))}
+            {filteredUsers.length === 0 && (
+              <tr>
+                <td colSpan="7" style={{ textAlign: "center", padding: "2rem" }}>
+                  Không có khách hàng nào
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
 
-      <div className="summary-section">
-        <div className="summary-card">
-          <h3>Tổng khách hàng</h3>
-          <div className="summary-number">{filteredUsers.length}</div>
-        </div>
-        <div className="summary-card">
-          <h3>Đang hoạt động</h3>
-          <div className="summary-number active">
-            {filteredUsers.filter((u) => u.status === "active").length}
-          </div>
-        </div>
-        <div className="summary-card">
-          <h3>Tổng đơn hàng</h3>
-          <div className="summary-number orders">
-            {filteredUsers.reduce((sum, u) => sum + u.orders, 0)}
-          </div>
-        </div>
-      </div>
-
-      {/* View Modal */}
+      {/* Modal Xem Chi tiết */}
       {showViewModal && selectedUser && (
         <div className="modal-overlay" onClick={() => setShowViewModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Thông tin khách hàng</h2>
+              <h2>Thông tin Khách hàng</h2>
               <button
                 className="close-btn"
                 onClick={() => setShowViewModal(false)}
               >
-                ×
+                ✕
               </button>
             </div>
             <div className="modal-body">
               <div className="info-section">
                 <h3>Thông tin cá nhân</h3>
                 <div className="info-row">
-                  <span className="label">Mã khách hàng:</span>
-                  <span className="value">#{selectedUser.id}</span>
-                </div>
-                <div className="info-row">
-                  <span className="label">Họ và tên:</span>
-                  <span className="value">{selectedUser.name}</span>
-                </div>
-                <div className="info-row">
-                  <span className="label">Email:</span>
-                  <span className="value">{selectedUser.email}</span>
-                </div>
-                <div className="info-row">
-                  <span className="label">Số điện thoại:</span>
-                  <span className="value">{selectedUser.phone}</span>
-                </div>
-              </div>
-
-              <div className="info-section">
-                <h3>Thông tin hoạt động</h3>
-                <div className="info-row">
-                  <span className="label">Nhà hàng yêu thích:</span>
-                  <span className="value">{selectedUser.restaurantName}</span>
-                </div>
-                <div className="info-row">
-                  <span className="label">Số đơn hàng:</span>
-                  <span className="value order-count">
-                    {selectedUser.orders}
-                  </span>
-                </div>
-                <div className="info-row">
-                  <span className="label">Trạng thái:</span>
-                  <span className={`status-badge ${selectedUser.status}`}>
-                    {selectedUser.status === "active"
-                      ? "✅ Hoạt động"
-                      : "❌ Không hoạt động"}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Modal */}
-      {showEditModal && selectedUser && (
-        <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
-          <div
-            className="modal-content modal-large"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="modal-header">
-              <h2>Chỉnh sửa thông tin khách hàng</h2>
-              <button
-                className="close-btn"
-                onClick={() => setShowEditModal(false)}
-              >
-                ×
-              </button>
-            </div>
-            <div className="modal-body">
-              <div className="form-section">
-                <h3>Thông tin cá nhân</h3>
-                <div className="form-group">
                   <label>Họ và tên:</label>
-                  <input
-                    type="text"
-                    value={selectedUser.name}
-                    onChange={(e) =>
-                      setSelectedUser({ ...selectedUser, name: e.target.value })
-                    }
-                  />
+                  <span>{selectedUser.name}</span>
                 </div>
-                <div className="form-group">
-                  <label>Email:</label>
-                  <input
-                    type="email"
-                    value={selectedUser.email}
-                    onChange={(e) =>
-                      setSelectedUser({
-                        ...selectedUser,
-                        email: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-                <div className="form-group">
+                <div className="info-row">
                   <label>Số điện thoại:</label>
-                  <input
-                    type="tel"
-                    value={selectedUser.phone}
-                    onChange={(e) =>
-                      setSelectedUser({
-                        ...selectedUser,
-                        phone: e.target.value,
-                      })
-                    }
-                  />
+                  <span>{selectedUser.phone || "N/A"}</span>
+                </div>
+                <div className="info-row">
+                  <label>Email:</label>
+                  <span>{selectedUser.email}</span>
+                </div>
+                <div className="info-row">
+                  <label>Ngày tạo:</label>
+                  <span>{formatDate(selectedUser.createdAt)}</span>
+                </div>
+                <div className="info-row">
+                  <label>Trạng thái:</label>
+                  <span className={getStatusClass(selectedUser.isActive)}>
+                    {getStatusText(selectedUser.isActive)}
+                  </span>
                 </div>
               </div>
 
-              <div className="form-section">
-                <h3>Thông tin hoạt động</h3>
-                <div className="form-group">
-                  <label>Trạng thái:</label>
-                  <select
-                    value={selectedUser.status}
-                    onChange={(e) =>
-                      setSelectedUser({
-                        ...selectedUser,
-                        status: e.target.value,
-                      })
-                    }
-                  >
-                    <option value="active">Hoạt động</option>
-                    <option value="inactive">Không hoạt động</option>
-                  </select>
+              {selectedUser.addresses && selectedUser.addresses.length > 0 && (
+                <div className="info-section">
+                  <h3>Địa chỉ ({selectedUser.addresses.length})</h3>
+                  {selectedUser.addresses.map((addr, idx) => (
+                    <div key={idx} className="address-item">
+                      <strong>{addr.label || `Địa chỉ ${idx + 1}`}</strong>
+                      {addr.isDefault && <span className="default-badge">Mặc định</span>}
+                      <p>{addr.address}, {addr.ward}, {addr.district}, {addr.city}</p>
+                    </div>
+                  ))}
                 </div>
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button
-                className="btn-cancel"
-                onClick={() => setShowEditModal(false)}
-              >
-                Hủy
-              </button>
-              <button className="btn-save" onClick={handleSaveUser}>
-                Lưu thay đổi
-              </button>
+              )}
             </div>
           </div>
         </div>
