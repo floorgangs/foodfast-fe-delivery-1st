@@ -25,6 +25,10 @@ import notificationRoutes from "./routes/notificationRoutes.js";
 import cartRoutes from "./routes/cartRoutes.js";
 import savedOrderRoutes from "./routes/savedOrderRoutes.js";
 import deliveryRoutes from "./routes/deliveryRoutes.js";
+import dashboardRoutes from "./routes/dashboardRoutes.js";
+import transactionRoutes from "./routes/transactionRoutes.js";
+import staffRoutes from "./routes/staffRoutes.js";
+import adminSettingsRoutes from "./routes/adminSettingsRoutes.js";
 
 dotenv.config();
 
@@ -201,6 +205,10 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/saved-orders", savedOrderRoutes);
 app.use("/api/deliveries", deliveryRoutes);
+app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/transactions", transactionRoutes);
+app.use("/api/staff", staffRoutes);
+app.use("/api/admin-settings", adminSettingsRoutes);
 
 // Error handler
 app.use(errorHandler);

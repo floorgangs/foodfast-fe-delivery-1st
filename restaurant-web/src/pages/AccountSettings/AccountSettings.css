@@ -391,3 +391,172 @@
   color: #1890ff;
   font-weight: 600;
 }
+
+/* Payment Section Styles */
+.payment-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.balance-card {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border-radius: 16px;
+  padding: 2rem;
+  color: white;
+}
+
+.balance-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.balance-icon {
+  font-size: 1.5rem;
+}
+
+.balance-title {
+  font-size: 1rem;
+  opacity: 0.9;
+}
+
+.balance-amount {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.balance-note {
+  font-size: 0.85rem;
+  opacity: 0.8;
+  margin: 0;
+}
+
+.paypal-section,
+.withdraw-section,
+.transaction-history {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.paypal-section h3,
+.withdraw-section h3,
+.transaction-history h3 {
+  font-size: 1.1rem;
+  color: #1a1a1a;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.input-note {
+  font-size: 0.8rem;
+  color: #999;
+  margin-top: 0.5rem;
+}
+
+.save-paypal-btn {
+  padding: 0.75rem 1.5rem;
+  background: #0070ba;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 1rem;
+}
+
+.save-paypal-btn:hover {
+  background: #003087;
+}
+
+.withdraw-btn {
+  width: 100%;
+  padding: 1rem;
+  background: linear-gradient(135deg, #52c41a, #73d13d);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 1rem;
+}
+
+.withdraw-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(82, 196, 26, 0.4);
+}
+
+.withdraw-btn:disabled {
+  background: #d9d9d9;
+  cursor: not-allowed;
+}
+
+.transaction-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.no-transactions {
+  text-align: center;
+  color: #999;
+  padding: 2rem;
+}
+
+.transaction-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: #fafafa;
+  border-radius: 8px;
+  border-left: 4px solid #d9d9d9;
+}
+
+.transaction-item.income {
+  border-left-color: #52c41a;
+}
+
+.transaction-item.withdraw {
+  border-left-color: #fa8c16;
+}
+
+.tx-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.tx-type {
+  font-weight: 600;
+  color: #1a1a1a;
+  font-size: 0.9rem;
+}
+
+.tx-date {
+  font-size: 0.8rem;
+  color: #999;
+}
+
+.tx-amount {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.tx-amount.income {
+  color: #52c41a;
+}
+
+.tx-amount.withdraw {
+  color: #fa8c16;
+}

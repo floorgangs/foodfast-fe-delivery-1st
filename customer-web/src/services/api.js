@@ -114,6 +114,12 @@ export const paymentAPI = {
   },
 };
 
+// PayPal APIs
+export const paypalAPI = {
+  createOrder: (data) => api.post('/paypal/create-order', data),
+  captureOrder: (data) => api.post('/paypal/capture-order', data),
+};
+
 // Notification APIs
 export const notificationAPI = {
   getAll: () => api.get("/notifications"),

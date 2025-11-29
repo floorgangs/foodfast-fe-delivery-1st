@@ -14,6 +14,7 @@ import Checkout from "./pages/Checkout/Checkout";
 import OrderTracking from "./pages/OrderTracking/OrderTracking";
 import PaymentGateway from "./pages/PaymentGateway/PaymentGateway";
 import PaymentReturn from "./pages/PaymentReturn/PaymentReturn";
+import PayPalPayment from "./pages/PayPalPayment/PayPalPayment";
 import Profile from "./pages/Profile/Profile";
 import Review from "./pages/Review/Review";
 import EditProfile from "./pages/EditProfile/EditProfile";
@@ -103,6 +104,14 @@ function App() {
         <Route path="payment/vnpay-return" element={<PaymentReturn />} />
         <Route path="payment/momo-return" element={<PaymentReturn />} />
         <Route path="payment-return/:provider" element={<PaymentReturn />} />
+        <Route
+          path="paypal-payment/:orderId"
+          element={
+            <PrivateRoute>
+              <PayPalPayment />
+            </PrivateRoute>
+          }
+        />
         <Route
           path="review/:orderId"
           element={

@@ -177,8 +177,6 @@ function RegisterRestaurantModal({ onClose, onSuccess }) {
     idIssuePlace: '',
     businessLicense: null,
     taxCode: '',
-    taxRate: '4.5',
-    taxCertificate: null,
     relatedDocuments: [],
     bankName: 'Vietcombank',
     bankAccountNumber: '',
@@ -392,23 +390,7 @@ function RegisterRestaurantModal({ onClose, onSuccess }) {
                   required
                 />
               </label>
-              <label>
-                Thuế suất
-                <select name="taxRate" value={formData.taxRate} onChange={handleChange} required>
-                  <option value="4.5">4,5%</option>
-                  <option value="5">5%</option>
-                  <option value="8">8%</option>
-                  <option value="10">10%</option>
-                </select>
-              </label>
             </div>
-
-            <label className="file-label">
-              Ảnh chụp mã số thuế kinh doanh
-              <input type="file" name="taxCertificate" onChange={handleFileChange} accept="image/*" required />
-              <span className="file-button">📎 Chọn file</span>
-              {formData.taxCertificate && <span className="file-name">{formData.taxCertificate.name}</span>}
-            </label>
           </div>
 
           <div className="form-section">

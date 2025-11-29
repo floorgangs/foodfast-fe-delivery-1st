@@ -108,8 +108,9 @@ const PersonalInfoScreen = ({ navigation }: any) => {
               placeholder="Nhập email"
               value={email}
               onChangeText={setEmail}
-              keyboardType="email-address"
+              keyboardType="default"
               autoCapitalize="none"
+              autoCorrect={false}
             />
           </View>
 

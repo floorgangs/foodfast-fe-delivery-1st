@@ -94,6 +94,22 @@ const restaurantSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // Payment & Financial
+    balance: {
+      type: Number,
+      default: 0,
+    },
+    paypalEmail: {
+      type: String,
+    },
+    totalRevenue: {
+      type: Number,
+      default: 0,
+    },
+    totalOrders: {
+      type: Number,
+      default: 0,
+    },
     compliance: {
       status: {
         type: String,
@@ -102,6 +118,23 @@ const restaurantSchema = new mongoose.Schema(
       },
       submittedAt: {
         type: Date,
+      },
+      approvedAt: {
+        type: Date,
+      },
+      approvedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+      rejectedAt: {
+        type: Date,
+      },
+      rejectedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+      rejectionReason: {
+        type: String,
       },
       idCard: {
         number: String,

@@ -31,7 +31,7 @@ const generateAccessToken = async () => {
 // Tạo đơn hàng PayPal
 export const createPayPalOrder = async (req, res) => {
   try {
-    const { amount, orderId, description } = req.body;
+    const { amount, orderId, description, returnUrl, cancelUrl } = req.body;
 
     if (!amount || !orderId) {
       return res.status(400).json({
@@ -51,6 +51,10 @@ export const createPayPalOrder = async (req, res) => {
 
     const accessToken = await generateAccessToken();
     const BASE_URL = process.env.PAYPAL_API_URL;
+    
+    // Use custom URLs from request or fallback to env vars
+    const finalReturnUrl = returnUrl || `${process.env.PAYPAL_RETURN_URL}?orderId=${orderId}`;
+    const finalCancelUrl = cancelUrl || `${process.env.PAYPAL_CANCEL_URL}?orderId=${orderId}`;
 
     const response = await fetch(`${BASE_URL}/v2/checkout/orders`, {
       method: "POST",
@@ -75,8 +79,8 @@ export const createPayPalOrder = async (req, res) => {
           landing_page: "LOGIN",
           user_action: "PAY_NOW",
           shipping_preference: "NO_SHIPPING",
-          return_url: `${process.env.PAYPAL_RETURN_URL}?orderId=${orderId}`,
-          cancel_url: `${process.env.PAYPAL_CANCEL_URL}?orderId=${orderId}`,
+          return_url: finalReturnUrl,
+          cancel_url: finalCancelUrl,
         },
       }),
     });
@@ -141,12 +145,34 @@ export const capturePayPalOrder = async (req, res) => {
 
     const data = await response.json();
 
+    console.log("[PayPal Capture] Response status:", response.status);
+    console.log("[PayPal Capture] Response data:", JSON.stringify(data, null, 2));
+
+    // Xử lý trường hợp đã capture rồi
     if (!response.ok) {
+      // Kiểm tra nếu order đã được capture trước đó
+      const errorName = data?.details?.[0]?.issue || data?.name;
+      if (errorName === 'ORDER_ALREADY_CAPTURED') {
+        console.log('[PayPal] Order already captured, treating as success');
+        
+        // Trả về success vì payment đã được xử lý
+        return res.json({
+          success: true,
+          data: {
+            status: 'COMPLETED',
+            paypalOrderId: paypalOrderId,
+            orderId: orderId,
+            alreadyCaptured: true,
+          },
+        });
+      }
+
       console.error("PayPal Capture Error:", data);
       return res.status(response.status).json({
         success: false,
         message: "Failed to capture PayPal payment",
         error: data,
+        details: data.details || data.message,
       });
     }
 

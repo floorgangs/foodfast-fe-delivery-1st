@@ -40,18 +40,11 @@ const seedExtendedData = async () => {
         password: plainPassword,
         role: "admin",
       },
-      // Restaurant owners (10 owners for 10 restaurants)
+      // Restaurant owners (3 owners for 3 restaurants)
       {
         name: "Chủ Phở Việt",
         email: "phoviet@restaurant.com",
         phone: "0902345678",
-        password: plainPassword,
-        role: "restaurant",
-      },
-      {
-        name: "Chủ Bún Chả",
-        email: "buncha@restaurant.com",
-        phone: "0902345679",
         password: plainPassword,
         role: "restaurant",
       },
@@ -66,48 +59,6 @@ const seedExtendedData = async () => {
         name: "Chủ Lẩu Hải Sản",
         email: "lauhaisan@restaurant.com",
         phone: "0902345681",
-        password: plainPassword,
-        role: "restaurant",
-      },
-      {
-        name: "Chủ Sushi Tokyo",
-        email: "sushitokyo@restaurant.com",
-        phone: "0902345682",
-        password: plainPassword,
-        role: "restaurant",
-      },
-      {
-        name: "Chủ Pizza Italia",
-        email: "pizza@restaurant.com",
-        phone: "0902345683",
-        password: plainPassword,
-        role: "restaurant",
-      },
-      {
-        name: "Chủ Gà Rán",
-        email: "garan@restaurant.com",
-        phone: "0902345684",
-        password: plainPassword,
-        role: "restaurant",
-      },
-      {
-        name: "Chủ Trà Sữa",
-        email: "trasua@restaurant.com",
-        phone: "0902345685",
-        password: plainPassword,
-        role: "restaurant",
-      },
-      {
-        name: "Chủ Bánh Mì",
-        email: "banhmi@restaurant.com",
-        phone: "0902345686",
-        password: plainPassword,
-        role: "restaurant",
-      },
-      {
-        name: "Chủ BBQ Garden",
-        email: "bbq@restaurant.com",
-        phone: "0902345687",
         password: plainPassword,
         role: "restaurant",
       },
@@ -158,7 +109,7 @@ const seedExtendedData = async () => {
 
     console.log(`✅ Created ${users.length} users`);
 
-    // Tạo 10 restaurants
+    // Tạo 3 restaurants
     console.log("🏪 Creating restaurants...");
     const restaurants = await Restaurant.create([
       {
@@ -195,41 +146,8 @@ const seedExtendedData = async () => {
         tags: ["Phổ biến", "Giao nhanh"],
       },
       {
-        name: "Bún Chả Hương Liên",
-        owner: users[2]._id,
-        description: "Bún chả đặc sản Hà Nội chính gốc",
-        cuisine: ["Việt Nam", "Bún chả", "Món nướng"],
-        avatar: "https://images.unsplash.com/photo-1559314809-0d155014e29e?w=400",
-        coverImage: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800",
-        address: {
-          street: "456 Lê Lợi",
-          city: "Hồ Chí Minh",
-          district: "Quận 1",
-          ward: "Phường Bến Thành",
-        },
-        phone: "0902345679",
-        email: "buncha@restaurant.com",
-        openingHours: {
-          monday: { open: "10:00", close: "22:00", isOpen: true },
-          tuesday: { open: "10:00", close: "22:00", isOpen: true },
-          wednesday: { open: "10:00", close: "22:00", isOpen: true },
-          thursday: { open: "10:00", close: "22:00", isOpen: true },
-          friday: { open: "10:00", close: "22:00", isOpen: true },
-          saturday: { open: "10:00", close: "22:00", isOpen: true },
-          sunday: { open: "10:00", close: "22:00", isOpen: true },
-        },
-        rating: 4.8,
-        totalReviews: 320,
-        deliveryFee: 15000,
-        minOrder: 50000,
-        estimatedDeliveryTime: "20-30 phút",
-        isActive: true,
-        isApproved: true,
-        tags: ["Đặc sản", "Bán chạy"],
-      },
-      {
         name: "Cơm Tấm Sài Gòn",
-        owner: users[3]._id,
+        owner: users[2]._id,
         description: "Cơm tấm sườn bì chả truyền thống Sài Gòn",
         cuisine: ["Việt Nam", "Cơm", "Đồ nướng"],
         avatar: "https://images.unsplash.com/photo-1543353071-087092ec393a?w=400",
@@ -262,7 +180,7 @@ const seedExtendedData = async () => {
       },
       {
         name: "Lẩu Hải Sản Biển Đông",
-        owner: users[4]._id,
+        owner: users[3]._id,
         description: "Lẩu hải sản tươi sống, nước lẩu đậm đà",
         cuisine: ["Hải sản", "Lẩu", "Nhà hàng"],
         avatar: "https://images.unsplash.com/photo-1569562211093-4ed0d0758f12?w=400",
@@ -293,209 +211,11 @@ const seedExtendedData = async () => {
         isApproved: true,
         tags: ["Cao cấp", "Hải sản tươi"],
       },
-      {
-        name: "Sushi Tokyo",
-        owner: users[5]._id,
-        description: "Sushi Nhật Bản cao cấp, cá hồi tươi nhập khẩu",
-        cuisine: ["Nhật Bản", "Sushi", "Sashimi"],
-        avatar: "https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400",
-        coverImage: "https://images.unsplash.com/photo-1553621042-f6e147245754?w=800",
-        address: {
-          street: "567 Hai Bà Trưng",
-          city: "Hồ Chí Minh",
-          district: "Quận 1",
-          ward: "Phường Đa Kao",
-        },
-        phone: "0902345682",
-        email: "sushitokyo@restaurant.com",
-        openingHours: {
-          monday: { open: "11:00", close: "23:00", isOpen: true },
-          tuesday: { open: "11:00", close: "23:00", isOpen: true },
-          wednesday: { open: "11:00", close: "23:00", isOpen: true },
-          thursday: { open: "11:00", close: "23:00", isOpen: true },
-          friday: { open: "11:00", close: "00:00", isOpen: true },
-          saturday: { open: "11:00", close: "00:00", isOpen: true },
-          sunday: { open: "11:00", close: "23:00", isOpen: true },
-        },
-        rating: 4.9,
-        totalReviews: 420,
-        deliveryFee: 25000,
-        minOrder: 150000,
-        estimatedDeliveryTime: "20-30 phút",
-        isActive: true,
-        isApproved: true,
-        tags: ["Cao cấp", "Nhật Bản"],
-      },
-      {
-        name: "Pizza Italia",
-        owner: users[6]._id,
-        description: "Pizza Ý truyền thống, lò nướng than",
-        cuisine: ["Ý", "Pizza", "Pasta"],
-        avatar: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400",
-        coverImage: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800",
-        address: {
-          street: "890 Nguyễn Đình Chiểu",
-          city: "Hồ Chí Minh",
-          district: "Quận 3",
-          ward: "Phường 5",
-        },
-        phone: "0902345683",
-        email: "pizza@restaurant.com",
-        openingHours: {
-          monday: { open: "10:00", close: "22:00", isOpen: true },
-          tuesday: { open: "10:00", close: "22:00", isOpen: true },
-          wednesday: { open: "10:00", close: "22:00", isOpen: true },
-          thursday: { open: "10:00", close: "22:00", isOpen: true },
-          friday: { open: "10:00", close: "23:00", isOpen: true },
-          saturday: { open: "10:00", close: "23:00", isOpen: true },
-          sunday: { open: "10:00", close: "22:00", isOpen: true },
-        },
-        rating: 4.4,
-        totalReviews: 195,
-        deliveryFee: 18000,
-        minOrder: 80000,
-        estimatedDeliveryTime: "25-35 phút",
-        isActive: true,
-        isApproved: true,
-        tags: ["Pizza", "Ý"],
-      },
-      {
-        name: "Gà Rán FastFood",
-        owner: users[7]._id,
-        description: "Gà rán giòn tan, khoai tây chiên",
-        cuisine: ["Fastfood", "Gà rán", "Burger"],
-        avatar: "https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?w=400",
-        coverImage: "https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58?w=800",
-        address: {
-          street: "321 Điện Biên Phủ",
-          city: "Hồ Chí Minh",
-          district: "Quận Bình Thạnh",
-          ward: "Phường 25",
-        },
-        phone: "0902345684",
-        email: "garan@restaurant.com",
-        openingHours: {
-          monday: { open: "09:00", close: "22:00", isOpen: true },
-          tuesday: { open: "09:00", close: "22:00", isOpen: true },
-          wednesday: { open: "09:00", close: "22:00", isOpen: true },
-          thursday: { open: "09:00", close: "22:00", isOpen: true },
-          friday: { open: "09:00", close: "23:00", isOpen: true },
-          saturday: { open: "09:00", close: "23:00", isOpen: true },
-          sunday: { open: "09:00", close: "22:00", isOpen: true },
-        },
-        rating: 4.3,
-        totalReviews: 510,
-        deliveryFee: 15000,
-        minOrder: 50000,
-        estimatedDeliveryTime: "15-25 phút",
-        isActive: true,
-        isApproved: true,
-        tags: ["Fastfood", "Bán chạy"],
-      },
-      {
-        name: "Trà Sữa Gong Cha",
-        owner: users[8]._id,
-        description: "Trà sữa Đài Loan chính hiệu, trân châu đường đen",
-        cuisine: ["Đồ uống", "Trà sữa", "Smoothie"],
-        avatar: "https://images.unsplash.com/photo-1525385133512-2f3bdd039054?w=400",
-        coverImage: "https://images.unsplash.com/photo-1564890369478-c89ca6d9cde9?w=800",
-        address: {
-          street: "654 Lý Thường Kiệt",
-          city: "Hồ Chí Minh",
-          district: "Quận 10",
-          ward: "Phường 14",
-        },
-        phone: "0902345685",
-        email: "trasua@restaurant.com",
-        openingHours: {
-          monday: { open: "08:00", close: "22:00", isOpen: true },
-          tuesday: { open: "08:00", close: "22:00", isOpen: true },
-          wednesday: { open: "08:00", close: "22:00", isOpen: true },
-          thursday: { open: "08:00", close: "22:00", isOpen: true },
-          friday: { open: "08:00", close: "23:00", isOpen: true },
-          saturday: { open: "08:00", close: "23:00", isOpen: true },
-          sunday: { open: "08:00", close: "22:00", isOpen: true },
-        },
-        rating: 4.6,
-        totalReviews: 620,
-        deliveryFee: 10000,
-        minOrder: 30000,
-        estimatedDeliveryTime: "15-20 phút",
-        isActive: true,
-        isApproved: true,
-        tags: ["Đồ uống", "Phổ biến"],
-      },
-      {
-        name: "Bánh Mì 362",
-        owner: users[9]._id,
-        description: "Bánh mì Sài Gòn nổi tiếng, nhân đa dạng",
-        cuisine: ["Việt Nam", "Bánh mì", "Đồ ăn sáng"],
-        avatar: "https://images.unsplash.com/photo-1608198093002-ad4e005484ec?w=400",
-        coverImage: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800",
-        address: {
-          street: "362 Nguyễn Trãi",
-          city: "Hồ Chí Minh",
-          district: "Quận 1",
-          ward: "Phường Nguyễn Cư Trinh",
-        },
-        phone: "0902345686",
-        email: "banhmi@restaurant.com",
-        openingHours: {
-          monday: { open: "06:00", close: "20:00", isOpen: true },
-          tuesday: { open: "06:00", close: "20:00", isOpen: true },
-          wednesday: { open: "06:00", close: "20:00", isOpen: true },
-          thursday: { open: "06:00", close: "20:00", isOpen: true },
-          friday: { open: "06:00", close: "20:00", isOpen: true },
-          saturday: { open: "06:00", close: "20:00", isOpen: true },
-          sunday: { open: "06:00", close: "20:00", isOpen: true },
-        },
-        rating: 4.7,
-        totalReviews: 450,
-        deliveryFee: 8000,
-        minOrder: 20000,
-        estimatedDeliveryTime: "10-15 phút",
-        isActive: true,
-        isApproved: true,
-        tags: ["Bán chạy", "Giá rẻ", "Giao nhanh"],
-      },
-      {
-        name: "BBQ Garden",
-        owner: users[10]._id,
-        description: "Buffet nướng Hàn Quốc, thịt tươi ngon",
-        cuisine: ["Hàn Quốc", "Nướng", "BBQ"],
-        avatar: "https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?w=400",
-        coverImage: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800",
-        address: {
-          street: "222 Điện Biên Phủ",
-          city: "Hồ Chí Minh",
-          district: "Quận 3",
-          ward: "Phường Võ Thị Sáu",
-        },
-        phone: "0902345687",
-        email: "bbq@restaurant.com",
-        openingHours: {
-          monday: { open: "11:00", close: "23:00", isOpen: true },
-          tuesday: { open: "11:00", close: "23:00", isOpen: true },
-          wednesday: { open: "11:00", close: "23:00", isOpen: true },
-          thursday: { open: "11:00", close: "23:00", isOpen: true },
-          friday: { open: "11:00", close: "00:00", isOpen: true },
-          saturday: { open: "11:00", close: "00:00", isOpen: true },
-          sunday: { open: "11:00", close: "23:00", isOpen: true },
-        },
-        rating: 4.8,
-        totalReviews: 290,
-        deliveryFee: 20000,
-        minOrder: 200000,
-        estimatedDeliveryTime: "30-40 phút",
-        isActive: true,
-        isApproved: true,
-        tags: ["Cao cấp", "BBQ", "Hàn Quốc"],
-      },
     ]);
 
     console.log(`✅ Created ${restaurants.length} restaurants`);
 
-    // Tạo products (40+ products)
+    // Tạo products cho 3 nhà hàng
     console.log("🍜 Creating products...");
     const products = await Product.create([
       // Phở Hà Nội (3 món)
@@ -537,35 +257,9 @@ const seedExtendedData = async () => {
         soldCount: 567,
         tags: ["Đặc sản"],
       },
-      // Bún Chả (2 món)
-      {
-        restaurant: restaurants[1]._id,
-        name: "Bún Chả Hà Nội",
-        description: "Bún chả truyền thống với nem cua bể",
-        category: "Bún",
-        price: 50000,
-        image: "https://images.unsplash.com/photo-1559314809-0d155014e29e?w=400",
-        isAvailable: true,
-        rating: 4.8,
-        totalReviews: 320,
-        soldCount: 1450,
-        tags: ["Bán chạy", "Đặc sản"],
-      },
-      {
-        restaurant: restaurants[1]._id,
-        name: "Nem Cua Bể",
-        description: "Nem cua bể giòn rụm (5 miếng)",
-        category: "Món phụ",
-        price: 35000,
-        image: "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=400",
-        isAvailable: true,
-        rating: 4.7,
-        totalReviews: 98,
-        soldCount: 432,
-      },
       // Cơm Tấm (3 món)
       {
-        restaurant: restaurants[2]._id,
+        restaurant: restaurants[1]._id,
         name: "Cơm Tấm Sườn Bì Chả",
         description: "Combo đầy đủ: sườn nướng + bì + chả + trứng",
         category: "Cơm",
@@ -578,7 +272,7 @@ const seedExtendedData = async () => {
         tags: ["Bán chạy", "Combo"],
       },
       {
-        restaurant: restaurants[2]._id,
+        restaurant: restaurants[1]._id,
         name: "Cơm Tấm Sườn Nướng",
         description: "Sườn nướng thơm lừng",
         category: "Cơm",
@@ -590,7 +284,7 @@ const seedExtendedData = async () => {
         soldCount: 1800,
       },
       {
-        restaurant: restaurants[2]._id,
+        restaurant: restaurants[1]._id,
         name: "Cơm Tấm Đặc Biệt",
         description: "Cơm tấm với tất cả các loại: sườn, bì, chả, trứng ốp la",
         category: "Cơm",
@@ -602,9 +296,9 @@ const seedExtendedData = async () => {
         soldCount: 987,
         tags: ["Đặc biệt"],
       },
-      // Lẩu Hải Sản (2 món)
+      // Lẩu Hải Sản (3 món)
       {
-        restaurant: restaurants[3]._id,
+        restaurant: restaurants[2]._id,
         name: "Lẩu Hải Sản Đặc Biệt",
         description: "Tôm càng, cua biển, mực, nghêu, sò điệp (2-3 người)",
         category: "Lẩu",
@@ -617,7 +311,7 @@ const seedExtendedData = async () => {
         tags: ["Cao cấp"],
       },
       {
-        restaurant: restaurants[3]._id,
+        restaurant: restaurants[2]._id,
         name: "Lẩu Tôm Càng",
         description: "Tôm càng tươi sống, nước lẩu ngọt thanh (2-3 người)",
         category: "Lẩu",
@@ -628,18 +322,44 @@ const seedExtendedData = async () => {
         totalReviews: 98,
         soldCount: 167,
       },
-      // Sushi Tokyo (4 món)
       {
-        restaurant: restaurants[4]._id,
-        name: "Sushi Set A",
-        description: "12 miếng sushi cao cấp: cá hồi, cá ngừ, bạch tuộc",
-        category: "Sushi",
-        price: 180000,
-        image: "https://images.unsplash.com/photo-1553621042-f6e147245754?w=400",
+        restaurant: restaurants[2]._id,
+        name: "Lẩu Cá Hồi",
+        description: "Cá hồi tươi Nhật Bản, nước lẩu thanh mát (2-3 người)",
+        category: "Lẩu",
+        price: 380000,
+        image: "https://images.unsplash.com/photo-1582270691936-82d7c86d9e38?w=400",
         isAvailable: true,
-        rating: 4.9,
-        totalReviews: 320,
-        soldCount: 890,
+        rating: 4.7,
+        totalReviews: 87,
+        soldCount: 145,
+      },
+    ]);
+
+    console.log(`✅ Created ${products.length} products`);
+
+    // Reset rating counters before generating fresh statistics
+    await Restaurant.updateMany({}, { rating: 0, totalReviews: 0 });
+    await Product.updateMany({}, { rating: 0, totalReviews: 0 });
+
+    console.log("🛒 Creating sample orders & reviews...");
+    const customers = users.filter((user) => user.role === "customer");
+
+    const productsByRestaurant = products.reduce((acc, product) => {
+      const key = product.restaurant.toString();
+      if (!acc[key]) {
+        acc[key] = [];
+      }
+      acc[key].push(product);
+      return acc;
+    }, {});
+
+    const orderSeeds = [];
+    const reviewSeeds = [];
+
+    const reviewSamples = [
+      {
+        rating: 5,
         tags: ["Bán chạy"],
       },
       {
@@ -1074,7 +794,7 @@ const seedExtendedData = async () => {
             ward: customer.addresses?.[0]?.ward || "Phường Bến Nghé",
             phone: customer.phone,
           },
-          paymentMethod: flagIndex % 2 === 0 ? "momo" : "dronepay",
+          paymentMethod: "paypal",
           paymentStatus: "paid",
           status: "delivered",
           estimatedDeliveryTime: new Date(
@@ -1190,7 +910,7 @@ const seedExtendedData = async () => {
       });
     }
 
-    // Tạo drones (10 drones, mỗi nhà hàng 1)
+    // Tạo drones cho 3 nhà hàng
     console.log("🚁 Creating drones...");
     const drones = await Drone.create([
       {
@@ -1213,27 +933,9 @@ const seedExtendedData = async () => {
       },
       {
         droneId: "DRONE002",
-        name: "Drone Bún Chả 1",
-        model: "DJI Delivery Pro",
-        restaurant: restaurants[1]._id,
-        status: "available",
-        batteryLevel: 95,
-        maxWeight: 5000,
-        maxDistance: 10000,
-        homeLocation: { lat: 10.7769, lng: 106.7009 },
-        currentLocation: { lat: 10.7769, lng: 106.7009 },
-        specifications: {
-          flightTime: 35,
-          speed: 45,
-          manufacturer: "DJI",
-          purchaseDate: new Date("2024-02-01"),
-        },
-      },
-      {
-        droneId: "DRONE003",
         name: "Drone Cơm Tấm 1",
         model: "Wing Mini",
-        restaurant: restaurants[2]._id,
+        restaurant: restaurants[1]._id,
         status: "available",
         batteryLevel: 90,
         maxWeight: 3000,
@@ -1248,10 +950,10 @@ const seedExtendedData = async () => {
         },
       },
       {
-        droneId: "DRONE004",
+        droneId: "DRONE003",
         name: "Drone Lẩu Hải Sản 1",
         model: "Zipline Max",
-        restaurant: restaurants[3]._id,
+        restaurant: restaurants[2]._id,
         status: "available",
         batteryLevel: 100,
         maxWeight: 7000,
@@ -1265,11 +967,7 @@ const seedExtendedData = async () => {
           purchaseDate: new Date("2024-04-01"),
         },
       },
-      {
-        droneId: "DRONE005",
-        name: "Drone Sushi Tokyo 1",
-        model: "DJI Delivery Pro",
-        restaurant: restaurants[4]._id,
+    ]);
         status: "available",
         batteryLevel: 85,
         maxWeight: 5000,

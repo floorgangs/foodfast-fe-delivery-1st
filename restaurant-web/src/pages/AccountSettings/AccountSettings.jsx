@@ -1,6 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import axios from 'axios'
 import './AccountSettings.css'
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
 function AccountSettings() {
   const navigate = useNavigate()
@@ -8,72 +11,320 @@ function AccountSettings() {
   const [verifyPassword, setVerifyPassword] = useState('')
   const [verifyError, setVerifyError] = useState('')
   const [isVerified, setIsVerified] = useState(false)
+  const [isVerifying, setIsVerifying] = useState(false)
   const [activeTab, setActiveTab] = useState('account') // 'account', 'restaurant', 'payment', 'staff', 'password'
+  const [userData, setUserData] = useState(null)
+  const [restaurantData, setRestaurantData] = useState(null)
 
   const [formData, setFormData] = useState({
-    fullName: 'Nguyễn Văn A',
-    email: 'nguyenvana@example.com',
-    phone: '0912345678',
+    fullName: '',
+    email: '',
+    phone: '',
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
-    bankName: 'Vietcombank',
-    bankAccountNumber: '0123456789',
-    bankAccountName: 'NGUYEN VAN A',
-    bankBranch: 'Chi nhánh Quận 1',
-    restaurantName: 'Bún Bò Huế Mỹ Tho',
-    restaurantAddress: '123 Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP.HCM',
-    restaurantPhone: '0901234567',
-    cuisine: 'Ẩm thực Việt',
+    paypalEmail: '',
+    restaurantName: '',
+    restaurantAddress: '',
+    restaurantPhone: '',
+    cuisine: '',
     openTime: '06:00',
     closeTime: '22:00',
     workingDays: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
   })
 
-  const [staffList, setStaffList] = useState([
-    { id: 1, name: 'Nguyễn Văn B', position: 'Quản lý', phone: '0901234567' },
-    { id: 2, name: 'Trần Thị C', position: 'Thu ngân', phone: '0912345678' },
-    { id: 3, name: 'Lê Văn D', position: 'Đầu bếp', phone: '0923456789' }
-  ])
+  // Load user and restaurant data after verification
+  useEffect(() => {
+    if (isVerified) {
+      loadUserData()
+    }
+  }, [isVerified])
+
+  const loadUserData = async () => {
+    try {
+      const token = localStorage.getItem('restaurant_token')
+      const storedUser = JSON.parse(localStorage.getItem('restaurant_user') || '{}')
+      const storedRestaurant = JSON.parse(localStorage.getItem('restaurant_data') || '{}')
+      
+      console.log('🔍 Loaded restaurant data:', storedRestaurant)
+      
+      setUserData(storedUser)
+      setRestaurantData(storedRestaurant)
+      
+      setFormData(prev => ({
+        ...prev,
+        fullName: storedUser.name || '',
+        email: storedUser.email || '',
+        phone: storedUser.phone || '',
+        paypalEmail: storedRestaurant.paypalEmail || storedUser.email || '',
+        restaurantName: storedRestaurant.name || '',
+        restaurantAddress: typeof storedRestaurant.address === 'object' 
+          ? `${storedRestaurant.address?.street || ''}, ${storedRestaurant.address?.district || ''}, ${storedRestaurant.address?.city || ''}`
+          : storedRestaurant.address || '',
+        restaurantPhone: storedRestaurant.phone || '',
+        cuisine: Array.isArray(storedRestaurant.cuisine) ? storedRestaurant.cuisine.join(', ') : storedRestaurant.cuisine || '',
+      }))
+    } catch (error) {
+      console.error('Error loading user data:', error)
+    }
+  }
+
+  // Helper to get restaurant ID (handles both _id and id)
+  const getRestaurantId = () => {
+    return restaurantData?._id || restaurantData?.id || null
+  }
+
+  const [staffList, setStaffList] = useState([])
   const [staffSearch, setStaffSearch] = useState('')
   const [showStaffModal, setShowStaffModal] = useState(false)
+  const [transactions, setTransactions] = useState([])
+  const [loadingStaff, setLoadingStaff] = useState(false)
   const [newStaff, setNewStaff] = useState({
     name: '',
     position: 'Phục vụ',
     phone: ''
   })
 
+  // Load transactions
+  useEffect(() => {
+    const restaurantId = getRestaurantId()
+    if (isVerified && restaurantId) {
+      loadTransactions()
+      loadStaff()
+    }
+  }, [isVerified, restaurantData])
+
+  const loadStaff = async () => {
+    const restaurantId = getRestaurantId()
+    if (!restaurantId) {
+      console.error('No restaurant ID found')
+      return
+    }
+    
+    try {
+      setLoadingStaff(true)
+      const token = localStorage.getItem('restaurant_token')
+      const response = await axios.get(`${API_URL}/staff/restaurant/${restaurantId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (response.data.success) {
+        setStaffList(response.data.data || [])
+      }
+    } catch (error) {
+      console.error('Load staff error:', error)
+      // If API fails, use empty array
+      setStaffList([])
+    } finally {
+      setLoadingStaff(false)
+    }
+  }
+
+  const loadTransactions = async () => {
+    const restaurantId = getRestaurantId()
+    if (!restaurantId) return
+    
+    try {
+      const token = localStorage.getItem('restaurant_token')
+      const response = await axios.get(`${API_URL}/transactions/restaurant/${restaurantId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (response.data.success) {
+        setTransactions(response.data.data || [])
+      }
+    } catch (error) {
+      // If API not exist yet, use empty array
+      console.error('Load transactions error:', error)
+      setTransactions([])
+    }
+  }
+
+  const handleSavePaypal = async () => {
+    const restaurantId = getRestaurantId()
+    if (!restaurantId) {
+      alert('Không tìm thấy thông tin nhà hàng')
+      return
+    }
+    
+    try {
+      const token = localStorage.getItem('restaurant_token')
+      await axios.put(`${API_URL}/restaurants/${restaurantId}`, {
+        paypalEmail: formData.paypalEmail
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      
+      // Update localStorage
+      const updatedRestaurant = { ...restaurantData, paypalEmail: formData.paypalEmail }
+      localStorage.setItem('restaurant_data', JSON.stringify(updatedRestaurant))
+      setRestaurantData(updatedRestaurant)
+      
+      alert('Đã lưu tài khoản PayPal!')
+    } catch (error) {
+      console.error('Error saving PayPal:', error)
+      alert('Không thể lưu tài khoản PayPal')
+    }
+  }
+
+  const handleWithdraw = async () => {
+    const restaurantId = getRestaurantId()
+    const amount = parseInt(formData.withdrawAmount)
+    
+    if (!restaurantId) {
+      alert('Không tìm thấy thông tin nhà hàng')
+      return
+    }
+    
+    if (!amount || amount < 100000) {
+      alert('Số tiền rút tối thiểu là 100,000 VNĐ')
+      return
+    }
+    
+    if (amount > (restaurantData?.balance || 0)) {
+      alert('Số dư không đủ')
+      return
+    }
+    
+    if (!formData.paypalEmail) {
+      alert('Vui lòng cập nhật email PayPal trước')
+      return
+    }
+    
+    if (!confirm(`Bạn có chắc muốn rút ${amount.toLocaleString('vi-VN')} VNĐ về PayPal ${formData.paypalEmail}?`)) {
+      return
+    }
+    
+    try {
+      const token = localStorage.getItem('restaurant_token')
+      const response = await axios.post(`${API_URL}/transactions/withdraw`, {
+        restaurantId: restaurantId,
+        amount: amount,
+        paypalEmail: formData.paypalEmail
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      
+      if (response.data.success) {
+        alert('Yêu cầu rút tiền thành công! Tiền sẽ được chuyển vào PayPal trong 1-3 ngày làm việc.')
+        
+        // Update balance locally
+        const newBalance = (restaurantData?.balance || 0) - amount
+        const updatedRestaurant = { ...restaurantData, balance: newBalance }
+        localStorage.setItem('restaurant_data', JSON.stringify(updatedRestaurant))
+        setRestaurantData(updatedRestaurant)
+        setFormData(prev => ({ ...prev, withdrawAmount: '' }))
+        
+        loadTransactions()
+      }
+    } catch (error) {
+      console.error('Error withdrawing:', error)
+      alert(error.response?.data?.message || 'Không thể rút tiền. Vui lòng thử lại sau.')
+    }
+  }
+
   const filteredStaff = staffList.filter(staff => 
     staff.name.toLowerCase().includes(staffSearch.toLowerCase())
   )
 
-  const handleAddStaff = (e) => {
+  const handleAddStaff = async (e) => {
     e.preventDefault()
-    const staff = {
-      id: Date.now(),
-      ...newStaff
-    }
-    setStaffList([...staffList, staff])
-    setNewStaff({ name: '', position: 'Phục vụ', phone: '' })
-    setShowStaffModal(false)
-  }
-
-  const handleDeleteStaff = (id) => {
-    if (confirm('Bạn có chắc muốn xóa nhân viên này?')) {
-      setStaffList(staffList.filter(s => s.id !== id))
-    }
-  }
-
-  const handleVerify = (e) => {
-    e.preventDefault()
-    const savedAccount = JSON.parse(localStorage.getItem('foodfastPartnerAccount') || '{}')
     
-    if (verifyPassword === savedAccount.password) {
-      setIsVerified(true)
-      setShowVerifyModal(false)
-      setVerifyError('')
-    } else {
+    const restaurantId = getRestaurantId()
+    
+    if (!restaurantId) {
+      alert('Không tìm thấy thông tin nhà hàng')
+      return
+    }
+    
+    if (!newStaff.name || !newStaff.phone || !newStaff.position) {
+      alert('Vui lòng điền đầy đủ thông tin')
+      return
+    }
+
+    try {
+      const token = localStorage.getItem('restaurant_token')
+      const response = await axios.post(
+        `${API_URL}/staff/restaurant/${restaurantId}`,
+        {
+          name: newStaff.name,
+          phone: newStaff.phone,
+          position: newStaff.position
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      )
+
+      if (response.data.success) {
+        alert('Thêm nhân viên thành công!')
+        setNewStaff({ name: '', position: 'Phục vụ', phone: '' })
+        setShowStaffModal(false)
+        loadStaff() // Reload staff list
+      }
+    } catch (error) {
+      console.error('Add staff error:', error)
+      alert(error.response?.data?.message || 'Lỗi khi thêm nhân viên')
+    }
+  }
+
+  const handleDeleteStaff = async (staffId) => {
+    if (!confirm('Bạn có chắc muốn xóa nhân viên này?')) {
+      return
+    }
+
+    try {
+      const token = localStorage.getItem('restaurant_token')
+      const response = await axios.delete(`${API_URL}/staff/${staffId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+
+      if (response.data.success) {
+        alert('Xóa nhân viên thành công!')
+        loadStaff() // Reload staff list
+      }
+    } catch (error) {
+      console.error('Delete staff error:', error)
+      alert(error.response?.data?.message || 'Lỗi khi xóa nhân viên')
+    }
+  }
+
+  const handleVerify = async (e) => {
+    e.preventDefault()
+    setIsVerifying(true)
+    setVerifyError('')
+    
+    try {
+      // Restaurant-web uses 'restaurant_user' key, not 'user'
+      const storedUser = JSON.parse(localStorage.getItem('restaurant_user') || '{}')
+      const email = storedUser.email
+      
+      console.log('🔍 Verifying with email:', email)
+      console.log('🔍 Stored user:', storedUser)
+      
+      if (!email) {
+        setVerifyError('Không tìm thấy thông tin đăng nhập')
+        setIsVerifying(false)
+        return
+      }
+      
+      // Use login API to verify password
+      const response = await axios.post(`${API_URL}/auth/login`, {
+        email: email,
+        password: verifyPassword
+      })
+      
+      console.log('✅ Verify response:', response.data)
+      
+      if (response.data.success) {
+        setIsVerified(true)
+        setShowVerifyModal(false)
+        setVerifyError('')
+      }
+    } catch (error) {
+      console.error('❌ Verify error:', error)
+      console.error('❌ Error response:', error.response?.data)
       setVerifyError('Mật khẩu không chính xác')
+    } finally {
+      setIsVerifying(false)
     }
   }
 
@@ -111,7 +362,7 @@ function AccountSettings() {
       <div className="verify-overlay">
         <div className="verify-modal">
           <h2>Xác minh danh tính</h2>
-          <p>Vui lòng nhập mật khẩu để tiếp tục</p>
+          <p>Vui lòng nhập mật khẩu tài khoản để tiếp tục</p>
           <form onSubmit={handleVerify}>
             <input
               type="password"
@@ -119,14 +370,15 @@ function AccountSettings() {
               value={verifyPassword}
               onChange={(e) => setVerifyPassword(e.target.value)}
               className="verify-input"
+              disabled={isVerifying}
             />
             {verifyError && <p className="verify-error">{verifyError}</p>}
             <div className="verify-actions">
-              <button type="button" onClick={() => navigate(-1)} className="cancel-btn">
+              <button type="button" onClick={() => navigate(-1)} className="cancel-btn" disabled={isVerifying}>
                 Hủy
               </button>
-              <button type="submit" className="verify-btn">
-                Xác nhận
+              <button type="submit" className="verify-btn" disabled={isVerifying}>
+                {isVerifying ? 'Đang xác minh...' : 'Xác nhận'}
               </button>
             </div>
           </form>
@@ -344,69 +596,92 @@ function AccountSettings() {
             )}
 
             {activeTab === 'payment' && (
-              <>
-                <div className="form-group">
-                  <label>Ngân hàng</label>
-                  <select
-                    name="bankName"
-                    value={formData.bankName}
-                    onChange={handleChange}
+              <div className="payment-section">
+                {/* Balance Card */}
+                <div className="balance-card">
+                  <div className="balance-header">
+                    <span className="balance-icon">💰</span>
+                    <span className="balance-title">Số dư khả dụng</span>
+                  </div>
+                  <div className="balance-amount">
+                    {restaurantData?.balance?.toLocaleString('vi-VN') || '0'} VNĐ
+                  </div>
+                  <p className="balance-note">
+                    Doanh thu từ các đơn hàng đã hoàn thành (sau khi trừ phí dịch vụ)
+                  </p>
+                </div>
+
+                {/* PayPal Account */}
+                <div className="paypal-section">
+                  <h3>Tài khoản nhận tiền (PayPal)</h3>
+                  <div className="form-group">
+                    <label>Email PayPal</label>
+                    <input
+                      type="email"
+                      name="paypalEmail"
+                      value={formData.paypalEmail}
+                      onChange={handleChange}
+                      placeholder="Nhập email PayPal của bạn"
+                    />
+                    <p className="input-note">
+                      Tiền sẽ được chuyển vào tài khoản PayPal này khi bạn yêu cầu rút tiền
+                    </p>
+                  </div>
+
+                  <button type="button" className="save-paypal-btn" onClick={handleSavePaypal}>
+                    Lưu tài khoản PayPal
+                  </button>
+                </div>
+
+                {/* Withdraw Section */}
+                <div className="withdraw-section">
+                  <h3>Rút tiền về PayPal</h3>
+                  <div className="form-group">
+                    <label>Số tiền muốn rút (VNĐ)</label>
+                    <input
+                      type="number"
+                      name="withdrawAmount"
+                      value={formData.withdrawAmount || ''}
+                      onChange={handleChange}
+                      placeholder="Nhập số tiền"
+                      min="100000"
+                      step="10000"
+                    />
+                    <p className="input-note">Tối thiểu: 100,000 VNĐ</p>
+                  </div>
+
+                  <button 
+                    type="button" 
+                    className="withdraw-btn"
+                    onClick={handleWithdraw}
+                    disabled={!formData.paypalEmail || (restaurantData?.balance || 0) < 100000}
                   >
-                    <option value="Vietcombank">Vietcombank</option>
-                    <option value="BIDV">BIDV</option>
-                    <option value="VietinBank">VietinBank</option>
-                    <option value="Agribank">Agribank</option>
-                    <option value="Techcombank">Techcombank</option>
-                    <option value="MB Bank">MB Bank</option>
-                    <option value="ACB">ACB</option>
-                    <option value="VPBank">VPBank</option>
-                    <option value="TPBank">TPBank</option>
-                    <option value="Sacombank">Sacombank</option>
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label>Số tài khoản</label>
-                  <input
-                    type="text"
-                    name="bankAccountNumber"
-                    value={formData.bankAccountNumber}
-                    onChange={handleChange}
-                    placeholder="Nhập số tài khoản"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Tên tài khoản</label>
-                  <input
-                    type="text"
-                    name="bankAccountName"
-                    value={formData.bankAccountName}
-                    onChange={handleChange}
-                    placeholder="Nhập tên tài khoản (viết hoa không dấu)"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Chi nhánh</label>
-                  <input
-                    type="text"
-                    name="bankBranch"
-                    value={formData.bankBranch}
-                    onChange={handleChange}
-                    placeholder="Nhập chi nhánh ngân hàng"
-                  />
-                </div>
-
-                <div className="form-actions">
-                  <button type="button" onClick={() => navigate(-1)} className="cancel-btn">
-                    Hủy
-                  </button>
-                  <button type="submit" className="save-btn">
-                    Lưu thay đổi
+                    💸 Rút tiền về PayPal
                   </button>
                 </div>
-              </>
+
+                {/* Transaction History */}
+                <div className="transaction-history">
+                  <h3>Lịch sử giao dịch gần đây</h3>
+                  <div className="transaction-list">
+                    {transactions.length === 0 ? (
+                      <p className="no-transactions">Chưa có giao dịch nào</p>
+                    ) : (
+                      transactions.map((tx, index) => (
+                        <div key={index} className={`transaction-item ${tx.type}`}>
+                          <div className="tx-info">
+                            <span className="tx-type">{tx.type === 'income' ? '📥 Thu nhập' : '📤 Rút tiền'}</span>
+                            <span className="tx-date">{new Date(tx.date).toLocaleDateString('vi-VN')}</span>
+                          </div>
+                          <span className={`tx-amount ${tx.type}`}>
+                            {tx.type === 'income' ? '+' : '-'}{tx.amount.toLocaleString('vi-VN')}đ
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
             )}
 
             {activeTab === 'password' && (
@@ -461,22 +736,30 @@ function AccountSettings() {
               </div>
 
               <div className="staff-list">
-                {filteredStaff.map(staff => (
-                  <div key={staff.id} className="staff-item">
-                    <div className="staff-info">
-                      <span className="staff-name">{staff.name}</span>
-                      <span className="staff-position">{staff.position}</span>
-                      <span className="staff-login">SMS: {staff.phone}</span>
+                {loadingStaff ? (
+                  <p style={{ textAlign: 'center', padding: '20px' }}>Đang tải...</p>
+                ) : filteredStaff.length === 0 ? (
+                  <p style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
+                    {staffSearch ? 'Không tìm thấy nhân viên' : 'Chưa có nhân viên. Nhấn "Thêm nhân viên" để bắt đầu.'}
+                  </p>
+                ) : (
+                  filteredStaff.map(staff => (
+                    <div key={staff._id} className="staff-item">
+                      <div className="staff-info">
+                        <span className="staff-name">{staff.name}</span>
+                        <span className="staff-position">{staff.position}</span>
+                        <span className="staff-login">SMS: {staff.phone}</span>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => handleDeleteStaff(staff._id)} 
+                        className="delete-staff-btn"
+                      >
+                        Xóa
+                      </button>
                     </div>
-                    <button 
-                      type="button"
-                      onClick={() => handleDeleteStaff(staff.id)} 
-                      className="delete-staff-btn"
-                    >
-                      Xóa
-                    </button>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
           )}

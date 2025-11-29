@@ -36,7 +36,9 @@ const LoginScreen = ({ navigation }: any) => {
 
     setIsSubmitting(true);
     try {
+      console.log('🔐 Attempting login with:', { email, password });
       await dispatch(login({ email, password })).unwrap();
+      console.log('✅ Login successful');
       
       // Đợi một chút để đảm bảo token được lưu vào AsyncStorage
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -67,24 +69,26 @@ const LoginScreen = ({ navigation }: any) => {
             restaurantId: pending.restaurant.id || pending.restaurant._id,
             restaurantName: pending.restaurant.name,
             image: fallbackProductImage,
-          })).unwrap();
+          }));
           Alert.alert('Thành công', 'Đã thêm vào giỏ hàng');
-          navigation.replace('Main', { screen: 'Cart' });
+          navigation.replace('MainTabs');
           return;
         } catch (cartError: any) {
           console.error('Add to cart failed:', cartError);
           // Không hiển thị lỗi, vẫn chuyển về trang chính
           Alert.alert('Đăng nhập thành công', 'Bạn có thể thêm món vào giỏ hàng ngay bây giờ');
-          navigation.replace('Main');
+          navigation.replace('MainTabs');
           return;
         }
       }
 
       // Nếu không có pendingAdd, quay về Home
       Alert.alert('Thành công', 'Đăng nhập thành công!');
-      navigation.replace('Main');
+      navigation.replace('MainTabs');
     } catch (err: any) {
-      Alert.alert('Đăng nhập thất bại', err || 'Vui lòng kiểm tra lại thông tin');
+      console.error('❌ Login failed:', err);
+      const errorMessage = err?.message || err?.error || err || 'Vui lòng kiểm tra lại thông tin';
+      Alert.alert('Đăng nhập thất bại', errorMessage);
     } finally {
       setIsSubmitting(false);
     }

@@ -325,6 +325,13 @@ function Checkout() {
         } else {
           throw new Error("Không thể tạo thanh toán MoMo");
         }
+      } else if (paymentMethod === "paypal") {
+        // Navigate to PayPal payment page
+        const paypalParams = new URLSearchParams({
+          amount: total.toString(),
+          description: `Đơn hàng FoodFast #${createdOrder.orderNumber || createdOrder._id}`,
+        });
+        navigate(`/paypal-payment/${createdOrder._id || createdOrder.id}?${paypalParams.toString()}`);
       } else {
         // COD: Navigate to order tracking immediately
         await dispatch(clearCart());
@@ -633,6 +640,27 @@ function Checkout() {
                     <div className="payment-details">
                       <strong className="payment-title">Momo</strong>
                       <p className="payment-desc">Thanh toán qua ví Momo</p>
+                    </div>
+                  </label>
+
+                  <label className="payment-option">
+                    <input
+                      type="radio"
+                      name="payment"
+                      value="paypal"
+                      checked={paymentMethod === "paypal"}
+                      onChange={(e) => setPaymentMethod(e.target.value)}
+                    />
+                    <div className="payment-icon">
+                      <img
+                        src="https://www.paypalobjects.com/webstatic/mktg/Logo/pp-logo-100px.png"
+                        alt="PayPal"
+                        className="pay-logo"
+                      />
+                    </div>
+                    <div className="payment-details">
+                      <strong className="payment-title">PayPal</strong>
+                      <p className="payment-desc">Thanh toán quốc tế qua PayPal</p>
                     </div>
                   </label>
                 </div>
