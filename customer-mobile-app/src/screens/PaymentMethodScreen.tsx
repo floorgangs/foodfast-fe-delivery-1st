@@ -9,15 +9,13 @@ import {
   Modal,
   Platform,
   StatusBar,
+  Image,
 } from 'react-native';
 
 interface PaymentMethod {
   id: string;
-  type: 'card' | 'momo' | 'zalopay';
-  cardNumber?: string;
-  cardHolder?: string;
-  expiryDate?: string;
-  phoneNumber?: string;
+  type: 'paypal';
+  email?: string;
   isDefault: boolean;
 }
 
@@ -25,37 +23,20 @@ const PaymentMethodScreen = ({ navigation }: any) => {
   const [methods, setMethods] = useState<PaymentMethod[]>([
     {
       id: '1',
-      type: 'card',
-      cardNumber: '**** **** **** 1234',
-      cardHolder: 'NGUYEN VAN A',
-      expiryDate: '12/25',
+      type: 'paypal',
+      email: 'user@example.com',
       isDefault: true,
-    },
-    {
-      id: '2',
-      type: 'momo',
-      phoneNumber: '0901234567',
-      isDefault: false,
     },
   ]);
 
   const [modalVisible, setModalVisible] = useState(false);
-  const [selectedType, setSelectedType] = useState<'card' | 'momo' | 'zalopay'>('card');
   const [formData, setFormData] = useState({
-    cardNumber: '',
-    cardHolder: '',
-    expiryDate: '',
-    cvv: '',
-    phoneNumber: '',
+    email: '',
   });
 
   const handleAdd = () => {
     setFormData({
-      cardNumber: '',
-      cardHolder: '',
-      expiryDate: '',
-      cvv: '',
-      phoneNumber: '',
+      email: '',
     });
     setModalVisible(true);
   };
@@ -69,24 +50,23 @@ const PaymentMethodScreen = ({ navigation }: any) => {
       setMethods(methods.filter(method => method.id !== id));
       if (Platform.OS !== 'web') {
         const Alert = require('react-native').Alert;
-        Alert.alert('Thành công', 'Đã xóa phương thức thanh toán');
+        Alert.alert('Thành công', 'Đã xóa tài khoản PayPal');
       }
     }
   };
 
   const handleSave = () => {
+    if (!formData.email.trim()) {
+      const Alert = require('react-native').Alert;
+      Alert.alert('Lỗi', 'Vui lòng nhập email PayPal');
+      return;
+    }
+
     const newMethod: PaymentMethod = {
       id: Date.now().toString(),
-      type: selectedType,
+      type: 'paypal',
+      email: formData.email,
       isDefault: methods.length === 0,
-      ...(selectedType === 'card' && {
-        cardNumber: `**** **** **** ${formData.cardNumber.slice(-4)}`,
-        cardHolder: formData.cardHolder.toUpperCase(),
-        expiryDate: formData.expiryDate,
-      }),
-      ...(selectedType !== 'card' && {
-        phoneNumber: formData.phoneNumber,
-      }),
     };
     setMethods([...methods, newMethod]);
     setModalVisible(false);
@@ -97,24 +77,6 @@ const PaymentMethodScreen = ({ navigation }: any) => {
       ...method,
       isDefault: method.id === id,
     })));
-  };
-
-  const getMethodIcon = (type: string) => {
-    switch (type) {
-      case 'card': return '💳';
-      case 'momo': return '🅼';
-      case 'zalopay': return '🇿';
-      default: return '💳';
-    }
-  };
-
-  const getMethodName = (type: string) => {
-    switch (type) {
-      case 'card': return 'Thẻ tín dụng/Ghi nợ';
-      case 'momo': return 'Ví MoMo';
-      case 'zalopay': return 'Ví ZaloPay';
-      default: return 'Unknown';
-    }
   };
 
   return (
@@ -129,30 +91,34 @@ const PaymentMethodScreen = ({ navigation }: any) => {
       </View>
 
       <ScrollView style={styles.content}>
+        {/* Info Banner */}
+        <View style={styles.infoBanner}>
+          <Text style={styles.infoIcon}>ℹ️</Text>
+          <Text style={styles.infoText}>
+            Hiện tại chỉ hỗ trợ thanh toán qua PayPal để đảm bảo giao hàng nhanh bằng drone
+          </Text>
+        </View>
+
         {/* Payment Methods List */}
         {methods.map((method) => (
           <View key={method.id} style={styles.methodCard}>
             <View style={styles.methodHeader}>
               <View style={styles.methodInfo}>
-                <Text style={styles.methodIcon}>{getMethodIcon(method.type)}</Text>
+                <Image 
+                  source={{ uri: 'https://www.paypalobjects.com/webstatic/icon/pp258.png' }}
+                  style={styles.paypalLogo}
+                  resizeMode="contain"
+                />
                 <View style={styles.methodDetails}>
                   <View style={styles.methodNameRow}>
-                    <Text style={styles.methodName}>{getMethodName(method.type)}</Text>
+                    <Text style={styles.methodName}>PayPal</Text>
                     {method.isDefault && (
                       <View style={styles.defaultBadge}>
                         <Text style={styles.defaultBadgeText}>Mặc định</Text>
                       </View>
                     )}
                   </View>
-                  {method.type === 'card' && (
-                    <>
-                      <Text style={styles.methodText}>{method.cardNumber}</Text>
-                      <Text style={styles.methodText}>{method.cardHolder}</Text>
-                    </>
-                  )}
-                  {method.type !== 'card' && (
-                    <Text style={styles.methodText}>{method.phoneNumber}</Text>
-                  )}
+                  <Text style={styles.methodText}>{method.email}</Text>
                 </View>
               </View>
             </View>
@@ -172,7 +138,7 @@ const PaymentMethodScreen = ({ navigation }: any) => {
 
         {/* Add Button */}
         <TouchableOpacity style={styles.addButton} onPress={handleAdd}>
-          <Text style={styles.addButtonText}>+ Thêm phương thức mới</Text>
+          <Text style={styles.addButtonText}>+ Thêm tài khoản PayPal</Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -186,108 +152,46 @@ const PaymentMethodScreen = ({ navigation }: any) => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Thêm phương thức thanh toán</Text>
+              <Text style={styles.modalTitle}>Thêm tài khoản PayPal</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
                 <Text style={styles.modalClose}>✕</Text>
               </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.modalForm}>
-              {/* Type Selection */}
-              <View style={styles.typeSelection}>
-                <TouchableOpacity
-                  style={[styles.typeButton, selectedType === 'card' && styles.typeButtonActive]}
-                  onPress={() => setSelectedType('card')}
-                >
-                  <Text style={[styles.typeButtonText, selectedType === 'card' && styles.typeButtonTextActive]}>
-                    💳 Thẻ
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.typeButton, selectedType === 'momo' && styles.typeButtonActive]}
-                  onPress={() => setSelectedType('momo')}
-                >
-                  <Text style={[styles.typeButtonText, selectedType === 'momo' && styles.typeButtonTextActive]}>
-                    🅼 MoMo
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.typeButton, selectedType === 'zalopay' && styles.typeButtonActive]}
-                  onPress={() => setSelectedType('zalopay')}
-                >
-                  <Text style={[styles.typeButtonText, selectedType === 'zalopay' && styles.typeButtonTextActive]}>
-                    🇿 ZaloPay
-                  </Text>
-                </TouchableOpacity>
+              {/* PayPal Logo */}
+              <View style={styles.paypalLogoContainer}>
+                <Image 
+                  source={{ uri: 'https://www.paypalobjects.com/webstatic/icon/pp258.png' }}
+                  style={styles.paypalLogoLarge}
+                  resizeMode="contain"
+                />
+                <Text style={styles.paypalTitle}>PayPal</Text>
               </View>
 
-              {/* Card Form */}
-              {selectedType === 'card' && (
-                <>
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Số thẻ</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="0000 0000 0000 0000"
-                      value={formData.cardNumber}
-                      onChangeText={(text) => setFormData({ ...formData, cardNumber: text })}
-                      keyboardType="number-pad"
-                      maxLength={16}
-                    />
-                  </View>
+              {/* Email Input */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Email PayPal</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="your-email@example.com"
+                  value={formData.email}
+                  onChangeText={(text) => setFormData({ email: text })}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <Text style={styles.helperText}>
+                  Nhập địa chỉ email đã đăng ký với tài khoản PayPal của bạn
+                </Text>
+              </View>
 
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Tên chủ thẻ</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="NGUYEN VAN A"
-                      value={formData.cardHolder}
-                      onChangeText={(text) => setFormData({ ...formData, cardHolder: text })}
-                      autoCapitalize="characters"
-                    />
-                  </View>
-
-                  <View style={styles.row}>
-                    <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
-                      <Text style={styles.label}>Ngày hết hạn</Text>
-                      <TextInput
-                        style={styles.input}
-                        placeholder="MM/YY"
-                        value={formData.expiryDate}
-                        onChangeText={(text) => setFormData({ ...formData, expiryDate: text })}
-                        maxLength={5}
-                      />
-                    </View>
-
-                    <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
-                      <Text style={styles.label}>CVV</Text>
-                      <TextInput
-                        style={styles.input}
-                        placeholder="123"
-                        value={formData.cvv}
-                        onChangeText={(text) => setFormData({ ...formData, cvv: text })}
-                        keyboardType="number-pad"
-                        maxLength={3}
-                        secureTextEntry
-                      />
-                    </View>
-                  </View>
-                </>
-              )}
-
-              {/* E-Wallet Form */}
-              {selectedType !== 'card' && (
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Số điện thoại</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Nhập số điện thoại"
-                    value={formData.phoneNumber}
-                    onChangeText={(text) => setFormData({ ...formData, phoneNumber: text })}
-                    keyboardType="phone-pad"
-                  />
-                </View>
-              )}
+              <View style={styles.infoBox}>
+                <Text style={styles.infoBoxIcon}>💡</Text>
+                <Text style={styles.infoBoxText}>
+                  Bạn sẽ được chuyển đến trang PayPal để đăng nhập và xác nhận thanh toán khi đặt hàng
+                </Text>
+              </View>
 
               <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
                 <Text style={styles.saveButtonText}>Lưu</Text>
@@ -330,6 +234,25 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
+  infoBanner: {
+    flexDirection: 'row',
+    backgroundColor: '#E5F2FF',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#0070BA',
+  },
+  infoIcon: {
+    fontSize: 20,
+    marginRight: 8,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#003087',
+    lineHeight: 18,
+  },
   methodCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
@@ -348,8 +271,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  methodIcon: {
-    fontSize: 32,
+  paypalLogo: {
+    width: 50,
+    height: 50,
     marginRight: 12,
   },
   methodDetails: {
@@ -404,12 +328,12 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#EA5034',
+    borderColor: '#0070BA',
     borderStyle: 'dashed',
   },
   addButtonText: {
     fontSize: 16,
-    color: '#EA5034',
+    color: '#0070BA',
     fontWeight: '500',
   },
   modalOverlay: {
@@ -443,30 +367,19 @@ const styles = StyleSheet.create({
   modalForm: {
     padding: 16,
   },
-  typeSelection: {
-    flexDirection: 'row',
-    marginBottom: 16,
-  },
-  typeButton: {
-    flex: 1,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
+  paypalLogoContainer: {
     alignItems: 'center',
-    marginHorizontal: 4,
+    marginBottom: 24,
   },
-  typeButtonActive: {
-    borderColor: '#EA5034',
-    backgroundColor: '#FFF5F3',
+  paypalLogoLarge: {
+    width: 80,
+    height: 80,
+    marginBottom: 8,
   },
-  typeButtonText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  typeButtonTextActive: {
-    color: '#EA5034',
-    fontWeight: '600',
+  paypalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#003087',
   },
   inputGroup: {
     marginBottom: 16,
@@ -485,11 +398,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
     backgroundColor: '#fff',
   },
-  row: {
+  helperText: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
+  infoBox: {
     flexDirection: 'row',
+    backgroundColor: '#FFF9E5',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  infoBoxIcon: {
+    fontSize: 20,
+    marginRight: 8,
+  },
+  infoBoxText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#666',
+    lineHeight: 18,
   },
   saveButton: {
-    backgroundColor: '#EA5034',
+    backgroundColor: '#0070BA',
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',

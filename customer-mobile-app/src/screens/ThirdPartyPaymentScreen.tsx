@@ -59,32 +59,14 @@ const ThirdPartyPaymentScreen = ({ route, navigation }: any) => {
     : undefined;
 
   const getPaymentConfig = () => {
-    switch (paymentMethod) {
-      case 'momo':
-        return {
-          name: 'MoMo',
-          color: '#A50064',
-          bgColor: '#FFF0F8',
-          logo: '🅼',
-          buttonColor: '#A50064',
-        };
-      case 'vnpay':
-        return {
-          name: 'VNPay',
-          color: '#0066B3',
-          bgColor: '#E5F1FA',
-          logo: 'Ⓥ',
-          buttonColor: '#0066B3',
-        };
-      default:
-        return {
-          name: 'MoMo',
-          color: '#A50064',
-          bgColor: '#FFF0F8',
-          logo: '🅼',
-          buttonColor: '#A50064',
-        };
-    }
+    // Only PayPal is supported
+    return {
+      name: 'PayPal',
+      color: '#003087',
+      bgColor: '#E5F2FF',
+      logo: '🅿',
+      buttonColor: '#0070BA',
+    };
   };
 
   const config = getPaymentConfig();

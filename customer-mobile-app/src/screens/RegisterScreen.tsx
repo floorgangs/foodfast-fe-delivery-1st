@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { useRoute } from '@react-navigation/native';
@@ -25,12 +26,14 @@ const RegisterScreen = ({ navigation }: any) => {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const dispatch = useDispatch<AppDispatch>();
 
   const route = useRoute<any>();
 
-  const handleRegister = async () => {
+  const handleRegister = useCallback(async () => {
     if (name && email && phone && password && password === confirmPassword) {
+      setIsSubmitting(true);
       try {
         await dispatch(register({ name, email, phone, password })).unwrap();
         try {
@@ -69,17 +72,19 @@ const RegisterScreen = ({ navigation }: any) => {
         navigation.navigate('MainTabs');
       } catch (error: any) {
         Alert.alert('Đăng ký thất bại', error?.message || 'Vui lòng kiểm tra lại thông tin');
+      } finally {
+        setIsSubmitting(false);
       }
     }
-  };
+  }, [name, email, phone, password, confirmPassword, dispatch, navigation, route]);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     navigation.goBack();
-  };
+  }, [navigation]);
 
-  const handleLogin = () => {
+  const handleLogin = useCallback(() => {
     navigation.navigate('Login');
-  };
+  }, [navigation]);
 
   return (
     <KeyboardAvoidingView
@@ -107,6 +112,8 @@ const RegisterScreen = ({ navigation }: any) => {
               placeholder="Nhập họ và tên"
               value={name}
               onChangeText={setName}
+              autoCorrect={false}
+              editable={!isSubmitting}
             />
           </View>
 
@@ -117,8 +124,10 @@ const RegisterScreen = ({ navigation }: any) => {
               placeholder="Nhập email của bạn"
               value={email}
               onChangeText={setEmail}
-              keyboardType="email-address"
+              keyboardType="default"
               autoCapitalize="none"
+              autoCorrect={false}
+              editable={!isSubmitting}
             />
           </View>
 
@@ -130,6 +139,8 @@ const RegisterScreen = ({ navigation }: any) => {
               value={phone}
               onChangeText={setPhone}
               keyboardType="phone-pad"
+              autoCorrect={false}
+              editable={!isSubmitting}
             />
           </View>
 
@@ -141,6 +152,9 @@ const RegisterScreen = ({ navigation }: any) => {
               value={password}
               onChangeText={setPassword}
               secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!isSubmitting}
             />
           </View>
 
@@ -152,11 +166,24 @@ const RegisterScreen = ({ navigation }: any) => {
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="off"
+              textContentType="none"
+              editable={!isSubmitting}
             />
           </View>
 
-          <TouchableOpacity style={styles.registerButton} onPress={handleRegister}>
-            <Text style={styles.registerButtonText}>Đăng ký</Text>
+          <TouchableOpacity 
+            style={[styles.registerButton, isSubmitting && styles.buttonDisabled]} 
+            onPress={handleRegister}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.registerButtonText}>Đăng ký</Text>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.loginLink} onPress={handleLogin}>
@@ -239,6 +266,9 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   loginLink: {
     marginTop: 20,

@@ -1,7 +1,11 @@
 // Payment Methods
 export const PAYMENT_METHODS = [
-  { id: 'momo', name: 'Ví MoMo', icon: 'Ⓜ' },
-  { id: 'vnpay', name: 'VNPay', icon: 'Ⓥ' },
+  { 
+    id: 'paypal', 
+    name: 'PayPal', 
+    icon: 'https://www.paypalobjects.com/webstatic/icon/pp258.png',
+    description: 'Thanh toán an toàn qua PayPal'
+  },
 ];
 
 // Order Status

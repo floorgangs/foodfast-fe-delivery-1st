@@ -154,7 +154,21 @@ export const persistCart = createAsyncThunk<NormalizedCartPayload, CartSyncPaylo
       const response = await cartAPI.upsert(payload);
       return normalizeCartResponse(response);
     } catch (error: any) {
-      return rejectWithValue(error?.message || 'Không thể lưu giỏ hàng');
+      const errorMessage = error?.message || 'Không thể lưu giỏ hàng';
+      
+      // Chỉ log nếu là lỗi thực sự liên quan đến cart
+      const isIrrelevantError = 
+        errorMessage.includes('đã tồn tại') || 
+        errorMessage.includes('user') ||
+        errorMessage.includes('đăng nhập') || 
+        errorMessage.includes('Token') ||
+        errorMessage.includes('401');
+      
+      if (!isIrrelevantError) {
+        console.error('[persistCart] Error:', errorMessage);
+      }
+      
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -298,12 +312,31 @@ export const selectCartState = (state: RootState) => state.cart;
 export const synchronizeCart = (): AppThunk<Promise<NormalizedCartPayload | void>> =>
   async (dispatch, getState) => {
     const state = getState();
+    
+    // Kiểm tra authentication
     if (!state.auth?.isAuthenticated) {
       return undefined;
     }
 
-    const payload = serializeCartForServer(state.cart);
-    return dispatch(persistCart(payload)).unwrap();
+    try {
+      const payload = serializeCartForServer(state.cart);
+      return await dispatch(persistCart(payload)).unwrap();
+    } catch (error: any) {
+      const errorMsg = error?.message || error?.toString() || '';
+      
+      // Bỏ qua các error không liên quan đến cart
+      const isIrrelevantError = 
+        errorMsg.includes('đã tồn tại') || 
+        errorMsg.includes('user') ||
+        errorMsg.includes('đăng nhập') || 
+        errorMsg.includes('Token') ||
+        errorMsg.includes('401');
+      
+      if (!isIrrelevantError) {
+        console.error('[synchronizeCart] Failed:', errorMsg);
+      }
+      throw error;
+    }
   };
 
 export const addToCart = (payload: AddToCartPayload): AppThunk<Promise<void>> =>
@@ -319,39 +352,62 @@ export const addToCart = (payload: AddToCartPayload): AppThunk<Promise<void>> =>
     try {
       await dispatch(synchronizeCart());
     } catch (error: any) {
-      console.error('Cart sync failed:', error);
-      // Vẫn giữ item trong local state mặc dù sync thất bại
-      throw new Error(error?.message || 'Không thể đồng bộ giỏ hàng với server');
+      // Silent - không log error, không throw
+      // Vẫn giữ item trong local state
     }
   };
 
 export const removeFromCart = (id: string): AppThunk<Promise<void>> =>
-  async (dispatch) => {
+  async (dispatch, getState) => {
     dispatch(removeItem(id));
+    
+    const state = getState();
+    if (!state.auth?.isAuthenticated) {
+      // Nếu chưa đăng nhập, chỉ cập nhật local state
+      return;
+    }
+    
     try {
       await dispatch(synchronizeCart());
-    } catch (error) {
-      throw error;
+    } catch (error: any) {
+      // Silent - không log error, không throw
+      // Vẫn giữ thay đổi trong local state
     }
   };
 
 export const updateQuantity = (payload: { id: string; quantity: number }): AppThunk<Promise<void>> =>
-  async (dispatch) => {
+  async (dispatch, getState) => {
     dispatch(updateItemQuantity(payload));
+    
+    const state = getState();
+    if (!state.auth?.isAuthenticated) {
+      // Nếu chưa đăng nhập, chỉ cập nhật local state
+      return;
+    }
+    
     try {
       await dispatch(synchronizeCart());
-    } catch (error) {
-      throw error;
+    } catch (error: any) {
+      // Silent - không log error, không throw
+      // Vẫn giữ thay đổi trong local state
     }
   };
 
 export const clearCart = (): AppThunk<Promise<void>> =>
-  async (dispatch) => {
+  async (dispatch, getState) => {
     dispatch(clearCartState());
+    
+    const state = getState();
+    if (!state.auth?.isAuthenticated) {
+      // Nếu chưa đăng nhập, chỉ cập nhật local state
+      return;
+    }
+    
     try {
       await dispatch(synchronizeCart());
-    } catch (error) {
-      throw error;
+    } catch (error: any) {
+      // Silent - không log error, không throw
+      // Vẫn giữ thay đổi trong local state
     }
   };
 

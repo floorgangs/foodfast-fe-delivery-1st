@@ -10,6 +10,7 @@ import {
   Platform,
   StatusBar,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
@@ -45,7 +46,7 @@ const CheckoutScreen = ({ navigation }: any) => {
   const paymentMethods = PAYMENT_METHODS;
 
   const [selectedAddress, setSelectedAddress] = useState(addresses[0]?._id || addresses[0]?.id || '');
-  const [selectedPayment, setSelectedPayment] = useState('momo');
+  const [selectedPayment, setSelectedPayment] = useState('paypal');
   const [note, setNote] = useState('');
   const [voucherCode, setVoucherCode] = useState('');
   const [discount, setDiscount] = useState(0);
@@ -252,6 +253,17 @@ const CheckoutScreen = ({ navigation }: any) => {
       if (!response?.data?._id || !response?.paymentSession?.sessionId) {
         console.error('[Checkout] Invalid response structure:', response);
         throw new Error('Không thể khởi tạo phiên thanh toán. Vui lòng thử lại.');
+      }
+
+      // Kiểm tra nếu là PayPal thì chuyển sang PayPalPaymentScreen
+      if (selectedPayment === 'paypal') {
+        console.log('[Checkout] Navigating to PayPalPayment');
+        navigation.replace('PayPalPayment', {
+          orderId: response.data._id,
+          amount: response.data.total,
+          description: `Đơn hàng #${response.data.orderNumber} - ${items[0]?.restaurantName}`,
+        });
+        return;
       }
 
       const navigationParams = {
@@ -473,10 +485,14 @@ const CheckoutScreen = ({ navigation }: any) => {
               <View style={styles.radioButton}>
                 {selectedPayment === method.id && <View style={styles.radioButtonInner} />}
               </View>
-              <Text style={styles.paymentIcon}>{method.icon}</Text>
+              <Image 
+                source={{ uri: method.icon }} 
+                style={styles.paymentLogo}
+                resizeMode="contain"
+              />
               <View style={{ flex: 1 }}>
                 <Text style={styles.paymentName}>{method.name}</Text>
-                <Text style={styles.paymentDescription}>Thanh toán được xử lý trên hệ thống thứ 3 để xác nhận trước khi drone cất cánh.</Text>
+                <Text style={styles.paymentDescription}>{method.description || 'Thanh toán an toàn và nhanh chóng'}</Text>
               </View>
             </TouchableOpacity>
           ))}
@@ -790,6 +806,11 @@ const styles = StyleSheet.create({
   },
   paymentIcon: {
     fontSize: 24,
+    marginRight: 12,
+  },
+  paymentLogo: {
+    width: 60,
+    height: 40,
     marginRight: 12,
   },
   paymentName: {

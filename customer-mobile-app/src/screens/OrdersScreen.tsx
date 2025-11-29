@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { submitOrderReview, Order as OrderType, setOrders } from '../store/slices/orderSlice';
 import { orderAPI, reviewAPI } from '../services/api';
 import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const OrdersScreen = ({ navigation }: any) => {
   const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
@@ -32,6 +33,12 @@ const OrdersScreen = ({ navigation }: any) => {
   const isFetchingRef = useRef(false);
 
   const fetchOrders = useCallback(async () => {
+    // Kiểm tra token trước khi fetch
+    const token = await AsyncStorage.getItem('token');
+    if (!token) {
+      return; // Không fetch nếu chưa đăng nhập
+    }
+
     const normalizeStatus = (status: string) => {
       if (status === 'completed') return 'delivered';
       if (status === 'preparing') return 'confirmed';
@@ -124,7 +131,10 @@ const OrdersScreen = ({ navigation }: any) => {
 
       dispatch(setOrders(transformedOrders));
     } catch (error: any) {
-      console.error('Failed to fetch orders:', error);
+      // Chỉ log lỗi nếu không phải lỗi authentication
+      if (error?.message && !error.message.includes('đăng nhập')) {
+        console.error('Failed to fetch orders:', error);
+      }
     } finally {
       setOrdersLoading(false);
       isFetchingRef.current = false;

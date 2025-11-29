@@ -171,6 +171,41 @@ export const paymentAPI = {
   },
 };
 
+// PayPal APIs
+export const paypalAPI = {
+  createOrder: async (payload: { amount: number; orderId: string; description?: string }) => {
+    console.log('[paypalAPI] createOrder payload:', payload);
+    try {
+      const response = await api.post('/paypal/create-order', payload);
+      console.log('[paypalAPI] createOrder response:', response);
+      return response;
+    } catch (error: any) {
+      console.error('[paypalAPI] createOrder error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
+      throw error;
+    }
+  },
+
+  captureOrder: async (payload: { paypalOrderId: string; orderId: string }) => {
+    console.log('[paypalAPI] captureOrder payload:', payload);
+    try {
+      const response = await api.post('/paypal/capture-order', payload);
+      console.log('[paypalAPI] captureOrder response:', response);
+      return response;
+    } catch (error: any) {
+      console.error('[paypalAPI] captureOrder error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
+      throw error;
+    }
+  },
+};
+
 // Notification APIs
 export const notificationAPI = {
   getAll: () =>

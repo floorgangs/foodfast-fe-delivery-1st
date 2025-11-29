@@ -29,6 +29,7 @@ import AddressScreen from './src/screens/AddressScreen';
 import PaymentMethodScreen from './src/screens/PaymentMethodScreen';
 import VouchersScreen from './src/screens/VouchersScreen';
 import ThirdPartyPaymentScreen from './src/screens/ThirdPartyPaymentScreen';
+import PayPalPaymentScreen from './src/screens/PayPalPaymentScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -286,29 +287,28 @@ function AppNavigator() {
     const loadUser = async () => {
       try {
         const userJson = await AsyncStorage.getItem('user');
-        if (userJson) {
+        const token = await AsyncStorage.getItem('token');
+        
+        if (userJson && token) {
           const user = JSON.parse(userJson);
           store.dispatch(setUser(user));
+          
+          // Chỉ load cart khi đã có user và token
+          try {
+            await store.dispatch(fetchCart()).unwrap();
+          } catch (error: any) {
+            // Chỉ log lỗi nếu không phải lỗi authentication
+            if (error && !error.includes('Token không hợp lệ')) {
+              console.error('Error fetching cart:', error);
+            }
+          }
         }
       } catch (error) {
         console.error('Error loading user:', error);
       }
     };
 
-    const loadCartFromServer = async () => {
-      try {
-        const token = await AsyncStorage.getItem('token');
-        if (!token) {
-          return;
-        }
-        await store.dispatch(fetchCart()).unwrap();
-      } catch (error) {
-        console.error('Error fetching cart:', error);
-      }
-    };
-
     loadUser();
-    loadCartFromServer();
   }, []);
 
   return (
@@ -321,6 +321,7 @@ function AppNavigator() {
           <Stack.Screen name="Cart" component={CartScreen} />
           <Stack.Screen name="Checkout" component={CheckoutScreen} />
           <Stack.Screen name="ThirdPartyPayment" component={ThirdPartyPaymentScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="PayPalPayment" component={PayPalPaymentScreen} options={{ headerShown: false }} />
           <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} />
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Register" component={RegisterScreen} />

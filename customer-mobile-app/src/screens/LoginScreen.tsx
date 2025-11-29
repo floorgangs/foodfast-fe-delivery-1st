@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -24,17 +24,17 @@ const resolveRestaurantImage = (restaurant: any) =>
 const LoginScreen = ({ navigation }: any) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const dispatch = useDispatch<AppDispatch>();
-  const { loading, error } = useSelector((state: RootState) => state.auth);
-
   const route = useRoute<any>();
 
-  const handleLogin = async () => {
+  const handleLogin = useCallback(async () => {
     if (!email || !password) {
       Alert.alert('Lỗi', 'Vui lòng nhập email và mật khẩu');
       return;
     }
 
+    setIsSubmitting(true);
     try {
       await dispatch(login({ email, password })).unwrap();
       
@@ -85,22 +85,18 @@ const LoginScreen = ({ navigation }: any) => {
       navigation.replace('Main');
     } catch (err: any) {
       Alert.alert('Đăng nhập thất bại', err || 'Vui lòng kiểm tra lại thông tin');
+    } finally {
+      setIsSubmitting(false);
     }
-  };
+  }, [email, password, dispatch, navigation, route]);
 
-  React.useEffect(() => {
-    if (error) {
-      dispatch(clearError());
-    }
-  }, []);
-
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     navigation.goBack();
-  };
+  }, [navigation]);
 
-  const handleRegister = () => {
+  const handleRegister = useCallback(() => {
     navigation.navigate('Register');
-  };
+  }, [navigation]);
 
   return (
     <KeyboardAvoidingView
@@ -128,8 +124,10 @@ const LoginScreen = ({ navigation }: any) => {
               placeholder="Nhập email của bạn"
               value={email}
               onChangeText={setEmail}
-              keyboardType="email-address"
+              keyboardType="default"
               autoCapitalize="none"
+              autoCorrect={false}
+              editable={!isSubmitting}
             />
           </View>
 
@@ -141,15 +139,18 @@ const LoginScreen = ({ navigation }: any) => {
               value={password}
               onChangeText={setPassword}
               secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!isSubmitting}
             />
           </View>
 
           <TouchableOpacity 
-            style={[styles.loginButton, loading && styles.buttonDisabled]} 
+            style={[styles.loginButton, isSubmitting && styles.buttonDisabled]} 
             onPress={handleLogin}
-            disabled={loading}
+            disabled={isSubmitting}
           >
-            {loading ? (
+            {isSubmitting ? (
               <ActivityIndicator color="#fff" />
             ) : (
               <Text style={styles.loginButtonText}>Đăng nhập</Text>
