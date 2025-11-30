@@ -19,6 +19,7 @@ import { addToCart } from '../store/slices/cartSlice';
 import { RootState } from '../store';
 import type { AppDispatch } from '../store';
 import { productAPI, reviewAPI } from '../services/api';
+import useResponsive from '../hooks/useResponsive';
 
 const RATING_BREAKDOWN_TEMPLATE = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
 
@@ -27,6 +28,7 @@ const resolveRestaurantImage = (restaurant: any) =>
 
 const RestaurantDetailScreen = ({ route, navigation }: any) => {
   const { restaurant } = route.params;
+  const { isLandscape, numColumns, containerPadding, cardWidth } = useResponsive();
   const dispatch = useDispatch<AppDispatch>();
   const { items, currentRestaurantId, currentRestaurantName } = useSelector((state: RootState) => state.cart);
   const { isAuthenticated } = useSelector((state: RootState) => state.auth);
@@ -390,7 +392,23 @@ const RestaurantDetailScreen = ({ route, navigation }: any) => {
         {/* Menu */}
         <View style={styles.menuSection}>
           <Text style={styles.sectionTitle}>Thực đơn</Text>
-          {enrichedProducts.map(renderProductCard)}
+          <View style={[
+            isLandscape && numColumns > 1 && { 
+              flexDirection: 'row', 
+              flexWrap: 'wrap', 
+              justifyContent: 'space-between',
+              marginHorizontal: -6
+            }
+          ]}>
+            {enrichedProducts.map((product) => (
+              <View 
+                key={product.id || product._id} 
+                style={isLandscape && numColumns > 1 ? { width: '48%', marginHorizontal: '1%' } : undefined}
+              >
+                {renderProductCard(product)}
+              </View>
+            ))}
+          </View>
         </View>
         </ScrollView>
       )}

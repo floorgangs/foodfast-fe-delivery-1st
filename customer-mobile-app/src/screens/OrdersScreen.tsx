@@ -11,6 +11,7 @@ import {
   Modal,
   TextInput,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, AppDispatch } from '../store';
@@ -19,8 +20,10 @@ import { submitOrderReview, Order as OrderType, setOrders } from '../store/slice
 import { orderAPI, reviewAPI } from '../services/api';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import useResponsive from '../hooks/useResponsive';
 
 const OrdersScreen = ({ navigation }: any) => {
+  const { isLandscape, numColumns, containerPadding, cardWidth } = useResponsive();
   const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
   const orders = useSelector((state: RootState) => state.orders.orders);
   const dispatch = useDispatch<AppDispatch>();
@@ -40,9 +43,16 @@ const OrdersScreen = ({ navigation }: any) => {
     }
 
     const normalizeStatus = (status: string) => {
-      // Keep completed as-is now
-      if (status === 'preparing') return 'confirmed';
-      return status;
+      // Normalize status but preserve delivered/completed
+      if (!status) return 'pending';
+      const normalized = status.toLowerCase().trim();
+      
+      // Map completed to delivered for consistency
+      if (normalized === 'completed') return 'delivered';
+      if (normalized === 'delivered') return 'delivered';
+      if (normalized === 'preparing') return 'confirmed';
+      
+      return normalized;
     };
 
     const formatDeliveryAddress = (address: any) => {
@@ -107,23 +117,28 @@ const OrdersScreen = ({ navigation }: any) => {
           };
         });
         const customerReview = order.customerReview || order.review;
+        // Chỉ coi là đã review nếu có rating
+        const hasReviewed = order.isReviewed === true || (customerReview && customerReview.rating > 0);
         const pickupCoordinate = normalizeCoordinate(order.pickupCoordinate);
         const dropoffCoordinate =
           normalizeCoordinate(order.dropoffCoordinate) ??
           normalizeCoordinate(order.deliveryAddress?.coordinates);
 
+        const normalizedStatus = normalizeStatus(order.status);
+        console.log(`Order ${order._id}: Original status = ${order.status}, Normalized = ${normalizedStatus}, isReviewed = ${hasReviewed}, customerReview =`, customerReview);
+        
         return {
           id: order._id,
           restaurantName: order.restaurant?.name || 'Nhà hàng',
           items,
           total: order.total ?? order.totalAmount ?? 0,
-          status: normalizeStatus(order.status),
+          status: normalizedStatus,
           createdAt: order.createdAt,
           deliveryAddress: formatDeliveryAddress(order.deliveryAddress),
           pickupCoordinate,
           dropoffCoordinate,
           unlockPin: order.unlockPin,
-          isReviewed: Boolean(order.isReviewed || customerReview),
+          isReviewed: hasReviewed,
           rating: customerReview?.rating ?? null,
           reviewComment: customerReview?.comment ?? '',
         };
@@ -188,7 +203,7 @@ const OrdersScreen = ({ navigation }: any) => {
       case 'confirmed':
         return { label: '✅ Đã xác nhận', style: styles.statusPreparing };
       case 'cancelled':
-        return { label: '✕ Đã hủy', style: styles.statusConfirmed };
+        return { label: '✕ Đã hủy', style: styles.statusCancelled };
       case 'pending':
       default:
         return { label: '⏳ Chờ xác nhận', style: styles.statusConfirmed };
@@ -229,6 +244,12 @@ const OrdersScreen = ({ navigation }: any) => {
   );
 
   const openReviewModal = (order: OrderType) => {
+    console.log('Opening review modal for order:', {
+      id: order.id,
+      status: order.status,
+      isReviewed: order.isReviewed,
+      restaurantName: order.restaurantName
+    });
     setSelectedOrder(order);
     setReviewRating(order.rating ?? 0);
     setReviewComment(order.reviewComment ?? '');
@@ -247,6 +268,25 @@ const OrdersScreen = ({ navigation }: any) => {
     if (!selectedOrder) {
       return;
     }
+    
+    console.log('Attempting to submit review for order:', {
+      orderId: selectedOrder.id,
+      status: selectedOrder.status,
+      rating: reviewRating
+    });
+    
+    // Cho phép đánh giá tất cả đơn trong lịch sử
+    const historyStatuses = ['delivered', 'completed', 'cancelled'];
+    if (!historyStatuses.includes(selectedOrder.status)) {
+      console.error('Cannot review order with status:', selectedOrder.status);
+      Alert.alert(
+        'Không thể đánh giá',
+        `Chỉ có thể đánh giá đơn hàng trong lịch sử. Status hiện tại: ${selectedOrder.status}`
+      );
+      closeReviewModal();
+      return;
+    }
+    
     if (reviewRating === 0) {
       Alert.alert('Thông báo', 'Vui lòng chọn số sao đánh giá.');
       return;
@@ -333,39 +373,49 @@ const OrdersScreen = ({ navigation }: any) => {
     );
   };
 
-  const renderHistoryOrder = ({ item }: { item: OrderType }) => (
-    <View style={styles.orderCard}>
-      <View style={styles.orderHeader}>
-        <Text style={styles.restaurantName}>{item.restaurantName}</Text>
-        <View style={[styles.statusBadge, styles.statusDelivered]}>
-          <Text style={styles.statusText}>✓ Đã giao</Text>
+  const renderHistoryOrder = ({ item }: { item: OrderType }) => {
+    const statusInfo = getStatusInfo(item.status);
+    // Cho phép đánh giá tất cả đơn trong lịch sử (delivered, completed, cancelled)
+    const canReview = !item.isReviewed;
+    
+    console.log(`📋 History Order ${item.id}: status=${item.status}, isReviewed=${item.isReviewed}, canReview=${canReview}`);
+    
+    return (
+      <View style={styles.orderCard}>
+        <View style={styles.orderHeader}>
+          <Text style={styles.restaurantName}>{item.restaurantName}</Text>
+          <View style={[styles.statusBadge, statusInfo.style]}>
+            <Text style={styles.statusText}>{statusInfo.label}</Text>
+          </View>
+        </View>
+        {renderItemsPreview(item)}
+        <View style={styles.orderFooter}>
+          <Text style={styles.orderDate}>
+            {String(new Date(item.createdAt).toLocaleDateString('vi-VN'))}
+          </Text>
+          <Text style={styles.orderTotal}>{`${item.total.toLocaleString('vi-VN')}đ`}</Text>
+        </View>
+        <View style={styles.historyReviewRow}>
+          {item.isReviewed ? (
+            <View style={styles.historyRatingGroup}>
+              {renderStarRow(item.rating ?? 0)}
+              <Text style={styles.historyRatingText}>{`${(item.rating ?? 0).toFixed(1)}/5`}</Text>
+            </View>
+          ) : (
+            <Text style={styles.pendingReviewText}>Chưa có đánh giá</Text>
+          )}
+          <TouchableOpacity
+            style={styles.reviewButtonGhost}
+            onPress={() => openReviewModal(item)}
+          >
+            <Text style={styles.reviewButtonGhostText}>
+              {item.isReviewed ? 'Sửa đánh giá' : 'Đánh giá'}
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
-      {renderItemsPreview(item)}
-      <View style={styles.orderFooter}>
-        <Text style={styles.orderDate}>
-          {String(new Date(item.createdAt).toLocaleDateString('vi-VN'))}
-        </Text>
-        <Text style={styles.orderTotal}>{`${item.total.toLocaleString('vi-VN')}đ`}</Text>
-      </View>
-      <View style={styles.historyReviewRow}>
-        {item.isReviewed ? (
-          <View style={styles.historyRatingGroup}>
-            {renderStarRow(item.rating ?? 0)}
-            <Text style={styles.historyRatingText}>{`${(item.rating ?? 0).toFixed(1)}/5`}</Text>
-          </View>
-        ) : (
-          <Text style={styles.pendingReviewText}>Chưa có đánh giá</Text>
-        )}
-        <TouchableOpacity
-          style={styles.reviewButtonGhost}
-          onPress={() => openReviewModal(item)}
-        >
-          <Text style={styles.reviewButtonGhostText}>Đánh giá</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+    );
+  };
 
   const renderEmptyState = (
     icon: string,
@@ -407,10 +457,16 @@ const OrdersScreen = ({ navigation }: any) => {
         return (
           <FlatList
             data={activeOrders}
-            renderItem={renderActiveOrder}
+            renderItem={({ item }) => (
+              <View style={isLandscape && numColumns > 1 ? { width: cardWidth, marginRight: 12 } : undefined}>
+                {renderActiveOrder({ item })}
+              </View>
+            )}
             keyExtractor={item => item.id}
-            contentContainerStyle={styles.listContent}
+            contentContainerStyle={[styles.listContent, { padding: containerPadding }]}
             showsVerticalScrollIndicator={false}
+            numColumns={numColumns}
+            key={`active-${numColumns}`}
           />
         );
       case 'history':
@@ -424,13 +480,19 @@ const OrdersScreen = ({ navigation }: any) => {
         return (
           <FlatList
             data={historyOrders}
-            renderItem={renderHistoryOrder}
+            renderItem={({ item }) => (
+              <View style={isLandscape && numColumns > 1 ? { width: cardWidth, marginRight: 12 } : undefined}>
+                {renderHistoryOrder({ item })}
+              </View>
+            )}
             keyExtractor={item => `${item.id}-history`}
-            contentContainerStyle={styles.listContent}
+            contentContainerStyle={[styles.listContent, { padding: containerPadding }]}
             showsVerticalScrollIndicator={false}
+            numColumns={numColumns}
+            key={`history-${numColumns}`}
             ListHeaderComponent={
               pendingReviewCount > 0 ? (
-                <View style={styles.reviewReminder}>
+                <View style={[styles.reviewReminder, { marginHorizontal: numColumns > 1 ? 0 : 0 }]}>
                   <Ionicons name="star" size={14} color="#EA5034" style={styles.reviewReminderIcon} />
                   <Text style={styles.reviewReminderText}>
                     {`Bạn còn ${pendingReviewCount} đơn chờ đánh giá.`}
@@ -627,6 +689,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 4,
     elevation: 2,
+    minWidth: 0,
+    maxWidth: '100%',
   },
   orderHeader: {
     flexDirection: 'row',
@@ -639,12 +703,15 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
     flex: 1,
+    marginRight: 8,
+    flexWrap: 'wrap',
   },
   statusBadge: {
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
     backgroundColor: '#f0f0f0',
+    flexShrink: 0,
   },
   statusDelivered: {
     backgroundColor: '#E8F5E9',
@@ -660,6 +727,9 @@ const styles = StyleSheet.create({
   },
   statusPreparing: {
     backgroundColor: '#FFF3E0',
+  },
+  statusCancelled: {
+    backgroundColor: '#FFEBEE',
   },
   statusText: {
     fontSize: 12,
@@ -832,10 +902,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: 12,
+    flexWrap: 'wrap',
+    gap: 8,
   },
   historyRatingGroup: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 1,
   },
   historyRatingText: {
     fontSize: 13,
@@ -847,6 +920,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#888',
     fontStyle: 'italic',
+    flexShrink: 1,
   },
   reviewButtonGhost: {
     paddingVertical: 8,
@@ -854,6 +928,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#EA5034',
+    flexShrink: 0,
   },
   reviewButtonGhostText: {
     color: '#EA5034',
@@ -903,12 +978,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: 16,
   },
   modalContent: {
     backgroundColor: '#fff',
     borderRadius: 16,
     width: '100%',
+    maxWidth: 500,
     padding: 20,
   },
   modalTitle: {
@@ -934,6 +1010,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     marginTop: 12,
+    maxHeight: 150,
   },
   modalActions: {
     flexDirection: 'row',

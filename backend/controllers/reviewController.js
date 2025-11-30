@@ -301,8 +301,13 @@ export const createReview = async (req, res) => {
       throw createHttpError(403, "Bạn không thể đánh giá đơn hàng này");
     }
 
-    if (order.status !== "delivered") {
-      throw createHttpError(400, "Chỉ đánh giá được đơn hàng đã giao thành công");
+    console.log(`📝 Review attempt - Order ${orderId}: status = "${order.status}", customer = ${order.customer}`);
+
+    // Cho phép đánh giá đơn đã hoàn thành hoặc đã hủy (lịch sử)
+    const allowedStatuses = ["delivered", "completed", "cancelled"];
+    if (!allowedStatuses.includes(order.status)) {
+      console.log(`❌ Review rejected - Order status "${order.status}" is not in history`);
+      throw createHttpError(400, `Chỉ đánh giá được đơn hàng trong lịch sử. Status hiện tại: ${order.status}`);
     }
 
     let resolvedProductId = null;

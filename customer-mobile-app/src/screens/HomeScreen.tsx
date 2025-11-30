@@ -17,6 +17,7 @@ import {
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { restaurantAPI } from '../services/api';
+import useResponsive from '../hooks/useResponsive';
 
 const { width } = Dimensions.get('window');
 const BANNER_WIDTH = width - 32; // 16px padding on each side
@@ -144,6 +145,7 @@ const generateBannerFromRestaurant = (input: any) => {
 };
 
 const HomeScreen = ({ navigation }: any) => {
+  const { isLandscape, numColumns, containerPadding, width: screenWidth } = useResponsive();
   const [searchText, setSearchText] = useState('');
   const [activeSlide, setActiveSlide] = useState(0);
   const [selectedFilter, setSelectedFilter] = useState('suggest');
@@ -155,6 +157,11 @@ const HomeScreen = ({ navigation }: any) => {
   const scrollViewRef = useRef<ScrollView>(null);
   const user = useSelector((state: RootState) => state.auth.user);
   const [restaurantImageFallbacks, setRestaurantImageFallbacks] = useState<Record<string, number>>({});
+
+  // Calculate responsive card width
+  const restaurantCardWidth = isLandscape && numColumns > 1 
+    ? (screenWidth - containerPadding * 2 - 12 * (numColumns - 1)) / numColumns 
+    : screenWidth - 32;
 
   // Load restaurants from API
   useEffect(() => {
@@ -516,7 +523,10 @@ const HomeScreen = ({ navigation }: any) => {
         </View>
 
         {/* Restaurant List */}
-        <View style={{ backgroundColor: '#fff' }}>
+        <View style={[
+          { backgroundColor: '#fff', padding: containerPadding },
+          isLandscape && numColumns > 1 && { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }
+        ]}>
         {Array.isArray(filteredRestaurants) && filteredRestaurants.map((restaurant) => {
           if (!restaurant || typeof restaurant !== 'object') {
             return null;
@@ -556,7 +566,10 @@ const HomeScreen = ({ navigation }: any) => {
           return (
           <TouchableOpacity
             key={restaurantKey}
-            style={styles.restaurantCard}
+            style={[
+              styles.restaurantCard,
+              isLandscape && numColumns > 1 && { width: restaurantCardWidth, marginHorizontal: 0 }
+            ]}
             onPress={() => navigation.navigate('RestaurantDetail', { restaurant: normalizedRestaurant })}
           >
             <Image

@@ -15,8 +15,10 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
 import { removeFromCart, updateQuantity, clearCart } from '../store/slices/cartSlice';
 import type { AppDispatch } from '../store';
+import useResponsive from '../hooks/useResponsive';
 
 const CartScreen = ({ navigation }: any) => {
+  const { isLandscape, numColumns, containerPadding, cardWidth } = useResponsive();
   const { items, total, isSyncing } = useSelector((state: RootState) => state.cart);
   const dispatch = useDispatch<AppDispatch>();
 
@@ -129,9 +131,15 @@ const CartScreen = ({ navigation }: any) => {
         <>
           <FlatList
             data={items}
-            renderItem={renderCartItem}
+            renderItem={({ item }) => (
+              <View style={isLandscape && numColumns > 1 ? { width: cardWidth, marginRight: 12 } : undefined}>
+                {renderCartItem({ item })}
+              </View>
+            )}
             keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.cartList}
+            contentContainerStyle={[styles.cartList, { padding: containerPadding }]}
+            numColumns={numColumns}
+            key={`cart-${numColumns}`}
           />
 
           <View style={styles.footer}>

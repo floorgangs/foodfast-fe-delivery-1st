@@ -12,8 +12,10 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
 import { logout } from '../store/slices/authSlice';
 import { Ionicons } from '@expo/vector-icons';
+import useResponsive from '../hooks/useResponsive';
 
 const ProfileScreen = ({ navigation }: any) => {
+  const { isLandscape, containerPadding } = useResponsive();
   const { user, isAuthenticated } = useSelector((state: RootState) => state.auth);
   const { orders } = useSelector((state: RootState) => state.orders);
   const dispatch = useDispatch();
@@ -53,7 +55,10 @@ const ProfileScreen = ({ navigation }: any) => {
         <View style={{ width: 70 }} />
       </View>
 
-      <ScrollView>
+      <ScrollView contentContainerStyle={[
+        { paddingHorizontal: containerPadding },
+        isLandscape && { paddingHorizontal: containerPadding * 2 }
+      ]}>
         {/* User Info Card */}
         <View style={styles.userCard}>
           <View style={styles.avatar}>
