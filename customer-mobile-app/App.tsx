@@ -30,6 +30,7 @@ import PaymentMethodScreen from './src/screens/PaymentMethodScreen';
 import VouchersScreen from './src/screens/VouchersScreen';
 import ThirdPartyPaymentScreen from './src/screens/ThirdPartyPaymentScreen';
 import PayPalPaymentScreen from './src/screens/PayPalPaymentScreen';
+import APIConfigScreen from './src/screens/APIConfigScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -329,6 +330,7 @@ function AppNavigator() {
           <Stack.Screen name="Address" component={AddressScreen} />
           <Stack.Screen name="PaymentMethod" component={PaymentMethodScreen} />
           <Stack.Screen name="Vouchers" component={VouchersScreen} />
+          <Stack.Screen name="APIConfig" component={APIConfigScreen} options={{ headerShown: true, title: 'Cấu hình Server' }} />
         </Stack.Navigator>
         <CartFloatingButton />
       </View>

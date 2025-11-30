@@ -14,7 +14,8 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.foodfast.customer"
+      "bundleIdentifier": "com.foodfast.customer",
+      "requireFullScreen": true
     },
     "android": {
       "adaptiveIcon": {
@@ -24,7 +25,8 @@
       "permissions": [],
       "blockedPermissions": [
         "android.permission.DETECT_SCREEN_CAPTURE"
-      ]
+      ],
+      "screenOrientation": "portrait"
     },
     "web": {
       "bundler": "metro"

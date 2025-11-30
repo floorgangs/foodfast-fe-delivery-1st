@@ -1,5 +1,7 @@
 import Staff from "../models/Staff.js";
 import Restaurant from "../models/Restaurant.js";
+import User from "../models/User.js";
+import bcrypt from "bcryptjs";
 
 // Get all staff for a restaurant
 export const getRestaurantStaff = async (req, res) => {
@@ -24,9 +26,11 @@ export const getRestaurantStaff = async (req, res) => {
       }
     }
 
-    const staff = await Staff.find({ restaurant: restaurantId })
-      .populate("restaurant", "name")
-      .sort({ createdAt: -1 });
+    // Get staff from Users collection with role="staff"
+    const staff = await User.find({ 
+      restaurant: restaurantId,
+      role: "staff"
+    }).select('+password').sort({ createdAt: -1 });
 
     res.json({
       success: true,
@@ -45,7 +49,7 @@ export const getRestaurantStaff = async (req, res) => {
 // Get all staff (Admin only)
 export const getAllStaff = async (req, res) => {
   try {
-    const staff = await Staff.find()
+    const staff = await User.find({ role: "staff" })
       .populate("restaurant", "name")
       .sort({ createdAt: -1 });
 
@@ -67,21 +71,32 @@ export const getAllStaff = async (req, res) => {
 export const addStaff = async (req, res) => {
   try {
     const { restaurantId } = req.params;
-    const { name, phone, position } = req.body;
+    const { 
+      name, 
+      phone, 
+      email,
+      password,
+      position,
+      salary,
+      startDate,
+      idCard,
+      address,
+      birthDate,
+      emergencyContact,
+      workSchedule,
+    } = req.body;
 
     console.log('🔍 Adding staff:', { restaurantId, name, phone, position });
-    console.log('🔍 User:', req.user?._id, req.user?.role);
 
     // Check if admin or restaurant owner
     const isAdmin = req.user.role === "admin";
     
     if (!isAdmin) {
-      // For restaurant users, check if they own the restaurant OR have restaurant field
       const restaurant = await Restaurant.findOne({
         _id: restaurantId,
         $or: [
           { owner: req.user._id },
-          { _id: req.user.restaurant } // Also allow if user.restaurant matches
+          { _id: req.user.restaurant }
         ]
       });
 
@@ -92,46 +107,73 @@ export const addStaff = async (req, res) => {
           message: "Không tìm thấy nhà hàng hoặc không có quyền",
         });
       }
-    } else {
-      // Admin - just verify restaurant exists
-      const restaurant = await Restaurant.findById(restaurantId);
-      if (!restaurant) {
-        return res.status(404).json({
-          success: false,
-          message: "Không tìm thấy nhà hàng",
-        });
-      }
     }
 
-    // Check if phone already exists for this restaurant
-    const existingStaff = await Staff.findOne({
+    // Validate required fields
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Email và mật khẩu là bắt buộc",
+      });
+    }
+
+    // Check if email already exists
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: "Email này đã được đăng ký",
+      });
+    }
+
+    // Check if phone already exists for staff in this restaurant
+    const existingPhone = await User.findOne({
       restaurant: restaurantId,
+      role: "staff",
       phone: phone,
     });
 
-    if (existingStaff) {
+    if (existingPhone) {
       return res.status(400).json({
         success: false,
         message: "Số điện thoại này đã được sử dụng",
       });
     }
 
-    const staff = await Staff.create({
-      restaurant: restaurantId,
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Create user with role "staff"
+    const newStaff = await User.create({
       name,
+      email: email.toLowerCase(),
+      password: hashedPassword,
       phone,
+      role: "staff",
+      restaurant: restaurantId,
       position,
+      startDate: startDate || new Date(),
+      idCard,
+      address,
+      birthDate,
+      emergencyContact,
+      isActive: true,
     });
 
-    console.log('✅ Staff created:', staff._id);
+    console.log('✅ Staff created:', newStaff._id);
 
-    // Populate restaurant info before sending response
-    await staff.populate("restaurant", "name");
+    // Populate restaurant info
+    await newStaff.populate("restaurant", "name");
+
+    // Remove password from response
+    const staffResponse = newStaff.toObject();
+    delete staffResponse.password;
 
     res.status(201).json({
       success: true,
       message: "Thêm nhân viên thành công",
-      data: staff,
+      data: staffResponse,
     });
   } catch (error) {
     console.error("Add staff error:", error);
@@ -147,7 +189,22 @@ export const addStaff = async (req, res) => {
 export const updateStaff = async (req, res) => {
   try {
     const { staffId } = req.params;
-    const { name, phone, position, isActive } = req.body;
+    const { 
+      name, 
+      phone, 
+      email,
+      position, 
+      salary,
+      startDate,
+      idCard,
+      address,
+      birthDate,
+      emergencyContact,
+      workSchedule,
+      isActive,
+      createAccount,
+      password 
+    } = req.body;
 
     const staff = await Staff.findById(staffId).populate("restaurant");
 
@@ -187,14 +244,51 @@ export const updateStaff = async (req, res) => {
       }
     }
 
+    // Create user account if requested and doesn't exist
+    if (createAccount && email && password && !staff.hasAccount) {
+      const existingUser = await User.findOne({ email: email.toLowerCase() });
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          message: "Email này đã được đăng ký tài khoản",
+        });
+      }
+
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(password, salt);
+
+      const newUser = await User.create({
+        name: name || staff.name,
+        email: email.toLowerCase(),
+        password: hashedPassword,
+        phone: phone || staff.phone,
+        role: "staff",
+        restaurant: staff.restaurant._id,
+        isVerified: true,
+      });
+
+      staff.user = newUser._id;
+      staff.hasAccount = true;
+      console.log('✅ User account created for existing staff:', newUser._id);
+    }
+
     // Update fields
     if (name) staff.name = name;
     if (phone) staff.phone = phone;
+    if (email) staff.email = email;
     if (position) staff.position = position;
+    if (salary !== undefined) staff.salary = salary;
+    if (startDate) staff.startDate = startDate;
+    if (idCard) staff.idCard = idCard;
+    if (address) staff.address = address;
+    if (birthDate) staff.birthDate = birthDate;
+    if (emergencyContact) staff.emergencyContact = emergencyContact;
+    if (workSchedule) staff.workSchedule = workSchedule;
     if (typeof isActive !== "undefined") staff.isActive = isActive;
 
     await staff.save();
     await staff.populate("restaurant", "name");
+    await staff.populate("user", "name email");
 
     res.json({
       success: true,
@@ -216,7 +310,7 @@ export const deleteStaff = async (req, res) => {
   try {
     const { staffId } = req.params;
 
-    const staff = await Staff.findById(staffId).populate("restaurant");
+    const staff = await User.findOne({ _id: staffId, role: "staff" }).populate("restaurant");
 
     if (!staff) {
       return res.status(404).json({
@@ -238,7 +332,7 @@ export const deleteStaff = async (req, res) => {
       }
     }
 
-    await Staff.findByIdAndDelete(staffId);
+    await User.findByIdAndDelete(staffId);
 
     res.json({
       success: true,

@@ -81,8 +81,15 @@ function AccountSettings() {
   const [loadingStaff, setLoadingStaff] = useState(false)
   const [newStaff, setNewStaff] = useState({
     name: '',
+    phone: '',
+    email: '',
+    password: '',
     position: 'Phục vụ',
-    phone: ''
+    startDate: '',
+    idCard: '',
+    address: '',
+    birthDate: '',
+    emergencyContact: ''
   })
 
   // Load transactions
@@ -235,8 +242,8 @@ function AccountSettings() {
       return
     }
     
-    if (!newStaff.name || !newStaff.phone || !newStaff.position) {
-      alert('Vui lòng điền đầy đủ thông tin')
+    if (!newStaff.name || !newStaff.phone || !newStaff.email || !newStaff.password) {
+      alert('Vui lòng điền đầy đủ thông tin bắt buộc')
       return
     }
 
@@ -247,7 +254,14 @@ function AccountSettings() {
         {
           name: newStaff.name,
           phone: newStaff.phone,
-          position: newStaff.position
+          email: newStaff.email,
+          password: newStaff.password,
+          position: newStaff.position,
+          startDate: newStaff.startDate,
+          idCard: newStaff.idCard,
+          address: newStaff.address,
+          birthDate: newStaff.birthDate,
+          emergencyContact: newStaff.emergencyContact
         },
         {
           headers: { Authorization: `Bearer ${token}` }
@@ -256,7 +270,18 @@ function AccountSettings() {
 
       if (response.data.success) {
         alert('Thêm nhân viên thành công!')
-        setNewStaff({ name: '', position: 'Phục vụ', phone: '' })
+        setNewStaff({ 
+          name: '', 
+          phone: '',
+          email: '',
+          password: '',
+          position: 'Phục vụ',
+          startDate: '',
+          idCard: '',
+          address: '',
+          birthDate: '',
+          emergencyContact: ''
+        })
         setShowStaffModal(false)
         loadStaff() // Reload staff list
       }
@@ -774,39 +799,125 @@ function AccountSettings() {
               <button onClick={() => setShowStaffModal(false)} className="close-btn">×</button>
             </div>
             <form onSubmit={handleAddStaff}>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Họ và tên *</label>
+                  <input
+                    type="text"
+                    value={newStaff.name}
+                    onChange={(e) => setNewStaff({...newStaff, name: e.target.value})}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Số điện thoại *</label>
+                  <input
+                    type="tel"
+                    value={newStaff.phone}
+                    onChange={(e) => setNewStaff({...newStaff, phone: e.target.value})}
+                    placeholder="Nhập số điện thoại"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Vị trí *</label>
+                  <select
+                    value={newStaff.position}
+                    onChange={(e) => setNewStaff({...newStaff, position: e.target.value})}
+                  >
+                    <option value="Quản lý">Quản lý</option>
+                    <option value="Thu ngân">Thu ngân</option>
+                    <option value="Đầu bếp">Đầu bếp</option>
+                    <option value="Phụ bếp">Phụ bếp</option>
+                    <option value="Phục vụ">Phục vụ</option>
+                    <option value="Giao hàng">Giao hàng</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Ngày bắt đầu *</label>
+                  <input
+                    type="date"
+                    value={newStaff.startDate}
+                    onChange={(e) => setNewStaff({...newStaff, startDate: e.target.value})}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Số CCCD *</label>
+                  <input
+                    type="text"
+                    value={newStaff.idCard}
+                    onChange={(e) => setNewStaff({...newStaff, idCard: e.target.value})}
+                    placeholder="VD: 001234567890"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Ngày sinh *</label>
+                  <input
+                    type="date"
+                    value={newStaff.birthDate}
+                    onChange={(e) => setNewStaff({...newStaff, birthDate: e.target.value})}
+                    required
+                  />
+                </div>
+              </div>
+
               <div className="form-group">
-                <label>Tên nhân viên</label>
+                <label>Địa chỉ *</label>
                 <input
                   type="text"
-                  value={newStaff.name}
-                  onChange={(e) => setNewStaff({...newStaff, name: e.target.value})}
+                  value={newStaff.address}
+                  onChange={(e) => setNewStaff({...newStaff, address: e.target.value})}
+                  placeholder="VD: 123 Nguyễn Văn A, Quận 1, TP.HCM"
                   required
                 />
               </div>
+
               <div className="form-group">
-                <label>Số điện thoại (Đăng nhập SMS)</label>
+                <label>SĐT khẩn cấp *</label>
                 <input
                   type="tel"
-                  value={newStaff.phone}
-                  onChange={(e) => setNewStaff({...newStaff, phone: e.target.value})}
-                  placeholder="Nhập số điện thoại"
-                  maxLength="10"
+                  value={newStaff.emergencyContact}
+                  onChange={(e) => setNewStaff({...newStaff, emergencyContact: e.target.value})}
+                  placeholder="Số điện thoại người thân"
                   required
                 />
               </div>
-              <div className="form-group">
-                <label>Vị trí</label>
-                <select
-                  value={newStaff.position}
-                  onChange={(e) => setNewStaff({...newStaff, position: e.target.value})}
-                >
-                  <option value="Quản lý">Quản lý</option>
-                  <option value="Thu ngân">Thu ngân</option>
-                  <option value="Đầu bếp">Đầu bếp</option>
-                  <option value="Phục vụ">Phục vụ</option>
-                  <option value="Giao hàng">Giao hàng</option>
-                </select>
+
+              <div className="account-section">
+                <h3>🔐 Thông tin đăng nhập (Bắt buộc)</h3>
+                <p className="section-desc">Email và mật khẩu để nhân viên đăng nhập vào hệ thống</p>
+                
+                <div className="form-group">
+                  <label>Email đăng nhập *</label>
+                  <input
+                    type="email"
+                    value={newStaff.email}
+                    onChange={(e) => setNewStaff({...newStaff, email: e.target.value})}
+                    placeholder="email@example.com"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Mật khẩu *</label>
+                  <input
+                    type="password"
+                    value={newStaff.password}
+                    onChange={(e) => setNewStaff({...newStaff, password: e.target.value})}
+                    placeholder="Nhập mật khẩu (tối thiểu 6 ký tự)"
+                    minLength="6"
+                    required
+                  />
+                </div>
               </div>
+
               <div className="modal-actions">
                 <button type="button" onClick={() => setShowStaffModal(false)} className="cancel-btn">
                   Hủy

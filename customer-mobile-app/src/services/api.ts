@@ -2,31 +2,78 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-// IMPORTANT: Thay YOUR_IP bằng IP máy tính chạy backend
-// Windows: Chạy ipconfig trong CMD để xem IPv4 Address
-// Mac/Linux: Chạy ifconfig để xem IP
-// Choose a sensible default for development depending on platform:
-// - Android emulator: use your machine LAN IP (NOT 10.0.2.2 if having issues)
-// - iOS simulator / physical device: use your machine LAN IP
-const DEFAULT_LAN_IP = '192.168.1.85'; // <-- Backend is accessible on this IP
-const DEV_HOST = DEFAULT_LAN_IP; // Use LAN IP for both Android and iOS
-const API_URL = __DEV__
-  ? `http://${DEV_HOST}:5000/api`
-  : 'https://your-production-api.com/api';
+const API_URL_KEY = '@custom_api_url';
 
-// Helpful debug log so you can see which backend URL the app is using
-if (__DEV__) {
-  // eslint-disable-next-line no-console
-  console.log(`[api] Using API_URL=${API_URL} (Platform=${Platform.OS})`);
-}
+// IMPORTANT: Có 3 cách kết nối backend
+// 1. CUSTOM URL (trong app) - Ưu tiên cao nhất
+// 2. NGROK (Khuyên dùng) - Hoạt động mọi máy, mọi mạng
+// 3. LAN IP - Chỉ hoạt động cùng mạng WiFi
+
+// ===== CÁCH 1: CUSTOM URL (Đặt trong app, xem ProfileScreen) =====
+// Người dùng có thể nhập URL trong app mà không cần edit code!
+
+// ===== CÁCH 2: NGROK (Khuyên dùng) =====
+// Bước 1: Cài ngrok: https://ngrok.com/download
+// Bước 2: Chạy backend: cd backend && npm run dev
+// Bước 3: Chạy ngrok: ngrok http 5000
+// Bước 4: Copy URL từ ngrok (VD: https://abc123.ngrok.io)
+// Bước 5: Paste vào NGROK_URL bên dưới HOẶC trong app
+const NGROK_URL = ''; // VD: 'https://abc123.ngrok.io'
+
+// ===== CÁCH 3: LAN IP =====
+const DEFAULT_LAN_IP = '192.168.1.163'; // IP máy tính chạy backend
+
+// ===== BUILD URL =====
+const buildAPIURL = () => {
+  if (NGROK_URL) {
+    return `${NGROK_URL}/api`;
+  }
+  return __DEV__
+    ? `http://${DEFAULT_LAN_IP}:5000/api`
+    : 'https://your-production-api.com/api';
+};
+
+let BASE_API_URL = buildAPIURL();
 
 const api = axios.create({
-  baseURL: API_URL,
+  baseURL: BASE_API_URL,
   timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
+// Update base URL dynamically from AsyncStorage
+(async () => {
+  try {
+    const customURL = await AsyncStorage.getItem(API_URL_KEY);
+    if (customURL) {
+      BASE_API_URL = `${customURL}/api`;
+      api.defaults.baseURL = BASE_API_URL;
+      
+      if (__DEV__) {
+        console.log(`\n=================================`);
+        console.log(`🎯 Dùng CUSTOM URL: ${BASE_API_URL}`);
+        console.log(`✏️  Đổi URL trong: Profile > Cấu hình Server`);
+        console.log(`=================================\n`);
+      }
+    } else if (__DEV__) {
+      console.log(`\n=================================`);
+      if (NGROK_URL) {
+        console.log(`🌐 Dùng NGROK: ${BASE_API_URL}`);
+        console.log(`✅ Hoạt động trên mọi máy, mọi mạng!`);
+      } else {
+        console.log(`🌐 API URL: ${BASE_API_URL}`);
+        console.log(`📱 Platform: ${Platform.OS}`);
+        console.log(`⚠️  Dùng LAN IP - phải cùng WiFi`);
+        console.log(`💡 Tip: Dùng ngrok hoặc đổi URL trong app!`);
+      }
+      console.log(`=================================\n`);
+    }
+  } catch (error) {
+    console.error('Error loading custom URL:', error);
+  }
+})();
 
 // Request interceptor - thêm token vào header
 api.interceptors.request.use(
@@ -50,6 +97,28 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response?.data || response,
   async (error) => {
+    // Log chi tiết để debug
+    if (__DEV__) {
+      console.error('❌ API Error:', {
+        url: error?.config?.url,
+        method: error?.config?.method,
+        status: error?.response?.status,
+        message: error?.message,
+        data: error?.response?.data,
+      });
+    }
+
+    // Network error - không kết nối được backend
+    if (error?.message === 'Network Error' || error?.code === 'ECONNABORTED') {
+      const networkError = new Error(
+        `Không kết nối được server. Vui lòng kiểm tra:\n` +
+        `1. Backend đã chạy chưa? (npm run dev trong thư mục backend)\n` +
+        `2. IP trong api.ts có đúng không? (hiện tại: ${DEV_HOST})\n` +
+        `3. Máy tính và điện thoại cùng mạng WiFi?`
+      );
+      return Promise.reject(networkError);
+    }
+
     if (error?.response?.status === 401) {
       // Token hết hạn, xóa và yêu cầu đăng nhập lại
       try {

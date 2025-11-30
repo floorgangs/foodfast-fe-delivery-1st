@@ -602,3 +602,96 @@
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* Account Section Styles */
+.account-section {
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border-radius: 12px;
+  border: 1px solid #bae6fd;
+}
+
+.account-section h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.1rem;
+  color: #0369a1;
+  font-weight: 600;
+}
+
+.account-section .section-desc {
+  margin: 0 0 1rem 0;
+  font-size: 0.9rem;
+  color: #0c4a6e;
+}
+
+.checkbox-group {
+  margin-bottom: 1rem;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  font-weight: 500;
+  color: #1a1a1a;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: #0284c7;
+}
+
+.checkbox-label span {
+  font-size: 0.95rem;
+}
+
+.account-section .form-group {
+  margin-bottom: 1rem;
+}
+
+.account-section .form-group:last-child {
+  margin-bottom: 0;
+}
+
+.account-section label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #1a1a1a;
+  font-size: 0.9rem;
+}
+
+.account-section input[type="email"],
+.account-section input[type="password"] {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  background: white;
+  transition: all 0.2s;
+}
+
+.account-section input[type="email"]:focus,
+.account-section input[type="password"]:focus {
+  outline: none;
+  border-color: #0284c7;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.1);
+}
+
+/* Has Account Badge */
+.has-account-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  background: #dcfce7;
+  color: #15803d;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}

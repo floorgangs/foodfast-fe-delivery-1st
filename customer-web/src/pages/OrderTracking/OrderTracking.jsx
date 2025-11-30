@@ -207,167 +207,163 @@ function OrderTracking() {
     return calculateBearing(droneCoordinate, nextPoint);
   }, [routeCoordinates, flightProgress, droneCoordinate]);
 
-  // Initialize and update Google Maps
+  // Initialize Google Maps (only once)
   useEffect(() => {
-    // Wait for map to be ready and data loaded
     if (!mapReady || loading || !trackingData) {
-      console.log('[Map] Waiting for prerequisites:', { mapReady, loading, hasTracking: !!trackingData });
       return;
     }
-    
-    console.log('[Map] Checking prerequisites:', {
-      hasGoogle: !!window.google,
-      hasTracking: !!trackingData,
-      pickup: pickupCoordinate,
-      dropoff: dropoffCoordinate,
-      drone: droneCoordinate
-    });
 
     if (!window.google) {
       console.warn('[Map] Google Maps API not loaded');
       return;
     }
 
-    // Small delay to ensure DOM is rendered
     const timer = setTimeout(() => {
       const mapContainer = document.getElementById('tracking-map');
-      if (!mapContainer) {
-        console.warn('[Map] Map container not found');
-        return;
-      }
+      if (!mapContainer || mapInstanceRef.current) return;
 
-      // Create map if not exists
-      if (!mapInstanceRef.current) {
-        console.log('[Map] Creating new map instance');
-        mapInstanceRef.current = new window.google.maps.Map(mapContainer, {
-          center: pickupCoordinate,
-          zoom: 14,
-          disableDefaultUI: false,
-          zoomControl: true,
-          mapTypeControl: false,
-          streetViewControl: false,
-          fullscreenControl: false,
-          styles: [
-            { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
-            { featureType: 'transit', elementType: 'labels', stylers: [{ visibility: 'off' }] },
-            { featureType: 'poi.business', stylers: [{ visibility: 'off' }] },
-          ]
-        });
-      }
-
-      const map = mapInstanceRef.current;
-      console.log('[Map] Updating markers and polylines');
-
-      // Clear old markers
-      Object.values(markersRef.current).forEach(marker => {
-        if (marker) marker.setMap(null);
+      console.log('[Map] Creating new map instance');
+      mapInstanceRef.current = new window.google.maps.Map(mapContainer, {
+        center: pickupCoordinate,
+        zoom: 14,
+        disableDefaultUI: false,
+        zoomControl: true,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false,
+        styles: [
+          { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+          { featureType: 'transit', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+          { featureType: 'poi.business', stylers: [{ visibility: 'off' }] },
+        ]
       });
 
-      // Create pickup marker (restaurant)
-      markersRef.current.pickup = new window.google.maps.Marker({
-        position: pickupCoordinate,
-        map: map,
-        title: trackingData?.tracking?.pickupLocation?.name || 'Nhà hàng',
-        icon: {
-          url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(`
-            <svg width="56" height="56" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="28" cy="28" r="24" fill="#FFEAE6" opacity="0.8"/>
-              <circle cx="28" cy="28" r="18" fill="#f97316" stroke="white" stroke-width="3"/>
-              <text x="28" y="34" font-size="16" text-anchor="middle" fill="white">🏪</text>
-            </svg>
-          `),
-          scaledSize: new window.google.maps.Size(56, 56),
-          anchor: new window.google.maps.Point(28, 28)
-        },
-        zIndex: 100
-      });
-
-      // Create delivery marker (home)
-      markersRef.current.delivery = new window.google.maps.Marker({
-        position: dropoffCoordinate,
-        map: map,
-        title: 'Điểm giao hàng',
-        icon: {
-          url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(`
-            <svg width="56" height="56" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="28" cy="28" r="24" fill="#E8F8EF" opacity="0.8"/>
-              <circle cx="28" cy="28" r="18" fill="#27AE60" stroke="white" stroke-width="3"/>
-              <text x="28" y="34" font-size="16" text-anchor="middle" fill="white">🏠</text>
-            </svg>
-          `),
-          scaledSize: new window.google.maps.Size(56, 56),
-          anchor: new window.google.maps.Point(28, 28)
-        },
-        zIndex: 100
-      });
-
-      // Create route polyline (background - darker)
-      markersRef.current.polyline = new window.google.maps.Polyline({
-        path: routeCoordinates,
-        geodesic: true,
-        strokeColor: '#1B2945',
-        strokeOpacity: 0.4,
-        strokeWeight: 4,
-        map: map
-      });
-
-      // Create progress polyline (orange - completed path)
-      const progressIndex = Math.max(1, Math.floor(flightProgress * routeCoordinates.length));
-      const progressPath = routeCoordinates.slice(0, progressIndex);
-      
-      if (progressPath.length > 1) {
-        markersRef.current.progressPolyline = new window.google.maps.Polyline({
-          path: progressPath,
-          geodesic: true,
-          strokeColor: '#f97316',
-          strokeOpacity: 1,
-          strokeWeight: 6,
-          map: map
-        });
-      }
-
-      // Create drone marker
-      markersRef.current.drone = new window.google.maps.Marker({
-        position: droneCoordinate,
-        map: map,
-        title: `Drone ${trackingData?.tracking?.drone?.droneId || ''}`,
-        icon: {
-          url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(`
-            <svg width="70" height="70" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="35" cy="35" r="32" fill="#FFF5F1" opacity="0.9"/>
-              <circle cx="35" cy="35" r="22" fill="#f97316" stroke="white" stroke-width="3"/>
-              <text x="35" y="42" font-size="20" text-anchor="middle" fill="white">🚁</text>
-            </svg>
-          `),
-          scaledSize: new window.google.maps.Size(70, 70),
-          anchor: new window.google.maps.Point(35, 35)
-        },
-        zIndex: 200
-      });
-
-      // Fit bounds to show all markers
+      // Fit bounds once
       const bounds = new window.google.maps.LatLngBounds();
       bounds.extend(pickupCoordinate);
       bounds.extend(dropoffCoordinate);
-      bounds.extend(droneCoordinate);
-      map.fitBounds(bounds);
-
-      // Adjust zoom
-      window.google.maps.event.addListenerOnce(map, 'bounds_changed', () => {
-        if (map.getZoom() > 15) map.setZoom(15);
+      mapInstanceRef.current.fitBounds(bounds);
+      
+      window.google.maps.event.addListenerOnce(mapInstanceRef.current, 'bounds_changed', () => {
+        if (mapInstanceRef.current.getZoom() > 15) mapInstanceRef.current.setZoom(15);
       });
     }, 100);
 
     return () => clearTimeout(timer);
-  }, [mapReady, loading, trackingData, pickupCoordinate, dropoffCoordinate, routeCoordinates, droneCoordinate, flightProgress]);
+  }, [mapReady, loading, trackingData, pickupCoordinate, dropoffCoordinate]);
 
-  // Demo animation - When drone arrives, update status to 'delivered'
-  const startDemo = () => {
-    // Only allow demo when status is 'delivering'
-    if (normalizedStatus !== 'delivering') {
-      alert('Demo chỉ khả dụng khi đơn hàng đang được giao');
-      return;
+  // Update markers and polylines when progress changes
+  useEffect(() => {
+    if (!mapInstanceRef.current || !window.google) return;
+
+    const map = mapInstanceRef.current;
+
+    // Clear old markers
+    if (markersRef.current.pickup) markersRef.current.pickup.setMap(null);
+    if (markersRef.current.delivery) markersRef.current.delivery.setMap(null);
+    if (markersRef.current.drone) markersRef.current.drone.setMap(null);
+    if (markersRef.current.polyline) markersRef.current.polyline.setMap(null);
+    if (markersRef.current.progressPolyline) markersRef.current.progressPolyline.setMap(null);
+
+    // Create pickup marker (restaurant)
+    markersRef.current.pickup = new window.google.maps.Marker({
+      position: pickupCoordinate,
+      map: map,
+      title: trackingData?.tracking?.pickupLocation?.name || 'Nhà hàng',
+      icon: {
+        url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(`
+          <svg width="56" height="56" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="28" cy="28" r="24" fill="#FFEAE6" opacity="0.8"/>
+            <circle cx="28" cy="28" r="18" fill="#f97316" stroke="white" stroke-width="3"/>
+            <text x="28" y="34" font-size="16" text-anchor="middle" fill="white">🏪</text>
+          </svg>
+        `),
+        scaledSize: new window.google.maps.Size(56, 56),
+        anchor: new window.google.maps.Point(28, 28)
+      },
+      zIndex: 100
+    });
+
+    // Create delivery marker (home)
+    markersRef.current.delivery = new window.google.maps.Marker({
+      position: dropoffCoordinate,
+      map: map,
+      title: 'Điểm giao hàng',
+      icon: {
+        url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(`
+          <svg width="56" height="56" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="28" cy="28" r="24" fill="#E8F8EF" opacity="0.8"/>
+            <circle cx="28" cy="28" r="18" fill="#27AE60" stroke="white" stroke-width="3"/>
+            <text x="28" y="34" font-size="16" text-anchor="middle" fill="white">🏠</text>
+          </svg>
+        `),
+        scaledSize: new window.google.maps.Size(56, 56),
+        anchor: new window.google.maps.Point(28, 28)
+      },
+      zIndex: 100
+    });
+
+    // Create full route polyline (dashed - remaining path)
+    markersRef.current.polyline = new window.google.maps.Polyline({
+      path: routeCoordinates,
+      geodesic: true,
+      strokeColor: '#94a3b8',
+      strokeOpacity: 0,
+      strokeWeight: 4,
+      icons: [{
+        icon: {
+          path: 'M 0,-1 0,1',
+          strokeOpacity: 0.6,
+          scale: 3
+        },
+        offset: '0',
+        repeat: '12px'
+      }],
+      map: map
+    });
+
+    // Create progress polyline (solid orange - completed path)
+    const progressIndex = Math.max(1, Math.ceil(flightProgress * routeCoordinates.length));
+    const progressPath = routeCoordinates.slice(0, progressIndex);
+    
+    if (progressPath.length > 1) {
+      markersRef.current.progressPolyline = new window.google.maps.Polyline({
+        path: progressPath,
+        geodesic: true,
+        strokeColor: '#f97316',
+        strokeOpacity: 1,
+        strokeWeight: 5,
+        map: map
+      });
     }
+
+    // Get current drone position
+    const currentDronePos = getCoordinateAtProgress(routeCoordinates, flightProgress);
+
+    // Create drone marker
+    markersRef.current.drone = new window.google.maps.Marker({
+      position: currentDronePos,
+      map: map,
+      title: `Drone ${trackingData?.tracking?.drone?.droneId || ''}`,
+      icon: {
+        url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(`
+          <svg width="70" height="70" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="35" cy="35" r="32" fill="#FFF5F1" opacity="0.9"/>
+            <circle cx="35" cy="35" r="22" fill="#f97316" stroke="white" stroke-width="3"/>
+            <text x="35" y="42" font-size="20" text-anchor="middle" fill="white">🚁</text>
+          </svg>
+        `),
+        scaledSize: new window.google.maps.Size(70, 70),
+        anchor: new window.google.maps.Point(35, 35)
+      },
+      zIndex: 200
+    });
+
+  }, [pickupCoordinate, dropoffCoordinate, routeCoordinates, flightProgress, trackingData]);
+
+  // Demo animation - Simulate drone flying
+  const startDemo = useCallback(() => {
+    if (isDemo) return;
     
     setIsDemo(true);
     setDemoProgress(0);
@@ -388,34 +384,32 @@ function OrderTracking() {
       if (progress < 1) {
         animationRef.current = requestAnimationFrame(animate);
       } else {
+        // Demo completed - drone arrived, update to delivered status
         setIsDemo(false);
-        // Drone has arrived - confirm delivery
         try {
+          console.log('🚁 Drone arrived, updating to delivered status');
           await orderAPI.confirmDelivery(orderId);
-          // Refresh tracking data
           await fetchTracking();
-          alert('🎉 Drone đã giao hàng thành công!');
+          console.log('✅ Order status updated to delivered');
         } catch (err) {
           console.error('Failed to confirm delivery:', err);
-          alert('Không thể cập nhật trạng thái. Vui lòng thử lại.');
         }
       }
     };
 
     animationRef.current = requestAnimationFrame(animate);
-  };
+  }, [isDemo, orderId, fetchTracking]);
 
   // Auto-start demo drone when status changes to 'delivering'
   useEffect(() => {
-    if (normalizedStatus === 'delivering' && !isDemo && demoProgress === 0) {
+    if (normalizedStatus === 'delivering' && !isDemo && demoProgress === 0 && mapInstanceRef.current) {
       console.log('🚁 Auto-starting drone delivery animation');
-      // Delay to ensure map is ready
       const timer = setTimeout(() => {
         startDemo();
-      }, 2000);
+      }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [normalizedStatus, isDemo, demoProgress]);
+  }, [normalizedStatus, isDemo, demoProgress, startDemo]);
 
   // Cleanup
   useEffect(() => {
@@ -436,10 +430,8 @@ function OrderTracking() {
       await orderAPI.complete(orderId);
       setAcknowledged(true);
       alert('🎉 Cảm ơn bạn! Đơn hàng đã hoàn thành.');
-      // Redirect to profile/history after 1 second
-      setTimeout(() => {
-        navigate('/profile?tab=history');
-      }, 1000);
+      // Refresh data to show updated status
+      await fetchTracking();
     } catch (err) {
       console.error('Failed to complete order:', err);
       alert('Không thể xác nhận. Vui lòng thử lại.');
@@ -564,10 +556,31 @@ function OrderTracking() {
           </div>
         </div>
 
-        {/* Demo Button */}
-        <button className="demo-btn" onClick={startDemo} disabled={isDemo}>
-          {isDemo ? `Demo: ${Math.round(demoProgress * 100)}%` : '🎬 Demo drone bay'}
-        </button>
+        {/* Flight Progress Bar - Show when delivering */}
+        {(normalizedStatus === 'delivering' || isDemo) && (
+          <div className="flight-progress-container">
+            <div className="flight-progress-info">
+              <span className="flight-icon">🚁</span>
+              <span className="flight-text">
+                {flightProgress >= 1 ? 'Đã đến điểm giao!' : 'Drone đang bay...'}
+              </span>
+              <span className="flight-percent">{Math.round(flightProgress * 100)}%</span>
+            </div>
+            <div className="flight-progress-bar">
+              <div 
+                className="flight-progress-fill" 
+                style={{ width: `${flightProgress * 100}%` }}
+              ></div>
+            </div>
+          </div>
+        )}
+
+        {/* Demo Button - Only show when NOT delivering */}
+        {normalizedStatus !== 'delivering' && (
+          <button className="demo-btn" onClick={startDemo} disabled={isDemo}>
+            {isDemo ? `Demo: ${Math.round(demoProgress * 100)}%` : '🎬 Demo drone bay'}
+          </button>
+        )}
       </div>
 
       {/* Main Content */}

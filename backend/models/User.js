@@ -28,7 +28,7 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["customer", "admin", "restaurant"],
+      enum: ["customer", "admin", "restaurant", "staff"],
       default: "customer",
     },
     // Restaurant user sẽ có reference đến restaurant info
@@ -39,6 +39,34 @@ const userSchema = new mongoose.Schema(
     avatar: {
       type: String,
       default: "https://ui-avatars.com/api/?background=random",
+    },
+    // Staff-specific fields
+    position: {
+      type: String,
+      enum: ["Quản lý", "Thu ngân", "Đầu bếp", "Phụ bếp", "Phục vụ", "Giao hàng"],
+    },
+    salary: {
+      type: Number,
+      default: 0,
+    },
+    startDate: {
+      type: Date,
+    },
+    idCard: {
+      type: String,
+    },
+    birthDate: {
+      type: Date,
+    },
+    emergencyContact: {
+      type: String,
+    },
+    workSchedule: {
+      type: String,
+      enum: ["Ca sáng", "Ca chiều", "Full time"],
+    },
+    address: {
+      type: String,
     },
     addresses: [
       {
