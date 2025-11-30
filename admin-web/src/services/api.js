@@ -157,6 +157,14 @@ export const restaurantAPI = {
   // Lấy thông tin compliance của nhà hàng
   getRestaurantCompliance: async (restaurantId) => {
     return apiCall(`/restaurants/admin/${restaurantId}/compliance`);
+  },
+
+  // Tạo nhà hàng mới kèm tài khoản owner (admin only)
+  createRestaurantWithOwner: async (data) => {
+    return apiCall('/restaurants/admin/create-with-owner', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
   }
 };
 
