@@ -113,8 +113,9 @@ api.interceptors.response.use(
       const networkError = new Error(
         `Không kết nối được server. Vui lòng kiểm tra:\n` +
         `1. Backend đã chạy chưa? (npm run dev trong thư mục backend)\n` +
-        `2. IP trong api.ts có đúng không? (hiện tại: ${DEV_HOST})\n` +
-        `3. Máy tính và điện thoại cùng mạng WiFi?`
+        `2. URL đúng chưa? (hiện tại: ${api.defaults.baseURL})\n` +
+        `3. Nếu dùng LAN IP, máy tính và điện thoại cùng mạng WiFi?\n` +
+        `💡 Đổi URL trong: Profile > Cấu hình Server`
       );
       return Promise.reject(networkError);
     }
