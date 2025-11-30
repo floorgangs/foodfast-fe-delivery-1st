@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import Cart from "../models/Cart.js";
+import CartItem from "../models/CartItem.js";
 
 const toStringOrNull = (value) => {
   if (typeof value === "string" && value.trim().length > 0) {
@@ -83,8 +84,39 @@ const buildResponsePayload = (cartDoc) => {
 
 export const getCart = async (req, res, next) => {
   try {
-    const cart = await Cart.findOne({ userId: req.user._id });
-    return res.json({ success: true, data: buildResponsePayload(cart) });
+    let cart = await Cart.findOne({ userId: req.user._id });
+    
+    if (!cart) {
+      return res.json({ 
+        success: true, 
+        data: { items: [], total: 0, currentRestaurantId: null, currentRestaurantName: null } 
+      });
+    }
+
+    // Lấy items từ CartItem collection
+    const cartItems = await CartItem.find({ cartId: cart._id }).populate('itemId', 'name price image');
+    
+    const items = cartItems.map(item => ({
+      id: item._id.toString(),
+      productId: item.itemId?._id?.toString() || '',
+      name: item.itemId?.name || '',
+      price: item.itemId?.price || 0,
+      quantity: item.quantity,
+      restaurantId: cart.currentRestaurantId || '',
+      restaurantName: cart.currentRestaurantName || '',
+      image: item.itemId?.image,
+      note: item.note,
+    }));
+
+    return res.json({ 
+      success: true, 
+      data: {
+        items,
+        total: cart.total,
+        currentRestaurantId: cart.currentRestaurantId,
+        currentRestaurantName: cart.currentRestaurantName,
+      }
+    });
   } catch (error) {
     return next(error);
   }
@@ -104,26 +136,74 @@ export const upsertCart = async (req, res, next) => {
     const currentRestaurantName =
       normalizedItems[0]?.restaurantName ?? toStringOrNull(req.body?.currentRestaurantName);
 
-    const payload = {
-      userId: req.user._id,
-      items: normalizedItems,
-      total,
-      currentRestaurantId,
-      currentRestaurantName,
-      metadata: {
+    // Tìm hoặc tạo Cart
+    let cart = await Cart.findOne({ userId: req.user._id });
+    
+    if (!cart) {
+      cart = await Cart.create({
+        userId: req.user._id,
+        items: [], // Không lưu items ở đây nữa
+        total,
+        currentRestaurantId,
+        currentRestaurantName,
+        metadata: {
+          lastClientUpdate: new Date(),
+          clientDevice: toStringOrNull(req.headers["user-agent"]),
+        },
+      });
+    } else {
+      cart.total = total;
+      cart.currentRestaurantId = currentRestaurantId;
+      cart.currentRestaurantName = currentRestaurantName;
+      cart.metadata = {
         lastClientUpdate: new Date(),
         clientDevice: toStringOrNull(req.headers["user-agent"]),
-      },
-    };
+      };
+      await cart.save();
+    }
 
-    const cart = await Cart.findOneAndUpdate(
-      { userId: req.user._id },
-      payload,
-      { new: true, upsert: true, setDefaultsOnInsert: true }
-    );
+    // Xóa CartItems cũ
+    await CartItem.deleteMany({ cartId: cart._id });
 
-    return res.json({ success: true, data: buildResponsePayload(cart) });
+    // Tạo CartItems mới trong collection cartitems
+    const cartItemsToCreate = normalizedItems.map(item => ({
+      cartId: cart._id,
+      itemId: item.productId,
+      quantity: item.quantity,
+      note: item.note || '',
+    }));
+
+    if (cartItemsToCreate.length > 0) {
+      await CartItem.insertMany(cartItemsToCreate);
+      console.log(`✅ Created ${cartItemsToCreate.length} cart items in cartitems collection`);
+    }
+
+    // Lấy lại items để trả về
+    const cartItems = await CartItem.find({ cartId: cart._id }).populate('itemId', 'name price image');
+    
+    const items = cartItems.map(item => ({
+      id: item._id.toString(),
+      productId: item.itemId?._id?.toString() || '',
+      name: item.itemId?.name || '',
+      price: item.itemId?.price || 0,
+      quantity: item.quantity,
+      restaurantId: currentRestaurantId || '',
+      restaurantName: currentRestaurantName || '',
+      image: item.itemId?.image,
+      note: item.note,
+    }));
+
+    return res.json({ 
+      success: true, 
+      data: {
+        items,
+        total: cart.total,
+        currentRestaurantId: cart.currentRestaurantId,
+        currentRestaurantName: cart.currentRestaurantName,
+      }
+    });
   } catch (error) {
+    console.error('Upsert cart error:', error);
     return next(error);
   }
 };
@@ -133,8 +213,15 @@ export const clearCart = async (req, res, next) => {
     const cart = await Cart.findOne({ userId: req.user._id });
 
     if (!cart) {
-      return res.json({ success: true, data: buildResponsePayload(null) });
+      return res.json({ 
+        success: true, 
+        data: { items: [], total: 0, currentRestaurantId: null, currentRestaurantName: null } 
+      });
     }
+
+    // Xóa tất cả CartItems
+    await CartItem.deleteMany({ cartId: cart._id });
+    console.log('✅ Cleared all cart items from cartitems collection');
 
     cart.items = [];
     cart.total = 0;
@@ -146,7 +233,10 @@ export const clearCart = async (req, res, next) => {
     };
     await cart.save();
 
-    return res.json({ success: true, data: buildResponsePayload(cart) });
+    return res.json({ 
+      success: true, 
+      data: { items: [], total: 0, currentRestaurantId: null, currentRestaurantName: null } 
+    });
   } catch (error) {
     return next(error);
   }

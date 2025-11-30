@@ -282,7 +282,7 @@ export const getDeliveryTracking = async (req, res) => {
 export const updateDroneLocation = async (req, res) => {
   try {
     const { droneId } = req.params;
-    const { latitude, longitude } = req.body;
+    const { latitude, longitude, altitude } = req.body;
 
     if (!latitude || !longitude) {
       return res.status(400).json({
@@ -310,11 +310,24 @@ export const updateDroneLocation = async (req, res) => {
       });
     }
 
+    // Save location history to Locations collection
+    const Location = (await import("../models/Location.js")).default;
+    await Location.create({
+      locationId: `${droneId}-${Date.now()}`,
+      droneId: droneId,
+      longitude,
+      latitude,
+      altitude: altitude || 0,
+      recordedAt: new Date(),
+    });
+
+    console.log('✅ Location saved for drone:', droneId);
+
     // Emit socket event for real-time tracking
     if (req.app.get("io")) {
       req.app.get("io").emit("drone_location_update", {
         droneId: drone._id,
-        location: { latitude, longitude },
+        location: { latitude, longitude, altitude },
         deliveryId: drone.currentDelivery,
       });
     }
@@ -325,6 +338,41 @@ export const updateDroneLocation = async (req, res) => {
     });
   } catch (error) {
     console.error("Update drone location error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Get drone location history
+export const getDroneLocationHistory = async (req, res) => {
+  try {
+    const { droneId } = req.params;
+    const { limit = 100, startDate, endDate } = req.query;
+
+    const Location = (await import("../models/Location.js")).default;
+    
+    const query = { droneId };
+    
+    // Filter by date range if provided
+    if (startDate || endDate) {
+      query.recordedAt = {};
+      if (startDate) query.recordedAt.$gte = new Date(startDate);
+      if (endDate) query.recordedAt.$lte = new Date(endDate);
+    }
+
+    const locations = await Location.find(query)
+      .sort({ recordedAt: -1 })
+      .limit(parseInt(limit));
+
+    res.json({
+      success: true,
+      data: locations,
+      count: locations.length,
+    });
+  } catch (error) {
+    console.error("Get drone location history error:", error);
     res.status(500).json({
       success: false,
       message: error.message,

@@ -453,9 +453,13 @@ export const updateOrderStatus = async (req, res) => {
     // When order status becomes "delivering", assign a drone and update its status
     if (status === "delivering" && !order.drone) {
       const Drone = (await import("../models/Drone.js")).default;
+      const Delivery = (await import("../models/Delivery.js")).default;
+      
       const availableDrone = await Drone.findOne({ status: "available" }).sort({
         batteryLevel: -1,
       });
+
+      console.log('🔍 Looking for available drone...', availableDrone ? `Found: ${availableDrone._id}` : 'No drone available');
 
       if (availableDrone) {
         availableDrone.status = "delivering";
@@ -467,18 +471,77 @@ export const updateOrderStatus = async (req, res) => {
           assignedAt: new Date(),
           launchedAt: new Date(),
         };
+
+        console.log('✅ Drone assigned:', availableDrone._id);
+      } else {
+        console.log('⚠️ No available drone found, creating Delivery without drone');
+      }
+
+      // Create Delivery record (with or without drone)
+      try {
+        const deliveryId = `DEL-${order._id}-${Date.now()}`;
+        
+        // Get restaurant info - need to populate first
+        const populatedOrder = await Order.findById(order._id).populate('restaurant');
+        
+        // Get restaurant location from populated restaurant or use default
+        const restaurantLocation = populatedOrder.restaurant?.location?.coordinates || 
+                                   [106.660172, 10.762622]; // Default HCM
+        
+        // Get delivery address coordinates
+        const deliveryCoords = order.deliveryAddress?.coordinates?.lat && order.deliveryAddress?.coordinates?.lng
+          ? [order.deliveryAddress.coordinates.lng, order.deliveryAddress.coordinates.lat]
+          : [106.660172, 10.762622]; // Default
+
+        console.log('📍 Restaurant location:', restaurantLocation);
+        console.log('📍 Delivery location:', deliveryCoords);
+
+        const newDelivery = await Delivery.create({
+          deliveryId,
+          orderId: order._id,
+          droneId: availableDrone?._id || null,
+          startLocation: {
+            type: "Point",
+            coordinates: Array.isArray(restaurantLocation) ? restaurantLocation : [106.660172, 10.762622],
+            address: populatedOrder.restaurant?.address || '',
+          },
+          endLocation: {
+            type: "Point",
+            coordinates: deliveryCoords,
+            address: order.deliveryAddress?.address || order.deliveryAddress?.street || '',
+          },
+          status: "in_transit",
+        });
+
+        console.log('✅ Delivery created:', newDelivery._id, 'deliveryId:', deliveryId);
+      } catch (deliveryError) {
+        console.error('❌ Error creating Delivery:', deliveryError.message);
+        console.error('Delivery validation errors:', deliveryError.errors);
       }
     }
 
     // When order is delivered, free up the drone
     if (status === "delivered" && order.drone) {
       const Drone = (await import("../models/Drone.js")).default;
+      const Delivery = (await import("../models/Delivery.js")).default;
+      
       const drone = await Drone.findById(order.drone);
       if (drone) {
         drone.status = "available";
         drone.currentOrder = null;
         await drone.save();
       }
+
+      // Update Delivery status
+      await Delivery.findOneAndUpdate(
+        { orderId: order._id },
+        { 
+          status: "delivered",
+          deliveredAt: new Date(),
+        }
+      );
+
+      console.log('✅ Delivery completed for order:', order._id);
     }
 
     await order.save();
@@ -1098,12 +1161,23 @@ export const confirmDelivery = async (req, res) => {
     // Free up the drone
     if (order.drone) {
       const Drone = (await import("../models/Drone.js")).default;
+      const Delivery = (await import("../models/Delivery.js")).default;
+      
       const drone = await Drone.findById(order.drone);
       if (drone) {
         drone.status = "available";
         drone.currentOrder = null;
         await drone.save();
       }
+
+      // Update Delivery status
+      await Delivery.findOneAndUpdate(
+        { orderId: order._id },
+        { 
+          status: "delivered",
+          deliveredAt: new Date(),
+        }
+      );
     }
 
     await order.save();

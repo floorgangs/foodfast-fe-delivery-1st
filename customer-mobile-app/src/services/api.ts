@@ -21,7 +21,7 @@ const API_URL_KEY = '@custom_api_url';
 const NGROK_URL = ''; // VD: 'https://abc123.ngrok.io'
 
 // ===== CÁCH 3: LAN IP =====
-const DEFAULT_LAN_IP = '192.168.1.163'; // IP máy tính chạy backend
+const DEFAULT_LAN_IP = '192.168.1.198'; // IP máy tính chạy backend
 
 // ===== BUILD URL =====
 const buildAPIURL = () => {

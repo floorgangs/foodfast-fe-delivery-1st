@@ -6,6 +6,7 @@ import {
   completeDelivery,
   getDeliveryTracking,
   updateDroneLocation,
+  getDroneLocationHistory,
 } from "../controllers/deliveryController.js";
 import { protect } from "../middleware/auth.js";
 
@@ -28,5 +29,8 @@ router.get("/tracking/:orderId", getDeliveryTracking);
 
 // Update drone location
 router.patch("/drone/:droneId/location", updateDroneLocation);
+
+// Get drone location history
+router.get("/drone/:droneId/location-history", getDroneLocationHistory);
 
 export default router;
