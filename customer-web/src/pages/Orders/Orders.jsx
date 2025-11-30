@@ -9,7 +9,7 @@ function Orders() {
   const { user, isAuthenticated } = useSelector((state) => state.auth);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeTab, setActiveTab] = useState("active");
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -17,6 +17,9 @@ function Orders() {
       return;
     }
     fetchOrders();
+    // Poll for updates every 5 seconds
+    const interval = setInterval(fetchOrders, 5000);
+    return () => clearInterval(interval);
   }, [isAuthenticated, navigate]);
 
   const fetchOrders = async () => {
@@ -40,6 +43,7 @@ function Orders() {
       ready: "Sẵn sàng giao",
       delivering: "Đang giao",
       delivered: "Đã giao",
+      completed: "Đã giao", // Customer sees completed as "Đã giao"
       cancelled: "Đã hủy",
     };
     return statusMap[status] || status;
@@ -53,13 +57,13 @@ function Orders() {
       ready: "#9C27B0",
       delivering: "#FF9800",
       delivered: "#4CAF50",
+      completed: "#4CAF50",
       cancelled: "#F44336",
     };
     return colorMap[status] || "#999";
   };
 
   const filteredOrders = orders.filter((order) => {
-    if (activeTab === "all") return true;
     if (activeTab === "active")
       return [
         "pending",
@@ -68,8 +72,8 @@ function Orders() {
         "ready",
         "delivering",
       ].includes(order.status);
-    if (activeTab === "completed")
-      return ["delivered", "cancelled"].includes(order.status);
+    if (activeTab === "history")
+      return ["delivered", "completed", "cancelled"].includes(order.status);
     return true;
   });
 
@@ -90,40 +94,36 @@ function Orders() {
 
         <div className="tabs">
           <button
-            className={activeTab === "all" ? "active" : ""}
-            onClick={() => setActiveTab("all")}
-          >
-            Tất cả ({orders.length})
-          </button>
-          <button
             className={activeTab === "active" ? "active" : ""}
             onClick={() => setActiveTab("active")}
           >
-            Đang xử lý (
-            {
-              orders.filter((o) =>
-                [
-                  "pending",
-                  "confirmed",
-                  "preparing",
-                  "ready",
-                  "delivering",
-                ].includes(o.status)
-              ).length
-            }
-            )
+            Đang xử lý
+            <span className="tab-count">
+              {
+                orders.filter((o) =>
+                  [
+                    "pending",
+                    "confirmed",
+                    "preparing",
+                    "ready",
+                    "delivering",
+                  ].includes(o.status)
+                ).length
+              }
+            </span>
           </button>
           <button
-            className={activeTab === "completed" ? "active" : ""}
-            onClick={() => setActiveTab("completed")}
+            className={activeTab === "history" ? "active" : ""}
+            onClick={() => setActiveTab("history")}
           >
-            Hoàn thành (
-            {
-              orders.filter((o) =>
-                ["delivered", "cancelled"].includes(o.status)
-              ).length
-            }
-            )
+            Lịch sử
+            <span className="tab-count">
+              {
+                orders.filter((o) =>
+                  ["delivered", "completed", "cancelled"].includes(o.status)
+                ).length
+              }
+            </span>
           </button>
         </div>
 

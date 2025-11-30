@@ -19,12 +19,13 @@ import { orderAPI } from '../services/api';
 const { height } = Dimensions.get('window');
 const MAP_HEIGHT = height * 0.42;
 
+// Customer chỉ thấy đến 'delivered', không thấy 'completed' (restaurant xử lý)
 const STATUS_STEPS = [
   { key: 'pending', label: 'Chờ xác nhận', description: 'Đơn hàng đang chờ nhà hàng xác nhận' },
   { key: 'confirmed', label: 'Đã xác nhận', description: 'Nhà hàng đã tiếp nhận và chuẩn bị đơn' },
   { key: 'ready', label: 'Sẵn sàng giao', description: 'Đơn đã đóng gói, chờ drone tiếp nhận' },
   { key: 'delivering', label: 'Drone đang giao', description: 'Drone đang trên đường bay tới vị trí của bạn' },
-  { key: 'delivered', label: 'Đã giao', description: 'Bạn đã nhận được đơn hàng' },
+  { key: 'delivered', label: 'Chờ giao hàng', description: 'Drone đã đến, vui lòng nhận hàng' },
 ] as const;
 
 const STATUS_SEQUENCE = STATUS_STEPS.map(step => step.key);
@@ -277,7 +278,7 @@ interface TrackingPayload {
 
 const normalizeStatus = (status?: string): string => {
   if (!status) return 'pending';
-  if (status === 'completed') return 'delivered';
+  // Now we have 'completed' as a separate step, no need to convert
   return status;
 };
 
@@ -311,6 +312,9 @@ const OrderTrackingScreen = ({ navigation, route }: any) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [acknowledged, setAcknowledged] = useState(false);
+  const [demoProgress, setDemoProgress] = useState(0);
+  const [isDemo, setIsDemo] = useState(false);
+  const animationRef = useRef<number | null>(null);
 
   const fetchTracking = useCallback(async () => {
     if (!orderId) {
@@ -392,15 +396,20 @@ const OrderTrackingScreen = ({ navigation, route }: any) => {
 
   const mapRegion = useMemo(() => computeRegionFromRoute(routeCoordinates), [routeCoordinates]);
 
+  const flightProgress = isDemo ? demoProgress : (trackingData?.tracking?.flightProgress ?? 0);
+
   const droneCoordinate = useMemo(() => {
+    // When demo is running, calculate position along route
+    if (isDemo || flightProgress > 0) {
+      return getCoordinateAtProgress(routeCoordinates, flightProgress);
+    }
+    // Otherwise use tracking data or fallback
     const coordinate = toLatLng(trackingData?.tracking?.droneLocation);
     if (coordinate) {
       return coordinate;
     }
     return normalizedStatus === 'delivered' ? dropoffCoordinate : pickupCoordinate;
-  }, [trackingData?.tracking?.droneLocation, normalizedStatus, dropoffCoordinate, pickupCoordinate]);
-
-  const flightProgress = trackingData?.tracking?.flightProgress ?? 0;
+  }, [isDemo, flightProgress, routeCoordinates, trackingData?.tracking?.droneLocation, normalizedStatus, dropoffCoordinate, pickupCoordinate]);
 
   const progressPolyline = useMemo(
     () => buildProgressPolyline(routeCoordinates, flightProgress),
@@ -468,12 +477,91 @@ const OrderTrackingScreen = ({ navigation, route }: any) => {
   const canConfirm = normalizedStatus === 'delivered';
   const timelineUpdatedAt = formatTimestamp(trackingData?.order?.updatedAt);
 
-  const handleConfirm = () => {
-    setAcknowledged(true);
-    if (Platform.OS === 'web') {
-      alert('Cảm ơn bạn! Đơn hàng đã được xác nhận.');
-    } else {
-      Alert.alert('Hoàn tất', 'Cảm ơn bạn! Đơn hàng đã được xác nhận.');
+  const startDroneDemo = () => {
+    if (isDemo) return; // Already running
+    setIsDemo(true);
+    setDemoProgress(0);
+    
+    const duration = 30000; // 30 seconds
+    const startTime = Date.now();
+
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      setDemoProgress(progress);
+
+      if (progress < 1) {
+        animationRef.current = requestAnimationFrame(animate);
+      } else {
+        setIsDemo(false);
+        // Drone has arrived - confirm delivery
+        orderAPI.confirmDelivery(orderId)
+          .then(() => {
+            fetchTracking();
+            if (Platform.OS === 'web') {
+              alert('🎉 Drone đã giao hàng thành công!');
+            } else {
+              Alert.alert('Thành công', '🎉 Drone đã giao hàng thành công!');
+            }
+          })
+          .catch(err => {
+            console.error('Failed to confirm delivery:', err);
+            if (Platform.OS !== 'web') {
+              Alert.alert('Lỗi', 'Không thể cập nhật trạng thái. Vui lòng thử lại.');
+            }
+          });
+      }
+    };
+
+    animationRef.current = requestAnimationFrame(animate);
+  };
+
+  // Auto-start demo drone when status changes to 'delivering'
+  useEffect(() => {
+    if (normalizedStatus === 'delivering' && !isDemo && demoProgress === 0) {
+      console.log('🚁 Auto-starting drone delivery animation');
+      // Delay to ensure map is ready
+      const timer = setTimeout(() => {
+        startDroneDemo();
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [normalizedStatus, isDemo, demoProgress]);
+
+  // Cleanup animation on unmount
+  useEffect(() => {
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, []);
+
+  const handleConfirm = async () => {
+    try {
+      await orderAPI.complete(orderId);
+      setAcknowledged(true);
+      if (Platform.OS === 'web') {
+        alert('Cảm ơn bạn! Đơn hàng đã hoàn thành.');
+      } else {
+        Alert.alert('Hoàn tất', 'Cảm ơn bạn! Đơn hàng đã hoàn thành.', [
+          {
+            text: 'OK',
+            onPress: () => navigation.navigate('Orders'),
+          },
+        ]);
+      }
+      // Navigate back to orders after completion
+      setTimeout(() => {
+        navigation.navigate('Orders');
+      }, 1500);
+    } catch (error: any) {
+      if (Platform.OS === 'web') {
+        alert(error.message || 'Không thể xác nhận đơn hàng');
+      } else {
+        Alert.alert('Lỗi', error.message || 'Không thể xác nhận đơn hàng');
+      }
     }
   };
 
@@ -537,130 +625,130 @@ const OrderTrackingScreen = ({ navigation, route }: any) => {
 
       {renderErrorBanner()}
 
-      <View style={styles.banner}>
-        <View style={styles.bannerLeft}>
-          <Text style={styles.bannerLabel}>Trạng thái đơn</Text>
-          <Text style={styles.bannerText}>
-            Drone {droneCode}{' '}
-            {normalizedStatus === 'delivering' ? 'đang bay tới điểm giao.' : 'đang sẵn sàng cho đơn hàng của bạn.'}
-          </Text>
-          {restaurantAddress ? (
-            <Text style={styles.bannerSubText}>{restaurantAddress}</Text>
-          ) : null}
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} bounces>
+        <View style={styles.banner}>
+          <View style={styles.bannerLeft}>
+            <Text style={styles.bannerLabel}>Trạng thái đơn</Text>
+            <Text style={styles.bannerText}>
+              Drone {droneCode}{' '}
+              {normalizedStatus === 'delivering' ? 'đang bay tới điểm giao.' : 'đang sẵn sàng cho đơn hàng của bạn.'}
+            </Text>
+            {restaurantAddress ? (
+              <Text style={styles.bannerSubText}>{restaurantAddress}</Text>
+            ) : null}
+          </View>
+          <Ionicons name="radio-outline" size={20} color="#EA5034" />
         </View>
-        <Ionicons name="radio-outline" size={20} color="#EA5034" />
-      </View>
 
-      <View style={styles.mapWrapper}>
-        <MapView
-          key={orderNumber}
-          ref={(mapInstance) => {
-            mapRef.current = mapInstance;
-          }}
-          style={styles.map}
-          initialRegion={mapRegion}
-          showsCompass={false}
-          showsPointsOfInterest={false}
-          scrollEnabled={false}
-          zoomEnabled={false}
-          pitchEnabled={false}
-          rotateEnabled={false}
-          onMapReady={() => {
-            cameraReadyRef.current = true;
-            if (mapRef.current) {
-              mapRef.current.fitToCoordinates(routeCoordinates, {
-                edgePadding: { top: 80, right: 60, bottom: 80, left: 60 },
-                animated: true,
-              });
-            }
-          }}
-        >
-          <Polyline
-            coordinates={routeCoordinates}
-            strokeColor="rgba(43, 76, 126, 0.18)"
-            strokeWidth={8}
-            lineCap="round"
-            lineJoin="round"
-          />
-          <Polyline
-            coordinates={routeCoordinates}
-            strokeColor="#1B2945"
-            strokeWidth={4}
-            lineCap="round"
-            lineJoin="round"
-          />
-          {progressPolyline.length > 1 && (
+        <View style={styles.mapWrapper}>
+          <MapView
+            key={orderNumber}
+            ref={(mapInstance) => {
+              mapRef.current = mapInstance;
+            }}
+            style={styles.map}
+            initialRegion={mapRegion}
+            showsCompass={true}
+            showsPointsOfInterest={false}
+            scrollEnabled={true}
+            zoomEnabled={true}
+            pitchEnabled={true}
+            rotateEnabled={true}
+            onMapReady={() => {
+              cameraReadyRef.current = true;
+              if (mapRef.current) {
+                mapRef.current.fitToCoordinates(routeCoordinates, {
+                  edgePadding: { top: 80, right: 60, bottom: 80, left: 60 },
+                  animated: true,
+                });
+              }
+            }}
+          >
             <Polyline
-              coordinates={progressPolyline}
-              strokeColor="#EA5034"
-              strokeWidth={6}
+              coordinates={routeCoordinates}
+              strokeColor="rgba(43, 76, 126, 0.18)"
+              strokeWidth={8}
               lineCap="round"
               lineJoin="round"
             />
-          )}
+            <Polyline
+              coordinates={routeCoordinates}
+              strokeColor="#1B2945"
+              strokeWidth={4}
+              lineCap="round"
+              lineJoin="round"
+            />
+            {progressPolyline.length > 1 && (
+              <Polyline
+                coordinates={progressPolyline}
+                strokeColor="#EA5034"
+                strokeWidth={6}
+                lineCap="round"
+                lineJoin="round"
+              />
+            )}
 
-          <Marker
-            coordinate={pickupCoordinate}
-            title="Nhà hàng"
-            description={restaurantName}
-            tracksViewChanges={false}
-            zIndex={100}
-          >
-            <View style={styles.markerWrapper}>
-              <View style={[styles.markerHalo, styles.originHalo]} />
-              <View style={[styles.markerIcon, styles.originMarker]}>
-                <Ionicons name="restaurant" size={20} color="#fff" />
+            <Marker
+              coordinate={pickupCoordinate}
+              title="Nhà hàng"
+              description={restaurantName}
+              tracksViewChanges={false}
+              zIndex={100}
+            >
+              <View style={styles.markerWrapper}>
+                <View style={[styles.markerHalo, styles.originHalo]} />
+                <View style={[styles.markerIcon, styles.originMarker]}>
+                  <Ionicons name="restaurant" size={20} color="#fff" />
+                </View>
               </View>
-            </View>
-          </Marker>
+            </Marker>
 
-          <Marker
-            coordinate={dropoffCoordinate}
-            title="Điểm giao hàng"
-            description={deliveryAddress}
-            tracksViewChanges={false}
-            zIndex={100}
-          >
-            <View style={styles.markerWrapper}>
-              <View style={[styles.markerHalo, styles.destinationHalo]} />
-              <View style={[styles.markerIcon, styles.destinationMarker]}>
-                <Ionicons name="home" size={20} color="#27AE60" />
+            <Marker
+              coordinate={dropoffCoordinate}
+              title="Điểm giao hàng"
+              description={deliveryAddress}
+              tracksViewChanges={false}
+              zIndex={100}
+            >
+              <View style={styles.markerWrapper}>
+                <View style={[styles.markerHalo, styles.destinationHalo]} />
+                <View style={[styles.markerIcon, styles.destinationMarker]}>
+                  <Ionicons name="home" size={20} color="#27AE60" />
+                </View>
               </View>
-            </View>
-          </Marker>
+            </Marker>
 
-          <Marker
-            coordinate={droneCoordinate}
-            title={`Drone ${droneCode}`}
-            description={`Tiến độ: ${Math.round(flightProgress * 100)}%`}
-            anchor={{ x: 0.5, y: 0.5 }}
-            tracksViewChanges={false}
-            rotation={routeHeading}
-            flat
-            zIndex={200}
-          >
-            <View style={styles.droneWrapper}>
-              <View style={styles.droneGlow} />
-              <View style={styles.droneMarker}>
-                <Ionicons name="airplane" size={22} color="#fff" />
+            <Marker
+              coordinate={droneCoordinate}
+              title={`Drone ${droneCode}`}
+              description={`Tiến độ: ${Math.round(flightProgress * 100)}%`}
+              anchor={{ x: 0.5, y: 0.5 }}
+              tracksViewChanges={false}
+              rotation={routeHeading}
+              flat
+              zIndex={200}
+            >
+              <View style={styles.droneWrapper}>
+                <View style={styles.droneGlow} />
+                <View style={styles.droneMarker}>
+                  <Ionicons name="airplane" size={22} color="#fff" />
+                </View>
               </View>
-            </View>
-          </Marker>
-        </MapView>
+            </Marker>
+          </MapView>
 
-        <View style={[styles.mapBadge, styles.shadow]}>
-          <Ionicons name="navigate" size={16} color="#EA5034" />
-          <View style={{ marginLeft: 10, flex: 1 }}>
-            <Text style={styles.mapBadgeLabel}>Điểm giao</Text>
-            <Text style={styles.mapBadgeText} numberOfLines={1}>
-              {deliveryAddress}
-            </Text>
+          <View style={[styles.mapBadge, styles.shadow]}>
+            <Ionicons name="navigate" size={16} color="#EA5034" />
+            <View style={{ marginLeft: 10, flex: 1 }}>
+              <Text style={styles.mapBadgeLabel}>Điểm giao</Text>
+              <Text style={styles.mapBadgeText} numberOfLines={1}>
+                {deliveryAddress}
+              </Text>
+            </View>
           </View>
         </View>
-      </View>
 
-      <View style={styles.bottomSheet}>
-        <ScrollView contentContainerStyle={styles.bottomContent} showsVerticalScrollIndicator={false} bounces>
+        <View style={styles.detailsSection}>
           <View style={styles.summaryHeader}>
             <View>
               <Text style={styles.orderCode}>#{orderNumber}</Text>
@@ -749,8 +837,8 @@ const OrderTrackingScreen = ({ navigation, route }: any) => {
               <Text style={styles.pinNote}>Mã xác nhận sẽ xuất hiện khi đơn được đánh dấu đã giao.</Text>
             )}
           </View>
-        </ScrollView>
-      </View>
+        </View>
+      </ScrollView>
     </View>
   );
 };
@@ -760,6 +848,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F6F8FD',
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 0,
+  },
+  scrollContent: {
+    paddingBottom: 36,
   },
   centeredState: {
     flex: 1,
@@ -840,6 +931,18 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: '#172B4D',
+  },
+  mapWrapper: {
+    height: MAP_HEIGHT,
+    backgroundColor: '#172B4D',
+    marginHorizontal: 20,
+    marginBottom: 12,
+    borderRadius: 24,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  map: {
+    ...StyleSheet.absoluteFillObject,
   },
   mapWrapper: {
     height: MAP_HEIGHT,
@@ -992,17 +1095,19 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     elevation: 4,
   },
-  bottomSheet: {
-    flex: 1,
+  detailsSection: {
     backgroundColor: '#fff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    marginTop: -24,
+    marginTop: -12,
     paddingHorizontal: 20,
     paddingTop: 20,
   },
+  bottomSheet: {
+    display: 'none',
+  },
   bottomContent: {
-    paddingBottom: 36,
+    display: 'none',
   },
   summaryHeader: {
     flexDirection: 'row',

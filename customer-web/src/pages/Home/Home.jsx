@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { restaurantAPI } from "../../services/api";
 import "./Home.css";
@@ -14,10 +14,33 @@ function Home() {
   const [freeShippingOnly, setFreeShippingOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [activeSlide, setActiveSlide] = useState(0);
+  const carouselRef = useRef(null);
 
   useEffect(() => {
     fetchRestaurants();
   }, []);
+
+  // Auto scroll banner
+  useEffect(() => {
+    if (restaurantList.length === 0) return;
+    const bannerCount = Math.min(restaurantList.length, 6);
+    const interval = setInterval(() => {
+      setActiveSlide((prev) => (prev + 1) % bannerCount);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [restaurantList]);
+
+  // Scroll to active slide
+  useEffect(() => {
+    if (carouselRef.current) {
+      const slideWidth = carouselRef.current.offsetWidth;
+      carouselRef.current.scrollTo({
+        left: activeSlide * slideWidth,
+        behavior: 'smooth'
+      });
+    }
+  }, [activeSlide]);
 
   const fetchRestaurants = async () => {
     try {
@@ -109,33 +132,75 @@ function Home() {
 
   return (
     <div className="home-page">
-      <div className="container">
-        <div className="hero">
-          <h1>🚁 Giao hàng bằng Drone</h1>
-          <p>Nhanh chóng - An toàn - Tiện lợi</p>
+      {/* Banner Carousel */}
+      <div className="banner-carousel">
+        <div className="carousel-wrapper" ref={carouselRef}>
+          {restaurantList.slice(0, 6).map((restaurant, index) => (
+            <Link 
+              key={restaurant._id || index} 
+              to={`/restaurant/${restaurant._id}`}
+              className="banner-slide"
+            >
+              <img 
+                src={restaurant.coverImage || restaurant.avatar} 
+                alt={restaurant.name}
+                onError={(e) => {
+                  e.target.src = "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800";
+                }}
+              />
+              <div className="banner-overlay">
+                <span className="banner-tag">Đối tác nổi bật</span>
+                <h2>{restaurant.name}</h2>
+                <p>{restaurant.description || "Giao nhanh • Chất lượng"}</p>
+              </div>
+            </Link>
+          ))}
         </div>
+        
+        {/* Indicators */}
+        <div className="carousel-indicators">
+          {restaurantList.slice(0, 6).map((_, index) => (
+            <button
+              key={index}
+              className={`indicator ${activeSlide === index ? 'active' : ''}`}
+              onClick={() => setActiveSlide(index)}
+            />
+          ))}
+        </div>
+      </div>
 
+      <div className="container">
+        {/* Search Section */}
         <div className="search-section">
           <div className="search-wrapper">
-            <input
-              type="text"
-              placeholder="Tìm kiếm nhà hàng, món ăn..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="search-input"
-            />
+            <div className="search-input-container">
+              <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="m21 21-4.35-4.35"/>
+              </svg>
+              <input
+                type="text"
+                placeholder="Tìm kiếm nhà hàng, món ăn..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="search-input"
+              />
+            </div>
             <button
               className="advanced-toggle"
               onClick={() => setShowAdvanced(!showAdvanced)}
             >
-              {showAdvanced ? "▲" : "▼"} Tìm kiếm nâng cao
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+                <path d="M3 6h18M6 12h12M9 18h6"/>
+              </svg>
+              Bộ lọc
             </button>
           </div>
 
           {showAdvanced && (
             <div className="advanced-filters">
               <div className="filter-group">
-                <label>⭐ Đánh giá tối thiểu</label>
+                <label>Đánh giá tối thiểu</label>
                 <div className="star-buttons">
                   {[0, 1, 2, 3, 4, 5].map((star) => (
                     <button
@@ -143,7 +208,7 @@ function Home() {
                       className={minRating === star ? "active" : ""}
                       onClick={() => setMinRating(star)}
                     >
-                      {star === 0 ? "Tất cả" : `${star}⭐`}
+                      {star === 0 ? "Tất cả" : `${star} sao`}
                     </button>
                   ))}
                 </div>
@@ -151,7 +216,7 @@ function Home() {
 
               <div className="filter-group">
                 <label>
-                  💰 Giá tối đa: {maxPrice.toLocaleString("vi-VN")}đ
+                  Giá tối đa: {maxPrice.toLocaleString("vi-VN")}đ
                 </label>
                 <input
                   type="range"
@@ -165,7 +230,7 @@ function Home() {
               </div>
 
               <div className="filter-group">
-                <label>📦 Sắp xếp theo</label>
+                <label>Sắp xếp theo</label>
                 <div className="sort-options">
                   <button
                     className={sortBy === "default" ? "active" : ""}
@@ -177,19 +242,19 @@ function Home() {
                     className={sortBy === "price-high" ? "active" : ""}
                     onClick={() => setSortBy("price-high")}
                   >
-                    Giá cao đến thấp
+                    Giá cao → thấp
                   </button>
                   <button
                     className={sortBy === "price-low" ? "active" : ""}
                     onClick={() => setSortBy("price-low")}
                   >
-                    Giá thấp đến cao
+                    Giá thấp → cao
                   </button>
                   <button
                     className={sortBy === "free-ship" ? "active" : ""}
                     onClick={() => setSortBy("free-ship")}
                   >
-                    Free ship
+                    Miễn phí ship
                   </button>
                 </div>
               </div>
@@ -201,7 +266,7 @@ function Home() {
                     checked={freeShippingOnly}
                     onChange={(e) => setFreeShippingOnly(e.target.checked)}
                   />
-                  <span>🚀 Chỉ hiển thị free shipping</span>
+                  <span>Chỉ hiển thị miễn phí giao hàng</span>
                 </label>
               </div>
 
@@ -217,64 +282,55 @@ function Home() {
             className={category === "all" ? "active" : ""}
             onClick={() => setCategory("all")}
           >
-            <span className="category-icon">🍽️</span>
-            <span className="category-label">Tất cả</span>
+            Tất cả
           </button>
           <button
             className={category === "pizza" ? "active" : ""}
             onClick={() => setCategory("pizza")}
           >
-            <span className="category-icon">🍕</span>
-            <span className="category-label">Pizza</span>
+            Pizza
           </button>
           <button
             className={category === "burger" ? "active" : ""}
             onClick={() => setCategory("burger")}
           >
-            <span className="category-icon">🍔</span>
-            <span className="category-label">Burger</span>
+            Burger
           </button>
           <button
             className={category === "phở" ? "active" : ""}
             onClick={() => setCategory("phở")}
           >
-            <span className="category-icon">🍜</span>
-            <span className="category-label">Phở</span>
+            Phở
           </button>
           <button
             className={category === "cơm" ? "active" : ""}
             onClick={() => setCategory("cơm")}
           >
-            <span className="category-icon">🍱</span>
-            <span className="category-label">Cơm</span>
+            Cơm
           </button>
           <button
             className={category === "bánh" ? "active" : ""}
             onClick={() => setCategory("bánh")}
           >
-            <span className="category-icon">🍰</span>
-            <span className="category-label">Bánh</span>
+            Bánh
           </button>
           <button
             className={category === "Đồ uống" ? "active" : ""}
             onClick={() => setCategory("Đồ uống")}
           >
-            <span className="category-icon">☕</span>
-            <span className="category-label">Đồ uống</span>
+            Đồ uống
           </button>
           <button
             className={category === "gà" ? "active" : ""}
             onClick={() => setCategory("gà")}
           >
-            <span className="category-icon">🍗</span>
-            <span className="category-label">Gà rán</span>
+            Gà rán
           </button>
           <button
             className={category === "salad" ? "active" : ""}
             onClick={() => setCategory("salad")}
           >
-            <span className="category-icon">🥗</span>
-            <span className="category-label">Salad</span>
+            Salad
           </button>
         </div>
 
@@ -295,10 +351,10 @@ function Home() {
                   }}
                 />
                 {restaurant.isActive && !restaurant.isBusy ? (
-                  <span className="status-badge open">Đang mở</span>
+                  <span className="status-badge open">Mở</span>
                 ) : (
                   <span className="status-badge closed">
-                    {restaurant.isBusy ? "Bận" : "Đã đóng"}
+                    {restaurant.isBusy ? "Bận" : "Đóng"}
                   </span>
                 )}
               </div>
@@ -306,24 +362,30 @@ function Home() {
                 <h3>{restaurant.name}</h3>
                 <div className="restaurant-meta">
                   <span className="rating">
-                    ⭐ {restaurant.rating.toFixed(1)}
+                    <svg viewBox="0 0 24 24" fill="#f59e0b" width="14" height="14">
+                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                    </svg>
+                    {restaurant.rating.toFixed(1)}
                   </span>
+                  <span className="meta-dot">•</span>
                   <span className="delivery-time">
-                    🚁 {restaurant.estimatedDeliveryTime}
+                    {restaurant.estimatedDeliveryTime}
                   </span>
                 </div>
                 <p className="address">
-                  {restaurant.address?.street}, {restaurant.address?.district},{" "}
-                  {restaurant.address?.city}
+                  {restaurant.address?.street}, {restaurant.address?.district}
                 </p>
                 <div className="restaurant-footer">
-                  <span className="min-order">
-                    {restaurant.minOrder?.toLocaleString()}đ
+                  <span className="promo-tag">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                    </svg>
+                    Drone siêu tốc
                   </span>
                   <span className="delivery-fee">
                     {restaurant.deliveryFee === 0
-                      ? "🚀 Free"
-                      : `${restaurant.deliveryFee?.toLocaleString()}đ`}
+                      ? "Miễn phí giao"
+                      : `Ship ${restaurant.deliveryFee?.toLocaleString()}đ`}
                   </span>
                 </div>
               </div>

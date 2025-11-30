@@ -1,0 +1,345 @@
+/* Payment Methods Page */
+.payment-methods-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  padding: 2rem 0 4rem;
+  position: relative;
+}
+
+.payment-methods-page::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 200px;
+  background: linear-gradient(135deg, #003087 0%, #0070ba 100%);
+  z-index: 0;
+}
+
+.payment-methods-page .container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0 16px;
+  position: relative;
+  z-index: 1;
+}
+
+.payment-methods-page .back-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  transition: background 0.3s;
+}
+
+.payment-methods-page .back-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.payment-card {
+  background: white;
+  border-radius: 20px;
+  padding: 2rem;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+}
+
+.payment-card h1 {
+  font-size: 1.75rem;
+  color: #1a1a2e;
+  margin-bottom: 0.5rem;
+}
+
+.payment-card .subtitle {
+  color: #6b7280;
+  margin-bottom: 1.5rem;
+}
+
+.info-banner {
+  display: flex;
+  gap: 0.75rem;
+  background: #e5f2ff;
+  border-left: 4px solid #0070ba;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.info-banner .info-icon {
+  font-size: 1.25rem;
+}
+
+.info-banner p {
+  color: #003087;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.methods-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.method-card {
+  background: #fafafa;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.25rem;
+  transition: all 0.3s;
+}
+
+.method-card:hover {
+  border-color: #0070ba;
+  box-shadow: 0 4px 12px rgba(0, 112, 186, 0.15);
+}
+
+.method-header {
+  margin-bottom: 1rem;
+}
+
+.method-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.paypal-logo {
+  width: 50px;
+  height: 50px;
+  object-fit: contain;
+}
+
+.method-details {
+  flex: 1;
+}
+
+.method-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.method-name {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.default-badge {
+  background: #0070ba;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+.method-text {
+  color: #6b7280;
+  font-size: 0.9375rem;
+}
+
+.method-actions {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.set-default-btn {
+  background: none;
+  border: none;
+  color: #0070ba;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.set-default-btn:hover {
+  color: #003087;
+}
+
+.delete-btn {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+}
+
+.delete-btn:hover {
+  color: #ef4444;
+}
+
+.add-method-btn {
+  width: 100%;
+  padding: 1rem;
+  background: white;
+  border: 2px dashed #0070ba;
+  border-radius: 12px;
+  color: #0070ba;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.add-method-btn:hover {
+  background: #e5f2ff;
+}
+
+/* Modal */
+.payment-methods-page .modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  z-index: 1000;
+}
+
+.payment-methods-page .modal-content {
+  background: white;
+  border-radius: 20px 20px 0 0;
+  width: 100%;
+  max-width: 500px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.payment-methods-page .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 10;
+}
+
+.payment-methods-page .modal-header h2 {
+  font-size: 1.25rem;
+  color: #1a1a2e;
+}
+
+.payment-methods-page .modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #6b7280;
+  cursor: pointer;
+}
+
+.payment-methods-page .modal-form {
+  padding: 1.5rem;
+}
+
+.paypal-logo-container {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.paypal-logo-large {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+  margin-bottom: 0.5rem;
+}
+
+.paypal-title {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #003087;
+}
+
+.payment-methods-page .form-group {
+  margin-bottom: 1.25rem;
+}
+
+.payment-methods-page .form-group label {
+  display: block;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.5rem;
+}
+
+.payment-methods-page .form-group input {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border-color 0.3s;
+}
+
+.payment-methods-page .form-group input:focus {
+  outline: none;
+  border-color: #0070ba;
+}
+
+.helper-text {
+  font-size: 0.8125rem;
+  color: #6b7280;
+  margin-top: 0.5rem;
+}
+
+.info-box {
+  display: flex;
+  gap: 0.75rem;
+  background: #fff9e5;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.info-box-icon {
+  font-size: 1.25rem;
+}
+
+.info-box p {
+  color: #666;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.payment-methods-page .save-btn {
+  width: 100%;
+  padding: 1rem;
+  background: linear-gradient(135deg, #0070ba 0%, #003087 100%);
+  border: none;
+  border-radius: 10px;
+  color: white;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.3s, transform 0.3s;
+}
+
+.payment-methods-page .save-btn:hover {
+  transform: translateY(-2px);
+}
+
+@media (min-width: 768px) {
+  .payment-methods-page .modal-overlay {
+    align-items: center;
+  }
+
+  .payment-methods-page .modal-content {
+    border-radius: 20px;
+    margin: 1rem;
+  }
+}

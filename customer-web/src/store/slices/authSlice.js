@@ -2,13 +2,23 @@ import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import { authAPI } from "../../services/api";
 
 const extractAuthPayload = (response) => {
-  const payload = response?.data?.user && response?.data?.token
-    ? response.data
-    : (response?.user && response?.token)
-      ? response
-      : null;
+  // Handle multiple response formats
+  // Format 1: { success: true, data: { user, token } }
+  // Format 2: { data: { user, token } }
+  // Format 3: { user, token }
+  
+  let payload = null;
+  
+  if (response?.data?.user && response?.data?.token) {
+    payload = response.data;
+  } else if (response?.user && response?.token) {
+    payload = response;
+  } else if (response?.success && response?.data?.user && response?.data?.token) {
+    payload = response.data;
+  }
 
   if (!payload?.user || !payload?.token) {
+    console.error('Invalid auth response:', response);
     throw new Error('Phản hồi đăng nhập không hợp lệ. Thiếu thông tin người dùng hoặc token.');
   }
 

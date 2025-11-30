@@ -118,6 +118,12 @@ export const orderAPI = {
   
   track: (id: string) =>
     api.get(`/orders/${id}/track`),
+  
+  confirmDelivery: (id: string) =>
+    api.put(`/orders/${id}/confirm-delivery`),
+  
+  complete: (id: string) =>
+    api.patch(`/orders/${id}/complete`),
 };
 
 // Voucher APIs

@@ -108,11 +108,10 @@ function OrderManagement() {
     const statusMap = {
       pending: "pending",
       confirmed: "confirmed",
-
       ready: "ready",
       delivering: "delivering",
       delivered: "delivered",
-      completed: "delivered",
+      completed: "completed",
       cancelled: "cancelled",
     };
     return statusMap[status] || "pending";
@@ -213,11 +212,11 @@ function OrderManagement() {
         return orders.filter((order) => order.status === "pending");
       case "confirmed":
         return orders.filter((order) =>
-          ["confirmed", "ready", "delivering"].includes(order.status)
+          ["confirmed", "ready", "delivering", "delivered"].includes(order.status)
         );
       case "history":
         return orders.filter((order) =>
-          ["delivered", "cancelled"].includes(order.status)
+          ["completed", "cancelled"].includes(order.status)
         );
       default:
         return orders;
@@ -272,11 +271,11 @@ function OrderManagement() {
           className={`tab-btn ${activeTab === "confirmed" ? "active" : ""}`}
           onClick={() => setActiveTab("confirmed")}
         >
-          Đã xác nhận
+          Đang xử lý
           <span className="tab-count">
             {
               orders.filter((o) =>
-                ["confirmed", "ready", "delivering"].includes(o.status)
+                ["confirmed", "ready", "delivering", "delivered"].includes(o.status)
               ).length
             }
           </span>
@@ -289,7 +288,7 @@ function OrderManagement() {
           <span className="tab-count">
             {
               orders.filter((o) =>
-                ["delivered", "cancelled"].includes(o.status)
+                ["completed", "cancelled"].includes(o.status)
               ).length
             }
           </span>
@@ -316,10 +315,10 @@ function OrderManagement() {
                 <span className={`status-badge ${order.status}`}>
                   {order.status === "pending" && "Chờ xác nhận"}
                   {order.status === "confirmed" && "Đã xác nhận"}
-
                   {order.status === "ready" && "Sẵn sàng giao"}
                   {order.status === "delivering" && "Đang giao"}
-                  {order.status === "delivered" && "Hoàn thành"}
+                  {order.status === "delivered" && "Chờ giao hàng"}
+                  {order.status === "completed" && "Hoàn thành"}
                   {order.status === "cancelled" && "Đã hủy"}
                 </span>
               </div>
@@ -376,12 +375,9 @@ function OrderManagement() {
                   </button>
                 )}
                 {order.status === "delivering" && (
-                  <button
-                    onClick={() => updateStatus(order.id, "delivered")}
-                    className="complete-btn btn-small"
-                  >
-                    Hoàn thành
-                  </button>
+                  <span className="delivering-status">
+                    🚁 Drone đang giao...
+                  </span>
                 )}
               </div>
             </div>
@@ -447,7 +443,8 @@ function OrderManagement() {
                     {selectedOrder.status === "preparing" && "Đang chuẩn bị"}
                     {selectedOrder.status === "ready" && "Sẵn sàng giao"}
                     {selectedOrder.status === "delivering" && "Đang giao"}
-                    {selectedOrder.status === "delivered" && "Hoàn thành"}
+                    {selectedOrder.status === "delivered" && "Chờ giao hàng"}
+                    {selectedOrder.status === "completed" && "Hoàn thành"}
                     {selectedOrder.status === "cancelled" && "Đã hủy"}
                   </span>
                 </div>
@@ -585,15 +582,10 @@ function OrderManagement() {
                   </button>
                 )}
                 {selectedOrder.status === "delivering" && (
-                  <button
-                    onClick={() => {
-                      updateStatus(selectedOrder.id, "delivered");
-                      setShowDetailModal(false);
-                    }}
-                    className="complete-btn"
-                  >
-                    Hoàn thành giao hàng
-                  </button>
+                  <div className="delivering-info">
+                    <p className="info-text">🚁 Drone đang giao hàng...</p>
+                    <p className="hint-text">Trạng thái sẽ tự động cập nhật khi drone giao hàng thành công</p>
+                  </div>
                 )}
               </div>
             </div>

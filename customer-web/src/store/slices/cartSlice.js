@@ -277,9 +277,11 @@ export const updateQuantity = (payload) => async (dispatch) => {
 export const clearCart = () => async (dispatch) => {
   dispatch(clearCartState());
   try {
-    await dispatch(synchronizeCart());
+    // Gọi API clear cart trên server
+    await cartAPI.clear();
   } catch (error) {
-    throw error;
+    console.error('Failed to clear cart on server:', error);
+    // Vẫn tiếp tục vì local đã clear rồi
   }
 };
 

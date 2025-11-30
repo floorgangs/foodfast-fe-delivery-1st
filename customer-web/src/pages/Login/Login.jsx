@@ -66,53 +66,62 @@ function Login() {
   return (
     <div className="login-page">
       <div className="login-container">
-        <div className="login-header">
-          <h1>🚁 FoodFast</h1>
-          <p>Giao hàng bằng Drone - Nhanh như chớp</p>
+        <div className="login-form-section">
+          <div className="login-header">
+            <div className="logo-text">FoodFast</div>
+            <h1>Chào mừng trở lại!</h1>
+            <p>Đăng nhập để tiếp tục đặt món</p>
+          </div>
+
+          <form className="login-form" onSubmit={handleSubmit}>
+            {error && <div className="error-message">{error}</div>}
+
+            <div className="form-group">
+              <label>Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Nhập email của bạn"
+                required
+                disabled={loading}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Mật khẩu</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Nhập mật khẩu"
+                required
+                disabled={loading}
+              />
+            </div>
+
+            <button type="submit" className="login-btn" disabled={loading}>
+              {loading ? (
+                <>
+                  <span className="spinner"></span>
+                  Đang đăng nhập...
+                </>
+              ) : (
+                "Đăng nhập"
+              )}
+            </button>
+
+            <div className="login-footer">
+              <p>
+                Chưa có tài khoản? <a href="/register">Đăng ký ngay</a>
+              </p>
+              <div className="demo-note">
+                <strong>Tài khoản demo:</strong>
+                customer1@gmail.com / 123456
+              </div>
+            </div>
+          </form>
         </div>
-
-        <form className="login-form" onSubmit={handleSubmit}>
-          <h2>Đăng nhập</h2>
-
-          <div className="form-group">
-            <label>Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="customer1@gmail.com"
-              required
-              disabled={loading}
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Mật khẩu</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-              disabled={loading}
-            />
-          </div>
-
-          {error && <div className="error-message">{error}</div>}
-
-          <button type="submit" className="login-btn" disabled={loading}>
-            {loading ? "Đang đăng nhập..." : "Đăng nhập"}
-          </button>
-
-          <div className="login-footer">
-            <p>
-              Chưa có tài khoản? <a href="/register">Đăng ký ngay</a>
-            </p>
-            <p className="demo-note">
-              📝 Tài khoản demo: customer1@gmail.com / 123456
-            </p>
-          </div>
-        </form>
       </div>
     </div>
   );
