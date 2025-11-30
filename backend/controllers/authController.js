@@ -228,6 +228,52 @@ export const login = async (req, res) => {
 
         console.log("✅ Restaurant login successful");
       }
+    } else if (user.role === "staff") {
+      // Staff user - lấy thông tin restaurant từ Staff collection
+      const Staff = (await import("../models/Staff.js")).default;
+      const staffRecord = await Staff.findOne({ user: user._id }).populate('restaurant');
+      
+      if (!staffRecord || !staffRecord.restaurant) {
+        return res.status(404).json({
+          success: false,
+          message: "Không tìm thấy thông tin nhân viên",
+        });
+      }
+
+      if (!staffRecord.restaurant.isApproved) {
+        return res.status(403).json({
+          success: false,
+          message: "Nhà hàng chưa được phê duyệt",
+        });
+      }
+
+      responseData.restaurant = {
+        id: staffRecord.restaurant._id,
+        name: staffRecord.restaurant.name,
+        phone: staffRecord.restaurant.phone,
+        avatar: staffRecord.restaurant.avatar,
+        coverImage: staffRecord.restaurant.coverImage,
+        description: staffRecord.restaurant.description,
+        cuisine: staffRecord.restaurant.cuisine,
+        address: staffRecord.restaurant.address,
+        openingHours: staffRecord.restaurant.openingHours,
+        rating: staffRecord.restaurant.rating,
+        totalReviews: staffRecord.restaurant.totalReviews,
+        deliveryFee: staffRecord.restaurant.deliveryFee,
+        minOrder: staffRecord.restaurant.minOrder,
+        estimatedDeliveryTime: staffRecord.restaurant.estimatedDeliveryTime,
+        isApproved: staffRecord.restaurant.isApproved,
+        isBusy: staffRecord.restaurant.isBusy,
+        tags: staffRecord.restaurant.tags,
+      };
+
+      responseData.staff = {
+        id: staffRecord._id,
+        position: staffRecord.position,
+        workSchedule: staffRecord.workSchedule,
+      };
+
+      console.log("✅ Staff login successful");
     } else if (user.role === "customer") {
       responseData.user.addresses = user.addresses;
       console.log("✅ Customer login successful");
