@@ -16,15 +16,35 @@ function RestaurantManagement() {
   const [rejectReason, setRejectReason] = useState("");
 
   const [formData, setFormData] = useState({
+    // Restaurant fields
     name: "",
-    email: "",
-    phone: "",
-    ownerName: "",
-    address: "",
     description: "",
-    cuisine: [],
-    taxCode: "",
+    phone: "",
+    addressStreet: "",
+    addressCity: "",
+    addressDistrict: "",
+    addressWard: "",
+    deliveryFee: "15000",
+    minOrder: "0",
+    estimatedDeliveryTime: "30-45 phút",
+    avatar: "",
+    coverImage: "",
+    // Owner fields
+    ownerName: "",
+    ownerEmail: "",
+    ownerPhone: "",
+    ownerPassword: "",
   });
+
+  const [selectedCuisines, setSelectedCuisines] = useState([]);
+  const [avatarPreview, setAvatarPreview] = useState("");
+  const [coverPreview, setCoverPreview] = useState("");
+  
+  const cuisineOptions = [
+    "Việt Nam", "Thái Lan", "Nhật Bản", "Hàn Quốc", "Trung Quốc",
+    "Ý", "Pháp", "Mỹ", "Ấn Độ", "Món nướng", "Lẩu", "Hải sản",
+    "Chay", "Buffet", "Fast Food", "Đồ uống", "Tráng miệng", "Khác"
+  ];
 
   useEffect(() => {
     loadRestaurants();
@@ -211,8 +231,86 @@ function RestaurantManagement() {
 
   const handleCreateRestaurant = async (e) => {
     e.preventDefault();
-    // ... existing create logic
-    alert("Tính năng đang phát triển");
+    
+    // Validate required fields
+    if (!formData.name || !formData.ownerName || !formData.ownerEmail || !formData.ownerPassword) {
+      alert("Vui lòng nhập đầy đủ thông tin bắt buộc (đánh dấu *)");
+      return;
+    }
+
+    if (!formData.addressStreet) {
+      alert("Vui lòng nhập địa chỉ nhà hàng");
+      return;
+    }
+
+    if (!formData.ownerPhone || !formData.phone) {
+      alert("Vui lòng nhập số điện thoại");
+      return;
+    }
+
+    // Validate email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.ownerEmail)) {
+      alert("Email không hợp lệ");
+      return;
+    }
+
+    // Validate password
+    if (formData.ownerPassword.length < 6) {
+      alert("Mật khẩu phải có ít nhất 6 ký tự");
+      return;
+    }
+
+    // Validate phone
+    const phoneRegex = /^[0-9]{10,11}$/;
+    if (!phoneRegex.test(formData.ownerPhone) || !phoneRegex.test(formData.phone)) {
+      alert("Số điện thoại không hợp lệ (10-11 số)");
+      return;
+    }
+
+    try {
+      setProcessing(true);
+      
+      const payload = {
+        // Restaurant info
+        name: formData.name.trim(),
+        description: formData.description.trim(),
+        cuisine: selectedCuisines.length > 0 ? selectedCuisines : [],
+        address: {
+          street: formData.addressStreet.trim(),
+          city: formData.addressCity.trim(),
+          district: formData.addressDistrict.trim(),
+          ward: formData.addressWard.trim(),
+        },
+        phone: formData.phone.trim(),
+        deliveryFee: parseFloat(formData.deliveryFee) || 15000,
+        minOrder: parseFloat(formData.minOrder) || 0,
+        estimatedDeliveryTime: formData.estimatedDeliveryTime.trim() || "30-45 phút",
+        avatar: formData.avatar || undefined,
+        coverImage: formData.coverImage || undefined,
+        // Owner info
+        ownerName: formData.ownerName.trim(),
+        ownerEmail: formData.ownerEmail.trim().toLowerCase(),
+        ownerPhone: formData.ownerPhone.trim(),
+        ownerPassword: formData.ownerPassword,
+      };
+
+      console.log("Creating restaurant with payload:", payload);
+
+      const response = await restaurantAPI.createRestaurantWithOwner(payload);
+
+      if (response.success) {
+        alert(`✅ Tạo nhà hàng thành công!\n\nThông tin đăng nhập:\nEmail: ${payload.ownerEmail}\nMật khẩu: (đã tạo)\n\nChủ nhà hàng có thể đăng nhập ngay!`);
+        setShowCreateModal(false);
+        resetForm();
+        await loadRestaurants();
+      }
+    } catch (error) {
+      console.error("Error creating restaurant:", error);
+      alert(error.message || "Không thể tạo nhà hàng. Vui lòng kiểm tra lại thông tin.");
+    } finally {
+      setProcessing(false);
+    }
   };
 
   const handleChange = (e) => {
@@ -226,14 +324,63 @@ function RestaurantManagement() {
   const resetForm = () => {
     setFormData({
       name: "",
-      email: "",
-      phone: "",
-      ownerName: "",
-      address: "",
       description: "",
-      cuisine: [],
-      taxCode: "",
+      phone: "",
+      addressStreet: "",
+      addressCity: "",
+      addressDistrict: "",
+      addressWard: "",
+      deliveryFee: "15000",
+      minOrder: "0",
+      estimatedDeliveryTime: "30-45 phút",
+      avatar: "",
+      coverImage: "",
+      ownerName: "",
+      ownerEmail: "",
+      ownerPhone: "",
+      ownerPassword: "",
     });
+    setSelectedCuisines([]);
+    setAvatarPreview("");
+    setCoverPreview("");
+  };
+
+  const toggleCuisine = (cuisine) => {
+    setSelectedCuisines(prev => 
+      prev.includes(cuisine) 
+        ? prev.filter(c => c !== cuisine)
+        : [...prev, cuisine]
+    );
+  };
+
+  const handleImageChange = (e, type) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        alert('Vui lòng chọn file ảnh');
+        return;
+      }
+      
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Kích thước ảnh không được vượt quá 5MB');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result;
+        if (type === 'avatar') {
+          setFormData(prev => ({ ...prev, avatar: base64String }));
+          setAvatarPreview(base64String);
+        } else {
+          setFormData(prev => ({ ...prev, coverImage: base64String }));
+          setCoverPreview(base64String);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const getTabCounts = () => ({
@@ -694,50 +841,74 @@ function RestaurantManagement() {
             </div>
             <form onSubmit={handleCreateRestaurant}>
               <div className="modal-body">
-                <div className="form-group">
-                  <label htmlFor="name">Tên nhà hàng *</label>
-                  <input
-                    type="text"
-                    id="name"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    required
-                    placeholder="Nhập tên nhà hàng"
-                  />
-                </div>
-
-                <div className="form-row-2">
+                <div className="form-section">
+                  <h3 className="section-title">Thông tin nhà hàng</h3>
+                  
                   <div className="form-group">
-                    <label htmlFor="ownerName">Tên chủ quán *</label>
+                    <label htmlFor="name">Tên nhà hàng *</label>
                     <input
                       type="text"
-                      id="ownerName"
-                      name="ownerName"
-                      value={formData.ownerName}
+                      id="name"
+                      name="name"
+                      value={formData.name}
                       onChange={handleChange}
                       required
-                      placeholder="Nhập tên chủ quán"
+                      placeholder="Nhập tên nhà hàng"
                     />
                   </div>
 
-                  <div className="form-group">
-                    <label htmlFor="email">Email *</label>
-                    <input
-                      type="email"
-                      id="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      required
-                      placeholder="Nhập email"
-                    />
-                  </div>
-                </div>
+                  <div className="form-row-2">
+                    <div className="form-group">
+                      <label>Ảnh đại diện (Logo)</label>
+                      <div className="image-upload-container">
+                        <input
+                          type="file"
+                          id="avatar"
+                          accept="image/*"
+                          onChange={(e) => handleImageChange(e, 'avatar')}
+                          style={{ display: 'none' }}
+                        />
+                        <label htmlFor="avatar" className="image-upload-label">
+                          {avatarPreview ? (
+                            <img src={avatarPreview} alt="Avatar preview" className="image-preview" />
+                          ) : (
+                            <div className="image-placeholder">
+                              <span className="upload-icon">📷</span>
+                              <span className="upload-text">Chọn ảnh đại diện</span>
+                              <span className="upload-hint">Tối đa 5MB</span>
+                            </div>
+                          )}
+                        </label>
+                      </div>
+                    </div>
 
-                <div className="form-row-2">
+                    <div className="form-group">
+                      <label>Ảnh bìa</label>
+                      <div className="image-upload-container">
+                        <input
+                          type="file"
+                          id="coverImage"
+                          accept="image/*"
+                          onChange={(e) => handleImageChange(e, 'cover')}
+                          style={{ display: 'none' }}
+                        />
+                        <label htmlFor="coverImage" className="image-upload-label">
+                          {coverPreview ? (
+                            <img src={coverPreview} alt="Cover preview" className="image-preview" />
+                          ) : (
+                            <div className="image-placeholder">
+                              <span className="upload-icon">🖼️</span>
+                              <span className="upload-text">Chọn ảnh bìa</span>
+                              <span className="upload-hint">Tối đa 5MB</span>
+                            </div>
+                          )}
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="form-group">
-                    <label htmlFor="phone">Số điện thoại *</label>
+                    <label htmlFor="phone">Số điện thoại nhà hàng *</label>
                     <input
                       type="tel"
                       id="phone"
@@ -750,41 +921,187 @@ function RestaurantManagement() {
                   </div>
 
                   <div className="form-group">
-                    <label htmlFor="taxCode">Mã số thuế</label>
+                    <label htmlFor="addressStreet">Địa chỉ (Số nhà, đường) *</label>
                     <input
                       type="text"
-                      id="taxCode"
-                      name="taxCode"
-                      value={formData.taxCode}
+                      id="addressStreet"
+                      name="addressStreet"
+                      value={formData.addressStreet}
                       onChange={handleChange}
-                      placeholder="Nhập mã số thuế"
+                      required
+                      placeholder="Nhập địa chỉ"
+                    />
+                  </div>
+
+                  <div className="form-row-3">
+                    <div className="form-group">
+                      <label htmlFor="addressWard">Phường/Xã</label>
+                      <input
+                        type="text"
+                        id="addressWard"
+                        name="addressWard"
+                        value={formData.addressWard}
+                        onChange={handleChange}
+                        placeholder="Nhập phường/xã"
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label htmlFor="addressDistrict">Quận/Huyện</label>
+                      <input
+                        type="text"
+                        id="addressDistrict"
+                        name="addressDistrict"
+                        value={formData.addressDistrict}
+                        onChange={handleChange}
+                        placeholder="Nhập quận/huyện"
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label htmlFor="addressCity">Thành phố</label>
+                      <input
+                        type="text"
+                        id="addressCity"
+                        name="addressCity"
+                        value={formData.addressCity}
+                        onChange={handleChange}
+                        placeholder="Nhập thành phố"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Loại ẩm thực</label>
+                    <div className="cuisine-tags">
+                      {cuisineOptions.map((cuisine) => (
+                        <button
+                          key={cuisine}
+                          type="button"
+                          className={`cuisine-tag ${selectedCuisines.includes(cuisine) ? 'active' : ''}`}
+                          onClick={() => toggleCuisine(cuisine)}
+                        >
+                          {cuisine}
+                        </button>
+                      ))}
+                    </div>
+                    <small className="form-hint">Chọn các loại ẩm thực phù hợp</small>
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="description">Mô tả</label>
+                    <textarea
+                      id="description"
+                      name="description"
+                      value={formData.description}
+                      onChange={handleChange}
+                      placeholder="Nhập mô tả về nhà hàng"
+                      rows="3"
+                    />
+                  </div>
+
+                  <div className="form-row-2">
+                    <div className="form-group">
+                      <label htmlFor="deliveryFee">Phí giao hàng (VNĐ)</label>
+                      <input
+                        type="number"
+                        id="deliveryFee"
+                        name="deliveryFee"
+                        value={formData.deliveryFee}
+                        onChange={handleChange}
+                        min="0"
+                        placeholder="15000"
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label htmlFor="minOrder">Đơn tối thiểu (VNĐ)</label>
+                      <input
+                        type="number"
+                        id="minOrder"
+                        name="minOrder"
+                        value={formData.minOrder}
+                        onChange={handleChange}
+                        min="0"
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="estimatedDeliveryTime">Thời gian giao hàng dự kiến</label>
+                    <input
+                      type="text"
+                      id="estimatedDeliveryTime"
+                      name="estimatedDeliveryTime"
+                      value={formData.estimatedDeliveryTime}
+                      onChange={handleChange}
+                      placeholder="30-45 phút"
                     />
                   </div>
                 </div>
 
-                <div className="form-group">
-                  <label htmlFor="address">Địa chỉ *</label>
-                  <textarea
-                    id="address"
-                    name="address"
-                    value={formData.address}
-                    onChange={handleChange}
-                    required
-                    placeholder="Nhập địa chỉ đầy đủ"
-                    rows="2"
-                  />
-                </div>
+                <div className="form-divider"></div>
 
-                <div className="form-group">
-                  <label htmlFor="description">Mô tả</label>
-                  <textarea
-                    id="description"
-                    name="description"
-                    value={formData.description}
-                    onChange={handleChange}
-                    placeholder="Nhập mô tả về nhà hàng"
-                    rows="3"
-                  />
+                <div className="form-section">
+                  <h3 className="section-title">Thông tin chủ nhà hàng</h3>
+                  
+                  <div className="form-group">
+                    <label htmlFor="ownerName">Tên chủ nhà hàng *</label>
+                    <input
+                      type="text"
+                      id="ownerName"
+                      name="ownerName"
+                      value={formData.ownerName}
+                      onChange={handleChange}
+                      required
+                      placeholder="Nhập họ tên"
+                    />
+                  </div>
+
+                  <div className="form-row-2">
+                    <div className="form-group">
+                      <label htmlFor="ownerEmail">Email đăng nhập *</label>
+                      <input
+                        type="email"
+                        id="ownerEmail"
+                        name="ownerEmail"
+                        value={formData.ownerEmail}
+                        onChange={handleChange}
+                        required
+                        placeholder="Nhập email"
+                      />
+                      <small className="form-hint">Email này sẽ dùng để đăng nhập hệ thống</small>
+                    </div>
+
+                    <div className="form-group">
+                      <label htmlFor="ownerPhone">Số điện thoại *</label>
+                      <input
+                        type="tel"
+                        id="ownerPhone"
+                        name="ownerPhone"
+                        value={formData.ownerPhone}
+                        onChange={handleChange}
+                        required
+                        placeholder="Nhập số điện thoại"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="ownerPassword">Mật khẩu *</label>
+                    <input
+                      type="password"
+                      id="ownerPassword"
+                      name="ownerPassword"
+                      value={formData.ownerPassword}
+                      onChange={handleChange}
+                      required
+                      minLength="6"
+                      placeholder="Nhập mật khẩu"
+                    />
+                    <small className="form-hint">Mật khẩu tối thiểu 6 ký tự</small>
+                  </div>
                 </div>
 
                 <div className="form-actions">
@@ -795,11 +1112,16 @@ function RestaurantManagement() {
                       setShowCreateModal(false);
                       resetForm();
                     }}
+                    disabled={processing}
                   >
                     Hủy
                   </button>
-                  <button type="submit" className="btn-create">
-                    Tạo nhà hàng
+                  <button 
+                    type="submit" 
+                    className="btn-create"
+                    disabled={processing}
+                  >
+                    {processing ? "Đang tạo..." : "Tạo nhà hàng"}
                   </button>
                 </div>
               </div>

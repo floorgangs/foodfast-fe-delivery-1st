@@ -11,6 +11,7 @@ import {
   approveRestaurant,
   rejectRestaurant,
   getRestaurantCompliance,
+  createRestaurantWithOwner,
 } from "../controllers/restaurantController.js";
 import { protect, restrictTo } from "../middleware/auth.js";
 
@@ -40,6 +41,12 @@ router.get(
   protect,
   restrictTo("admin"),
   getAllRestaurantsAdmin
+);
+router.post(
+  "/admin/create-with-owner",
+  protect,
+  restrictTo("admin"),
+  createRestaurantWithOwner
 );
 router.put(
   "/admin/:id/approve",

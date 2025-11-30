@@ -529,3 +529,155 @@ export const getRestaurantCompliance = async (req, res) => {
     });
   }
 };
+
+// Admin: Create restaurant with owner account
+export const createRestaurantWithOwner = async (req, res) => {
+  try {
+    const {
+      // Restaurant info
+      name,
+      description,
+      cuisine,
+      address,
+      phone,
+      deliveryFee,
+      minOrder,
+      estimatedDeliveryTime,
+      // Owner info
+      ownerName,
+      ownerEmail,
+      ownerPhone,
+      ownerPassword,
+    } = req.body;
+
+    console.log("[Admin] Creating restaurant with owner:", { name, ownerEmail });
+
+    // Validate required fields
+    if (!name || !ownerName || !ownerEmail || !ownerPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Vui lòng nhập đầy đủ thông tin bắt buộc",
+      });
+    }
+
+    if (!phone && !ownerPhone) {
+      return res.status(400).json({
+        success: false,
+        message: "Vui lòng nhập số điện thoại",
+      });
+    }
+
+    // Check if owner email already exists
+    const User = (await import("../models/User.js")).default;
+    const existingUser = await User.findOne({ email: ownerEmail.toLowerCase() });
+    
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: "Email chủ nhà hàng đã tồn tại trong hệ thống",
+      });
+    }
+
+    // Check if restaurant name already exists
+    const existingRestaurant = await Restaurant.findOne({ 
+      name: { $regex: new RegExp(`^${name}$`, 'i') } 
+    });
+    
+    if (existingRestaurant) {
+      return res.status(400).json({
+        success: false,
+        message: "Tên nhà hàng đã tồn tại",
+      });
+    }
+
+    // Create owner account
+    const owner = await User.create({
+      name: ownerName.trim(),
+      email: ownerEmail.trim().toLowerCase(),
+      phone: ownerPhone.trim(),
+      password: ownerPassword,
+      role: "restaurant",
+      isActive: true,
+    });
+
+    console.log("[Admin] Owner account created:", owner._id);
+
+    // Parse cuisine array
+    let cuisineArray = [];
+    if (cuisine) {
+      if (Array.isArray(cuisine)) {
+        cuisineArray = cuisine.filter(Boolean);
+      } else if (typeof cuisine === "string") {
+        cuisineArray = cuisine.split(",").map(c => c.trim()).filter(Boolean);
+      }
+    }
+
+    // Parse address
+    let restaurantAddress = address;
+    if (typeof address === "string") {
+      restaurantAddress = { street: address };
+    } else if (typeof address === "object" && address !== null) {
+      restaurantAddress = {
+        street: address.street || "",
+        ward: address.ward || "",
+        district: address.district || "",
+        city: address.city || "Hồ Chí Minh",
+        coordinates: address.coordinates || undefined,
+      };
+    }
+
+    // Create restaurant
+    const restaurant = await Restaurant.create({
+      name: name.trim(),
+      description: description?.trim() || "",
+      cuisine: cuisineArray,
+      address: restaurantAddress,
+      phone: phone?.trim() || ownerPhone.trim(),
+      avatar: req.body.avatar || "https://ui-avatars.com/api/?name=" + encodeURIComponent(name.trim()) + "&background=ff6b35&color=fff&size=300",
+      coverImage: req.body.coverImage || "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&h=400&fit=crop",
+      owner: owner._id,
+      deliveryFee: Number(deliveryFee) || 15000,
+      minOrder: Number(minOrder) || 0,
+      estimatedDeliveryTime: estimatedDeliveryTime || "30-45 phút",
+      isApproved: true, // Admin created, auto approve
+      isActive: true,
+      compliance: {
+        status: "approved",
+        submittedAt: new Date(),
+        approvedAt: new Date(),
+        approvedBy: req.user._id,
+        notes: "Tạo bởi admin",
+      },
+    });
+
+    console.log("[Admin] Restaurant created:", restaurant._id);
+
+    // Update user with restaurant reference
+    await User.findByIdAndUpdate(owner._id, {
+      restaurant: restaurant._id,
+    });
+
+    const populatedRestaurant = await Restaurant.findById(restaurant._id)
+      .populate("owner", "name email phone");
+
+    res.status(201).json({
+      success: true,
+      message: "Tạo nhà hàng thành công",
+      data: {
+        restaurant: populatedRestaurant,
+        owner: {
+          id: owner._id,
+          name: owner.name,
+          email: owner.email,
+          phone: owner.phone,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("[Admin] Error creating restaurant:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Không thể tạo nhà hàng",
+    });
+  }
+};
