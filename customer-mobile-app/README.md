@@ -59,6 +59,8 @@ Mobile app khách hàng cho hệ thống giao hàng bằng Drone FoodFast.
 
 ## 📦 Cài đặt
 
+**⚠️ LƯU Ý QUAN TRỌNG: Đọc [SETUP_GUIDE.md](./SETUP_GUIDE.md) để biết cách cấu hình kết nối backend!**
+
 ```bash
 # Di chuyển vào thư mục mobile app
 cd customer-mobile-app
@@ -66,15 +68,19 @@ cd customer-mobile-app
 # Cài đặt dependencies
 npm install
 
-# Chạy trên Android
-npm run android
-
-# Chạy trên iOS
-npm run ios
-
-# Chạy trên web (development)
-npm run web
+# Chạy với Expo (khuyên dùng --tunnel để test trên nhiều máy)
+npx expo start --tunnel
 ```
+
+### 🔧 Cấu hình Backend
+
+App này cần kết nối tới backend API. Có 3 cách:
+
+1. **Dùng Ngrok (Khuyên dùng)** - Hoạt động mọi máy, mọi mạng
+2. **Dùng IP LAN** - Phải cùng WiFi
+3. **Cấu hình trong app** - Vào Profile > Cấu hình Server
+
+📖 **Chi tiết xem file [SETUP_GUIDE.md](./SETUP_GUIDE.md)**
 
 ## 🗂️ Cấu trúc thư mục
 

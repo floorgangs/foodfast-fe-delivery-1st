@@ -26,11 +26,10 @@ export const getRestaurantStaff = async (req, res) => {
       }
     }
 
-    // Get staff from Users collection with role="staff"
-    const staff = await User.find({ 
-      restaurant: restaurantId,
-      role: "staff"
-    }).select('+password').sort({ createdAt: -1 });
+    // Get staff from Staffs collection
+    const staff = await Staff.find({ 
+      restaurant: restaurantId
+    }).populate('user', 'name email phone').sort({ createdAt: -1 });
 
     res.json({
       success: true,
@@ -49,8 +48,9 @@ export const getRestaurantStaff = async (req, res) => {
 // Get all staff (Admin only)
 export const getAllStaff = async (req, res) => {
   try {
-    const staff = await User.find({ role: "staff" })
+    const staff = await Staff.find({})
       .populate("restaurant", "name")
+      .populate("user", "name email phone")
       .sort({ createdAt: -1 });
 
     res.json({
@@ -117,19 +117,9 @@ export const addStaff = async (req, res) => {
       });
     }
 
-    // Check if email already exists
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
-    if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        message: "Email này đã được đăng ký",
-      });
-    }
-
     // Check if phone already exists for staff in this restaurant
-    const existingPhone = await User.findOne({
+    const existingPhone = await Staff.findOne({
       restaurant: restaurantId,
-      role: "staff",
       phone: phone,
     });
 
@@ -140,40 +130,66 @@ export const addStaff = async (req, res) => {
       });
     }
 
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    let userId = null;
+    let hasAccount = false;
 
-    // Create user with role "staff"
-    const newStaff = await User.create({
-      name,
-      email: email.toLowerCase(),
-      password: hashedPassword,
-      phone,
-      role: "staff",
+    // Create user account if email and password provided
+    if (email && password) {
+      const existingUser = await User.findOne({ email: email.toLowerCase() });
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          message: "Email này đã được đăng ký",
+        });
+      }
+
+      // Create user with role "staff" - password sẽ được hash tự động bởi pre-save hook
+      const newUser = await User.create({
+        name,
+        email: email.toLowerCase(),
+        password, // Để nguyên, sẽ được hash bởi pre-save hook
+        phone,
+        role: "staff",
+        restaurant: restaurantId,
+        isVerified: true,
+      });
+
+      userId = newUser._id;
+      hasAccount = true;
+      console.log('✅ User account created:', newUser._id);
+    }
+
+    // Create staff record in Staffs collection
+    const newStaff = await Staff.create({
       restaurant: restaurantId,
+      user: userId,
+      name,
+      phone,
+      email: email || '',
       position,
+      salary,
       startDate: startDate || new Date(),
       idCard,
       address,
       birthDate,
       emergencyContact,
+      workSchedule,
       isActive: true,
+      hasAccount,
     });
 
-    console.log('✅ Staff created:', newStaff._id);
+    console.log('✅ Staff record created:', newStaff._id);
 
-    // Populate restaurant info
+    // Populate relations
     await newStaff.populate("restaurant", "name");
-
-    // Remove password from response
-    const staffResponse = newStaff.toObject();
-    delete staffResponse.password;
+    if (userId) {
+      await newStaff.populate("user", "name email phone");
+    }
 
     res.status(201).json({
       success: true,
       message: "Thêm nhân viên thành công",
-      data: staffResponse,
+      data: newStaff,
     });
   } catch (error) {
     console.error("Add staff error:", error);
@@ -310,7 +326,7 @@ export const deleteStaff = async (req, res) => {
   try {
     const { staffId } = req.params;
 
-    const staff = await User.findOne({ _id: staffId, role: "staff" }).populate("restaurant");
+    const staff = await Staff.findById(staffId).populate("restaurant");
 
     if (!staff) {
       return res.status(404).json({
@@ -332,7 +348,14 @@ export const deleteStaff = async (req, res) => {
       }
     }
 
-    await User.findByIdAndDelete(staffId);
+    // Delete associated user account if exists
+    if (staff.user) {
+      await User.findByIdAndDelete(staff.user);
+      console.log('✅ User account deleted:', staff.user);
+    }
+
+    // Delete staff record
+    await Staff.findByIdAndDelete(staffId);
 
     res.json({
       success: true,

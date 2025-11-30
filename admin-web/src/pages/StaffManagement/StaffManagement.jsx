@@ -24,35 +24,34 @@ function StaffManagement() {
         localStorage.getItem("admin_token") || localStorage.getItem("token");
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
-      // Load staff users (role="staff") - not restaurant owners
-      const usersRes = await axios.get(`${API_URL}/auth/users?role=staff`, {
+      // Load staff from Staffs collection
+      const staffRes = await axios.get(`${API_URL}/staff/all`, {
         headers,
       });
 
-      // Load restaurants to match staff to their restaurants
-      const restaurantsRes = await axios.get(`${API_URL}/restaurants`, {
-        headers,
-      });
+      if (staffRes.data.success) {
+        const staffList = staffRes.data.data || [];
 
-      if (usersRes.data.success) {
-        const staffUsers = usersRes.data.data || [];
-        const restaurantsList = restaurantsRes.data.data || [];
-
-        // Map staff to their restaurants
-        const mappedStaff = staffUsers.map((user) => {
-          const restaurant = restaurantsList.find(
-            (r) => r._id === user.restaurant || r._id === user.restaurant?._id
-          );
+        // Map staff data (already populated with restaurant)
+        const mappedStaff = staffList.map((staff) => {
           return {
-            ...user,
-            id: user._id,
-            restaurantName: restaurant?.name || "Chưa có nhà hàng",
-            restaurantId: restaurant?._id || null,
+            ...staff,
+            id: staff._id,
+            restaurantName: staff.restaurant?.name || "Chưa có nhà hàng",
+            restaurantId: staff.restaurant?._id || null,
+            // Include user info if account exists
+            email: staff.user?.email || staff.email || '',
+            userName: staff.user?.name || staff.name,
           };
         });
 
         setStaff(mappedStaff);
-        setRestaurants(restaurantsList);
+
+        // Load restaurants for filter dropdown
+        const restaurantsRes = await axios.get(`${API_URL}/restaurants`, {
+          headers,
+        });
+        setRestaurants(restaurantsRes.data.data || []);
       }
     } catch (error) {
       console.error("Error loading staff:", error);
