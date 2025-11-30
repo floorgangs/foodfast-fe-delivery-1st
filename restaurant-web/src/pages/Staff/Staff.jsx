@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { staffAPI } from '../../services/api'
 import './Staff.css'
 
 function Staff() {
@@ -8,102 +9,24 @@ function Staff() {
   const [showEditModal, setShowEditModal] = useState(false)
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [selectedStaff, setSelectedStaff] = useState(null)
-
-  const [staff, setStaff] = useState([
-    {
-      id: 'NV001',
-      name: 'Nguyễn Văn A',
-      phone: '0901234567',
-      email: 'nguyenvana@email.com',
-      position: 'Quản lý',
-      salary: 15000000,
-      startDate: '2024-01-15',
-      status: 'active',
-      avatar: null,
-      idCard: '079024567890',
-      address: '123 Nguyễn Huệ, Quận 1, TP.HCM',
-      birthDate: '1990-05-20',
-      emergencyContact: '0987654321',
-      workSchedule: 'Ca sáng'
-    },
-    {
-      id: 'NV002',
-      name: 'Trần Thị B',
-      phone: '0912345678',
-      email: 'tranthib@email.com',
-      position: 'Thu ngân',
-      salary: 8000000,
-      startDate: '2024-03-10',
-      status: 'active',
-      avatar: null,
-      idCard: '079024567891',
-      address: '456 Lê Lợi, Quận 1, TP.HCM',
-      birthDate: '1995-08-15',
-      emergencyContact: '0976543210',
-      workSchedule: 'Ca chiều'
-    },
-    {
-      id: 'NV003',
-      name: 'Lê Văn C',
-      phone: '0923456789',
-      email: 'levanc@email.com',
-      position: 'Đầu bếp',
-      salary: 12000000,
-      startDate: '2024-02-20',
-      status: 'active',
-      avatar: null,
-      idCard: '079024567892',
-      address: '789 Trần Hưng Đạo, Quận 5, TP.HCM',
-      birthDate: '1988-12-10',
-      emergencyContact: '0965432109',
-      workSchedule: 'Full time'
-    },
-    {
-      id: 'NV004',
-      name: 'Phạm Thị D',
-      phone: '0934567890',
-      email: 'phamthid@email.com',
-      position: 'Phục vụ',
-      salary: 7000000,
-      startDate: '2024-04-05',
-      status: 'active',
-      avatar: null,
-      idCard: '079024567893',
-      address: '321 Võ Văn Tần, Quận 3, TP.HCM',
-      birthDate: '1998-03-25',
-      emergencyContact: '0954321098',
-      workSchedule: 'Ca sáng'
-    },
-    {
-      id: 'NV005',
-      name: 'Hoàng Văn E',
-      phone: '0945678901',
-      email: 'hoangvane@email.com',
-      position: 'Phục vụ',
-      salary: 7000000,
-      startDate: '2024-05-15',
-      status: 'inactive',
-      avatar: null,
-      idCard: '079024567894',
-      address: '654 Pasteur, Quận 3, TP.HCM',
-      birthDate: '1997-07-18',
-      emergencyContact: '0943210987',
-      workSchedule: 'Ca chiều'
-    },
-  ])
+  const [loading, setLoading] = useState(true)
+  const [staff, setStaff] = useState([])
+  
+  // Get restaurant ID from localStorage
+  const restaurantData = JSON.parse(localStorage.getItem('restaurant_data') || '{}')
+  const restaurantId = restaurantData._id
 
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
     email: '',
+    password: '',
     position: 'Phục vụ',
-    salary: '',
     startDate: '',
     idCard: '',
     address: '',
     birthDate: '',
     emergencyContact: '',
-    workSchedule: 'Ca sáng',
     avatar: null
   })
 
@@ -116,11 +39,43 @@ function Staff() {
     { value: 'Giao hàng', label: 'Giao hàng' },
   ]
 
-  const workSchedules = [
-    { value: 'Ca sáng', label: 'Ca sáng (6h-14h)' },
-    { value: 'Ca chiều', label: 'Ca chiều (14h-22h)' },
-    { value: 'Full time', label: 'Full time (6h-22h)' },
-  ]
+  // Load staff from API
+  useEffect(() => {
+    loadStaff()
+  }, [restaurantId])
+
+  const loadStaff = async () => {
+    if (!restaurantId) {
+      setLoading(false)
+      return
+    }
+    try {
+      setLoading(true)
+      const response = await staffAPI.getByRestaurant(restaurantId)
+      if (response.success && response.data) {
+        // Transform API data to match UI format
+        const transformedStaff = response.data.map(s => ({
+          id: s._id,
+          name: s.name,
+          phone: s.phone,
+          email: s.email || '',
+          position: s.position,
+          startDate: s.startDate ? s.startDate.split('T')[0] : '',
+          status: s.isActive ? 'active' : 'inactive',
+          avatar: s.avatar,
+          idCard: s.idCard || '',
+          address: s.address || '',
+          birthDate: s.birthDate ? s.birthDate.split('T')[0] : '',
+          emergencyContact: s.emergencyContact || ''
+        }))
+        setStaff(transformedStaff)
+      }
+    } catch (error) {
+      console.error('Error loading staff:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const getFilteredStaff = () => {
     let filtered = staff
@@ -143,12 +98,17 @@ function Staff() {
   }
 
   const handleChange = (e) => {
-    const { name, value, files } = e.target
+    const { name, value, files, type, checked } = e.target
 
     if (name === 'avatar') {
       setFormData({
         ...formData,
         [name]: files[0]
+      })
+    } else if (type === 'checkbox') {
+      setFormData({
+        ...formData,
+        [name]: checked
       })
     } else {
       setFormData({
@@ -158,35 +118,63 @@ function Staff() {
     }
   }
 
-  const handleAddStaff = (e) => {
+  const handleAddStaff = async (e) => {
     e.preventDefault()
-    const newStaff = {
-      id: `NV${String(staff.length + 1).padStart(3, '0')}`,
-      ...formData,
-      status: 'active',
-      salary: parseInt(formData.salary)
+    try {
+      const staffData = {
+        name: formData.name,
+        phone: formData.phone,
+        email: formData.email,
+        password: formData.password,
+        position: formData.position,
+        startDate: formData.startDate,
+        idCard: formData.idCard,
+        address: formData.address,
+        birthDate: formData.birthDate,
+        emergencyContact: formData.emergencyContact
+      }
+
+      const response = await staffAPI.create(restaurantId, staffData)
+      if (response.success) {
+        alert(response.message || 'Thêm nhân viên thành công!')
+        setShowAddModal(false)
+        resetForm()
+        loadStaff()
+      }
+    } catch (error) {
+      console.error('Error adding staff:', error)
+      alert(error.message || 'Lỗi khi thêm nhân viên')
     }
-    setStaff([...staff, newStaff])
-    setShowAddModal(false)
-    resetForm()
   }
 
-  const handleEditStaff = (e) => {
+  const handleEditStaff = async (e) => {
     e.preventDefault()
-    const updatedStaff = staff.map(s =>
-      s.id === selectedStaff.id
-        ? {
-            ...s,
-            ...formData,
-            salary: parseInt(formData.salary),
-            avatar: formData.avatar || s.avatar
-          }
-        : s
-    )
-    setStaff(updatedStaff)
-    setShowEditModal(false)
-    setSelectedStaff(null)
-    resetForm()
+    try {
+      const staffData = {
+        name: formData.name,
+        phone: formData.phone,
+        email: formData.email,
+        password: formData.password,
+        position: formData.position,
+        startDate: formData.startDate,
+        idCard: formData.idCard,
+        address: formData.address,
+        birthDate: formData.birthDate,
+        emergencyContact: formData.emergencyContact
+      }
+
+      const response = await staffAPI.update(selectedStaff.id, staffData)
+      if (response.success) {
+        alert('Cập nhật nhân viên thành công!')
+        setShowEditModal(false)
+        setSelectedStaff(null)
+        resetForm()
+        loadStaff()
+      }
+    } catch (error) {
+      console.error('Error updating staff:', error)
+      alert(error.message || 'Lỗi khi cập nhật nhân viên')
+    }
   }
 
   const resetForm = () => {
@@ -194,27 +182,43 @@ function Staff() {
       name: '',
       phone: '',
       email: '',
+      password: '',
       position: 'Phục vụ',
-      salary: '',
       startDate: '',
       idCard: '',
       address: '',
       birthDate: '',
       emergencyContact: '',
-      workSchedule: 'Ca sáng',
       avatar: null
     })
   }
 
-  const toggleStatus = (id) => {
-    setStaff(staff.map(s =>
-      s.id === id ? { ...s, status: s.status === 'active' ? 'inactive' : 'active' } : s
-    ))
+  const toggleStatus = async (id) => {
+    try {
+      const member = staff.find(s => s.id === id)
+      const newStatus = member.status === 'active' ? false : true
+      const response = await staffAPI.update(id, { isActive: newStatus })
+      if (response.success) {
+        loadStaff()
+      }
+    } catch (error) {
+      console.error('Error toggling status:', error)
+      alert(error.message || 'Lỗi khi thay đổi trạng thái')
+    }
   }
 
-  const deleteStaff = (id) => {
+  const deleteStaff = async (id) => {
     if (window.confirm('Bạn có chắc muốn xóa nhân viên này?')) {
-      setStaff(staff.filter(s => s.id !== id))
+      try {
+        const response = await staffAPI.delete(id)
+        if (response.success) {
+          alert('Xóa nhân viên thành công!')
+          loadStaff()
+        }
+      } catch (error) {
+        console.error('Error deleting staff:', error)
+        alert(error.message || 'Lỗi khi xóa nhân viên')
+      }
     }
   }
 
@@ -223,16 +227,18 @@ function Staff() {
     setFormData({
       name: member.name,
       phone: member.phone,
-      email: member.email,
+      email: member.email || '',
       position: member.position,
-      salary: member.salary.toString(),
+      salary: member.salary?.toString() || '',
       startDate: member.startDate,
-      idCard: member.idCard,
-      address: member.address,
+      idCard: member.idCard || '',
+      address: member.address || '',
       birthDate: member.birthDate,
-      emergencyContact: member.emergencyContact,
+      emergencyContact: member.emergencyContact || '',
       workSchedule: member.workSchedule,
-      avatar: null
+      avatar: null,
+      createAccount: false,
+      password: ''
     })
     setShowEditModal(true)
   }
@@ -319,8 +325,6 @@ function Staff() {
               <th>Họ và tên</th>
               <th>Vị trí</th>
               <th>Số điện thoại</th>
-              <th>Ca làm việc</th>
-              <th>Lương</th>
               <th>Trạng thái</th>
               <th>Thao tác</th>
             </tr>
@@ -350,12 +354,6 @@ function Staff() {
                   <span className="position-badge">{member.position}</span>
                 </td>
                 <td>{member.phone}</td>
-                <td>
-                  <span className="schedule-badge">{member.workSchedule}</span>
-                </td>
-                <td>
-                  <span className="salary">{member.salary.toLocaleString('vi-VN')}đ</span>
-                </td>
                 <td>
                   <span className={`status-badge ${member.status}`}>
                     {member.status === 'active' ? 'Đang làm' : 'Nghỉ việc'}
@@ -456,21 +454,6 @@ function Staff() {
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>Lương (VNĐ) *</label>
-                  <input
-                    type="number"
-                    name="salary"
-                    value={formData.salary}
-                    onChange={handleChange}
-                    min="1000000"
-                    step="500000"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
                   <label>Ngày bắt đầu *</label>
                   <input
                     type="date"
@@ -479,14 +462,6 @@ function Staff() {
                     onChange={handleChange}
                     required
                   />
-                </div>
-                <div className="form-group">
-                  <label>Ca làm việc *</label>
-                  <select name="workSchedule" value={formData.workSchedule} onChange={handleChange}>
-                    {workSchedules.map(schedule => (
-                      <option key={schedule.value} value={schedule.value}>{schedule.label}</option>
-                    ))}
-                  </select>
                 </div>
               </div>
 
@@ -543,6 +518,36 @@ function Staff() {
                   onChange={handleChange}
                   accept="image/*"
                 />
+              </div>
+
+              {/* Account Creation Section - Now Required */}
+              <div className="account-section">
+                <h3>🔐 Thông tin đăng nhập (Bắt buộc)</h3>
+                <p className="section-desc">Email và mật khẩu để nhân viên đăng nhập vào hệ thống</p>
+                
+                <div className="form-group">
+                  <label>Email đăng nhập *</label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    placeholder="email@example.com"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Mật khẩu *</label>
+                  <input
+                    type="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    placeholder="Nhập mật khẩu (tối thiểu 6 ký tự)"
+                    minLength="6"
+                    required
+                  />
+                </div>
               </div>
 
               <div className="modal-actions">
@@ -611,21 +616,6 @@ function Staff() {
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>Lương (VNĐ) *</label>
-                  <input
-                    type="number"
-                    name="salary"
-                    value={formData.salary}
-                    onChange={handleChange}
-                    min="1000000"
-                    step="500000"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
                   <label>Ngày bắt đầu *</label>
                   <input
                     type="date"
@@ -634,14 +624,6 @@ function Staff() {
                     onChange={handleChange}
                     required
                   />
-                </div>
-                <div className="form-group">
-                  <label>Ca làm việc *</label>
-                  <select name="workSchedule" value={formData.workSchedule} onChange={handleChange}>
-                    {workSchedules.map(schedule => (
-                      <option key={schedule.value} value={schedule.value}>{schedule.label}</option>
-                    ))}
-                  </select>
                 </div>
               </div>
 
@@ -752,14 +734,6 @@ function Staff() {
                 <div className="info-item">
                   <span className="info-label">Email</span>
                   <span className="info-value">{selectedStaff.email}</span>
-                </div>
-                <div className="info-item">
-                  <span className="info-label">Lương</span>
-                  <span className="info-value salary-highlight">{selectedStaff.salary.toLocaleString('vi-VN')}đ</span>
-                </div>
-                <div className="info-item">
-                  <span className="info-label">Ca làm việc</span>
-                  <span className="info-value">{selectedStaff.workSchedule}</span>
                 </div>
                 <div className="info-item">
                   <span className="info-label">Ngày bắt đầu</span>

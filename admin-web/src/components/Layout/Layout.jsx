@@ -38,6 +38,10 @@ function Layout() {
               <span className="nav-icon material-icons">store</span>
               <span className="nav-text">Nhà hàng</span>
             </Link>
+            <Link to="/restaurant-owners" className="nav-item">
+              <span className="nav-icon material-icons">store_mall_directory</span>
+              <span className="nav-text">Chủ nhà hàng</span>
+            </Link>
             <Link to="/staff" className="nav-item">
               <span className="nav-icon material-icons">badge</span>
               <span className="nav-text">Nhân viên</span>

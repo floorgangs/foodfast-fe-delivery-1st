@@ -78,6 +78,11 @@ export const orderAPI = {
     return apiCall(`/orders/${orderId}`);
   },
 
+  // Track order (theo dõi đơn hàng)
+  track: async (orderId) => {
+    return apiCall(`/orders/${orderId}/track`);
+  },
+
   // Cập nhật status của order
   updateOrderStatus: async (orderId, status) => {
     return apiCall(`/orders/${orderId}/status`, {

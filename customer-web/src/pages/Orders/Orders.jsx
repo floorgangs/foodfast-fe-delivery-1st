@@ -161,21 +161,30 @@ function Orders() {
                 </div>
 
                 <div className="order-items">
-                  {order.items.slice(0, 2).map((item, idx) => (
-                    <p key={idx}>
-                      {item.name} x{item.quantity}
-                    </p>
+                  {order.items.slice(0, 3).map((item, idx) => (
+                    <div key={idx} className="order-item-row">
+                      {item.product?.image && (
+                        <img 
+                          src={item.product.image} 
+                          alt={item.name} 
+                          className="item-image"
+                          onError={(e) => { e.target.style.display = 'none'; }}
+                        />
+                      )}
+                      <span className="item-name">{item.name}</span>
+                      <span className="item-qty">x{item.quantity}</span>
+                    </div>
                   ))}
-                  {order.items.length > 2 && (
+                  {order.items.length > 3 && (
                     <p className="more-items">
-                      +{order.items.length - 2} món khác
+                      +{order.items.length - 3} món khác
                     </p>
                   )}
                 </div>
 
                 <div className="order-footer">
                   <span className="order-date">
-                    {new Date(order.createdAt).toLocaleDateString("vi-VN", {
+                    🕐 {new Date(order.createdAt).toLocaleDateString("vi-VN", {
                       day: "2-digit",
                       month: "2-digit",
                       year: "numeric",

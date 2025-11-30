@@ -124,6 +124,17 @@ const ProfileScreen = ({ navigation }: any) => {
             <Text style={styles.menuText}>Ưu đãi của tôi</Text>
             <Ionicons name="chevron-forward" size={18} color="#999" />
           </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => navigation.navigate('APIConfig')}
+          >
+            <View style={styles.menuIconContainer}>
+              <Ionicons name="server-outline" size={22} color="#EA5034" />
+            </View>
+            <Text style={styles.menuText}>Cấu hình Server</Text>
+            <Ionicons name="chevron-forward" size={18} color="#999" />
+          </TouchableOpacity>
         </View>
 
         {/* Order History */}

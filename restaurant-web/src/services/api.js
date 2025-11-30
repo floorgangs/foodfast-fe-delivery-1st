@@ -175,4 +175,13 @@ export const voucherAPI = {
   delete: (id) => api.delete(`/vouchers/${id}`),
 };
 
+// Staff APIs
+export const staffAPI = {
+  getByRestaurant: (restaurantId) => api.get(`/staff/restaurant/${restaurantId}`),
+  getById: (id) => api.get(`/staff/${id}`),
+  create: (restaurantId, data) => api.post(`/staff/restaurant/${restaurantId}`, data),
+  update: (id, data) => api.put(`/staff/${id}`, data),
+  delete: (id) => api.delete(`/staff/${id}`),
+};
+
 export default api;
