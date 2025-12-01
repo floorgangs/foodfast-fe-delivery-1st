@@ -13,7 +13,7 @@ import DroneManagement from "./pages/DroneManagement/DroneManagement";
 import OrderManagement from "./pages/OrderManagement/OrderManagement";
 import TransactionManagement from "./pages/TransactionManagement/TransactionManagement";
 import AccountSettings from "./pages/AccountSettings/AccountSettings";
-import Statistics from "./pages/Statistics/Statistics";
+import Analytics from "./pages/Analytics/Analytics";
 import "./App.css";
 
 function App() {
@@ -41,7 +41,8 @@ function App() {
         <Route path="orders" element={<OrderManagement />} />
         <Route path="transactions" element={<TransactionManagement />} />
         <Route path="settings" element={<AccountSettings />} />
-        <Route path="statistics" element={<Statistics />} />
+        <Route path="analytics" element={<Analytics />} />
+        <Route path="statistics" element={<Navigate to="/analytics" replace />} />
       </Route>
     </Routes>
   );

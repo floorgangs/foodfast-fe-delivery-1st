@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
-import { restaurantAPI } from '../services/api';
+import { restaurantAPI, productAPI } from '../services/api';
 import useResponsive from '../hooks/useResponsive';
 
 const { width } = Dimensions.get('window');
@@ -150,11 +150,13 @@ const HomeScreen = ({ navigation }: any) => {
   const [activeSlide, setActiveSlide] = useState(0);
   const [selectedFilter, setSelectedFilter] = useState('suggest');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [restaurants, setRestaurants] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
+  const searchInputRef = useRef<TextInput>(null);
   const user = useSelector((state: RootState) => state.auth.user);
   const [restaurantImageFallbacks, setRestaurantImageFallbacks] = useState<Record<string, number>>({});
 
@@ -167,6 +169,20 @@ const HomeScreen = ({ navigation }: any) => {
   useEffect(() => {
     loadRestaurants();
   }, []);
+
+  // Search for products/restaurants when search text changes
+  useEffect(() => {
+    const delaySearch = setTimeout(async () => {
+      if (searchText.trim().length > 0) {
+        await searchProducts(searchText.trim());
+      } else {
+        setSearchResults([]);
+        setIsSearching(false);
+      }
+    }, 500); // Debounce 500ms
+
+    return () => clearTimeout(delaySearch);
+  }, [searchText]);
 
   const loadRestaurants = async () => {
     try {
@@ -209,8 +225,53 @@ const HomeScreen = ({ navigation }: any) => {
     setRefreshing(false);
   };
 
+  const searchProducts = async (keyword: string) => {
+    try {
+      setIsSearching(true);
+      const response = await productAPI.search(keyword);
+      
+      const products = Array.isArray(response?.data?.data)
+        ? response.data.data
+        : Array.isArray(response?.data)
+          ? response.data
+          : [];
+
+      // Group products by restaurant
+      const restaurantMap = new Map();
+      
+      products.forEach((product: any) => {
+        const restaurantId = product.restaurantId?._id || product.restaurantId;
+        const restaurantData = typeof product.restaurantId === 'object' 
+          ? product.restaurantId 
+          : restaurants.find(r => r._id === restaurantId);
+
+        if (restaurantData) {
+          if (!restaurantMap.has(restaurantId)) {
+            restaurantMap.set(restaurantId, {
+              ...restaurantData,
+              matchedProducts: []
+            });
+          }
+          restaurantMap.get(restaurantId).matchedProducts.push(product);
+        }
+      });
+
+      setSearchResults(Array.from(restaurantMap.values()));
+    } catch (error) {
+      console.error('[HomeScreen] Error searching products:', error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
   // Filter and sort restaurants based on selected filter and category
   const getFilteredRestaurants = () => {
+    // If searching, return search results
+    if (searchText.trim().length > 0 && searchResults.length > 0) {
+      return searchResults.map(normalizeRestaurant);
+    }
+
     const normalizedSearchText = searchText.trim().toLowerCase();
     const normalizedCategory = selectedCategory.trim().toLowerCase();
 
@@ -311,27 +372,39 @@ const HomeScreen = ({ navigation }: any) => {
         </View>
         
         {/* Search Bar */}
-        <View style={[
-          styles.searchContainer, 
-          isSearchFocused && styles.searchContainerFocused
-        ]}>
+        <TouchableOpacity 
+          style={styles.searchContainer}
+          activeOpacity={1}
+          onPress={() => searchInputRef.current?.focus()}
+        >
           <Text style={styles.searchIcon}>🔍</Text>
           <TextInput
-            style={[styles.searchInput, { outline: 'none' } as any]}
+            ref={searchInputRef}
+            style={styles.searchInput}
             placeholder="Tìm món ăn, nhà hàng..."
             placeholderTextColor="#999"
             value={searchText}
             onChangeText={setSearchText}
-            onFocus={() => setIsSearchFocused(true)}
-            onBlur={() => setIsSearchFocused(false)}
-            underlineColorAndroid="transparent"
+            autoCorrect={false}
+            autoCapitalize="none"
           />
-          {searchText.length > 0 ? (
+          {isSearching ? (
+            <ActivityIndicator size="small" color="#EA5034" style={{ marginLeft: 8 }} />
+          ) : searchText.length > 0 ? (
             <TouchableOpacity onPress={() => setSearchText('')} style={styles.clearButton}>
               <Text style={styles.clearIcon}>✕</Text>
             </TouchableOpacity>
           ) : null}
-        </View>
+        </TouchableOpacity>
+        
+        {/* Search Results Info */}
+        {searchText.trim().length > 0 && searchResults.length > 0 && (
+          <View style={styles.searchResultsInfo}>
+            <Text style={styles.searchResultsText}>
+              Tìm thấy {searchResults.length} nhà hàng có món "{searchText}"
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Main Content with Banner, Menu, Filter Tabs and Restaurant List */}
@@ -345,6 +418,9 @@ const HomeScreen = ({ navigation }: any) => {
           showsVerticalScrollIndicator={false}
           style={{ flex: 1 }}
           stickyHeaderIndices={[2]}
+          keyboardShouldPersistTaps="always"
+          nestedScrollEnabled={true}
+          removeClippedSubviews={false}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
@@ -562,6 +638,12 @@ const HomeScreen = ({ navigation }: any) => {
             const discountLabel = percentageVoucher && percentageVoucher.value
               ? `-${coerceToString(percentageVoucher.value)}%`
               : null;
+            
+            // Show matched products if searching
+            const hasMatchedProducts = restaurant.matchedProducts && restaurant.matchedProducts.length > 0;
+            const matchedProductNames = hasMatchedProducts 
+              ? restaurant.matchedProducts.slice(0, 2).map((p: any) => p.name).join(', ')
+              : '';
 
           return (
           <TouchableOpacity
@@ -597,6 +679,11 @@ const HomeScreen = ({ navigation }: any) => {
                   </View>
                 ) : null}
               </View>
+              {hasMatchedProducts && (
+                <Text style={styles.matchedProducts} numberOfLines={1}>
+                  🍽️ {matchedProductNames}{restaurant.matchedProducts.length > 2 ? '...' : ''}
+                </Text>
+              )}
               <View style={styles.restaurantMeta}>
                 <View style={styles.ratingContainer}>
                   <Text style={styles.ratingStar}>⭐</Text>
@@ -673,16 +760,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  searchContainerFocused: {
-    backgroundColor: '#fff',
-    borderColor: '#EA5034',
-    shadowColor: '#EA5034',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+    borderColor: '#ddd',
   },
   searchIcon: {
     fontSize: 16,
@@ -703,6 +781,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#999',
     fontWeight: 'bold',
+  },
+  searchResultsInfo: {
+    backgroundColor: '#FFF7ED',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#FFE4CC',
+  },
+  searchResultsText: {
+    fontSize: 13,
+    color: '#EA5034',
+    fontWeight: '500',
   },
   carouselContainer: {
     backgroundColor: '#fff',
@@ -874,6 +964,12 @@ const styles = StyleSheet.create({
     color: '#222',
     flex: 1,
     marginRight: 8,
+  },
+  matchedProducts: {
+    fontSize: 12,
+    color: '#EA5034',
+    marginBottom: 4,
+    fontStyle: 'italic',
   },
   discountBadge: {
     backgroundColor: '#EA5034',

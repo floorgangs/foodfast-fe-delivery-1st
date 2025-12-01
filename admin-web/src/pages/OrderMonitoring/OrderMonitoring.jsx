@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { orderAPI } from "../../services/api";
+import { loadGoogleMaps } from "../../utils/loadGoogleMaps";
 import "./OrderMonitoring.css";
 
 // Build route coordinates for smooth polyline
@@ -154,134 +155,153 @@ function OrderMonitoring() {
 
   // Initialize map
   useEffect(() => {
-    if (!showModal || !trackingData || !window.google) return;
+    if (!showModal || !trackingData) return;
 
-    const timer = setTimeout(() => {
-      const mapContainer = document.getElementById("admin-tracking-map");
-      if (!mapContainer) return;
+    let cancelled = false;
+    let timer;
 
-      const pickupCoords = trackingData?.tracking?.pickupLocation?.coordinates || {
-        lat: 10.776923,
-        lng: 106.700981,
-      };
-      const dropoffCoords = trackingData?.tracking?.deliveryLocation?.coordinates || {
-        lat: 10.782112,
-        lng: 106.70917,
-      };
+    const initialiseMap = async () => {
+      try {
+        await loadGoogleMaps();
+        if (cancelled) return;
 
-      if (!mapInstanceRef.current) {
-        mapInstanceRef.current = new window.google.maps.Map(mapContainer, {
-          center: pickupCoords,
-          zoom: 14,
-          disableDefaultUI: false,
-          zoomControl: true,
-        });
+        timer = window.setTimeout(() => {
+          const mapContainer = document.getElementById("admin-tracking-map");
+          if (!mapContainer) return;
 
-        const bounds = new window.google.maps.LatLngBounds();
-        bounds.extend(pickupCoords);
-        bounds.extend(dropoffCoords);
-        mapInstanceRef.current.fitBounds(bounds);
+          const pickupCoords = trackingData?.tracking?.pickupLocation?.coordinates || {
+            lat: 10.776923,
+            lng: 106.700981,
+          };
+          const dropoffCoords = trackingData?.tracking?.deliveryLocation?.coordinates || {
+            lat: 10.782112,
+            lng: 106.70917,
+          };
+
+          if (!mapInstanceRef.current) {
+            mapInstanceRef.current = new window.google.maps.Map(mapContainer, {
+              center: pickupCoords,
+              zoom: 14,
+              disableDefaultUI: false,
+              zoomControl: true,
+            });
+
+            const bounds = new window.google.maps.LatLngBounds();
+            bounds.extend(pickupCoords);
+            bounds.extend(dropoffCoords);
+            mapInstanceRef.current.fitBounds(bounds);
+          }
+
+          const map = mapInstanceRef.current;
+          Object.values(markersRef.current).forEach((m) => m?.setMap(null));
+
+          const routeCoords = buildRouteCoordinates(pickupCoords, dropoffCoords);
+          const progress = trackingData?.tracking?.flightProgress || 0;
+          const dronePos = getCoordinateAtProgress(routeCoords, progress);
+
+          // Pickup marker
+          markersRef.current.pickup = new window.google.maps.Marker({
+            position: pickupCoords,
+            map: map,
+            title: "Nhà hàng",
+            icon: {
+              url:
+                "data:image/svg+xml;charset=UTF-8," +
+                encodeURIComponent(`
+                <svg width="48" height="48" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="24" cy="24" r="20" fill="#f97316" stroke="white" stroke-width="3"/>
+                  <text x="24" y="29" font-size="14" text-anchor="middle" fill="white">🏪</text>
+                </svg>
+              `),
+              scaledSize: new window.google.maps.Size(48, 48),
+              anchor: new window.google.maps.Point(24, 24),
+            },
+          });
+
+          // Delivery marker
+          markersRef.current.delivery = new window.google.maps.Marker({
+            position: dropoffCoords,
+            map: map,
+            title: "Điểm giao",
+            icon: {
+              url:
+                "data:image/svg+xml;charset=UTF-8," +
+                encodeURIComponent(`
+                <svg width="48" height="48" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="24" cy="24" r="20" fill="#27AE60" stroke="white" stroke-width="3"/>
+                  <text x="24" y="29" font-size="14" text-anchor="middle" fill="white">🏠</text>
+                </svg>
+              `),
+              scaledSize: new window.google.maps.Size(48, 48),
+              anchor: new window.google.maps.Point(24, 24),
+            },
+          });
+
+          // Route polyline
+          markersRef.current.polyline = new window.google.maps.Polyline({
+            path: routeCoords,
+            geodesic: true,
+            strokeColor: "#94a3b8",
+            strokeOpacity: 0,
+            strokeWeight: 4,
+            icons: [
+              {
+                icon: { path: "M 0,-1 0,1", strokeOpacity: 0.6, scale: 3 },
+                offset: "0",
+                repeat: "12px",
+              },
+            ],
+            map: map,
+          });
+
+          // Progress polyline
+          const progressIndex = Math.ceil(progress * routeCoords.length);
+          const progressPath = routeCoords.slice(0, progressIndex);
+          if (progressPath.length > 1) {
+            markersRef.current.progressPolyline = new window.google.maps.Polyline({
+              path: progressPath,
+              geodesic: true,
+              strokeColor: "#f97316",
+              strokeOpacity: 1,
+              strokeWeight: 5,
+              map: map,
+            });
+          }
+
+          // Drone marker
+          markersRef.current.drone = new window.google.maps.Marker({
+            position: dronePos,
+            map: map,
+            title: "Drone",
+            icon: {
+              url:
+                "data:image/svg+xml;charset=UTF-8," +
+                encodeURIComponent(`
+                <svg width="60" height="60" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="30" cy="30" r="26" fill="#FFF5F1" opacity="0.9"/>
+                  <circle cx="30" cy="30" r="20" fill="#f97316" stroke="white" stroke-width="3"/>
+                  <text x="30" y="36" font-size="18" text-anchor="middle" fill="white">🚁</text>
+                </svg>
+              `),
+              scaledSize: new window.google.maps.Size(60, 60),
+              anchor: new window.google.maps.Point(30, 30),
+            },
+            zIndex: 200,
+          });
+        }, 100);
+      } catch (err) {
+        console.error("Không thể tải Google Maps:", err);
       }
+    };
 
-      const map = mapInstanceRef.current;
-      Object.values(markersRef.current).forEach((m) => m?.setMap(null));
+    initialiseMap();
 
-      const routeCoords = buildRouteCoordinates(pickupCoords, dropoffCoords);
-      const progress = trackingData?.tracking?.flightProgress || 0;
-      const dronePos = getCoordinateAtProgress(routeCoords, progress);
-
-      // Pickup marker
-      markersRef.current.pickup = new window.google.maps.Marker({
-        position: pickupCoords,
-        map: map,
-        title: "Nhà hàng",
-        icon: {
-          url:
-            "data:image/svg+xml;charset=UTF-8," +
-            encodeURIComponent(`
-            <svg width="48" height="48" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="24" cy="24" r="20" fill="#f97316" stroke="white" stroke-width="3"/>
-              <text x="24" y="29" font-size="14" text-anchor="middle" fill="white">🏪</text>
-            </svg>
-          `),
-          scaledSize: new window.google.maps.Size(48, 48),
-          anchor: new window.google.maps.Point(24, 24),
-        },
-      });
-
-      // Delivery marker
-      markersRef.current.delivery = new window.google.maps.Marker({
-        position: dropoffCoords,
-        map: map,
-        title: "Điểm giao",
-        icon: {
-          url:
-            "data:image/svg+xml;charset=UTF-8," +
-            encodeURIComponent(`
-            <svg width="48" height="48" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="24" cy="24" r="20" fill="#27AE60" stroke="white" stroke-width="3"/>
-              <text x="24" y="29" font-size="14" text-anchor="middle" fill="white">🏠</text>
-            </svg>
-          `),
-          scaledSize: new window.google.maps.Size(48, 48),
-          anchor: new window.google.maps.Point(24, 24),
-        },
-      });
-
-      // Route polyline
-      markersRef.current.polyline = new window.google.maps.Polyline({
-        path: routeCoords,
-        geodesic: true,
-        strokeColor: "#94a3b8",
-        strokeOpacity: 0,
-        strokeWeight: 4,
-        icons: [
-          {
-            icon: { path: "M 0,-1 0,1", strokeOpacity: 0.6, scale: 3 },
-            offset: "0",
-            repeat: "12px",
-          },
-        ],
-        map: map,
-      });
-
-      // Progress polyline
-      const progressIndex = Math.ceil(progress * routeCoords.length);
-      const progressPath = routeCoords.slice(0, progressIndex);
-      if (progressPath.length > 1) {
-        markersRef.current.progressPolyline = new window.google.maps.Polyline({
-          path: progressPath,
-          geodesic: true,
-          strokeColor: "#f97316",
-          strokeOpacity: 1,
-          strokeWeight: 5,
-          map: map,
-        });
+    return () => {
+      cancelled = true;
+      if (timer) {
+        clearTimeout(timer);
       }
-
-      // Drone marker
-      markersRef.current.drone = new window.google.maps.Marker({
-        position: dronePos,
-        map: map,
-        title: "Drone",
-        icon: {
-          url:
-            "data:image/svg+xml;charset=UTF-8," +
-            encodeURIComponent(`
-            <svg width="60" height="60" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="30" cy="30" r="26" fill="#FFF5F1" opacity="0.9"/>
-              <circle cx="30" cy="30" r="20" fill="#f97316" stroke="white" stroke-width="3"/>
-              <text x="30" y="36" font-size="18" text-anchor="middle" fill="white">🚁</text>
-            </svg>
-          `),
-          scaledSize: new window.google.maps.Size(60, 60),
-          anchor: new window.google.maps.Point(30, 30),
-        },
-        zIndex: 200,
-      });
-    }, 100);
-
-    return () => clearTimeout(timer);
+    };
   }, [showModal, trackingData]);
 
   if (loading) {

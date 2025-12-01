@@ -159,9 +159,10 @@ const BOTTOM_SAFE_MARGIN = Platform.OS === 'ios' ? 180 : 140;
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
 const deriveInitialPosition = (width: number, height: number) => {
-  const maxX = Math.max(HORIZONTAL_MARGIN, width - BUTTON_SIZE - HORIZONTAL_MARGIN);
-  const maxY = Math.max(TOP_SAFE_MARGIN, height - BUTTON_SIZE - BOTTOM_SAFE_MARGIN);
-  return { x: maxX, y: maxY };
+  // Place button at bottom right corner by default
+  const x = Math.max(HORIZONTAL_MARGIN, width - BUTTON_SIZE - HORIZONTAL_MARGIN);
+  const y = Math.max(TOP_SAFE_MARGIN, height - BUTTON_SIZE - BOTTOM_SAFE_MARGIN);
+  return { x, y };
 };
 
 function CartFloatingButton() {

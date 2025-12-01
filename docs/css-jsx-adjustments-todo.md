@@ -1,3 +1,0 @@
-- [ ] Remove promotional block
-- [ ] Align brand and login layout
-- [ ] Update typography sizing

@@ -129,17 +129,6 @@ const ProfileScreen = ({ navigation }: any) => {
             <Text style={styles.menuText}>Ưu đãi của tôi</Text>
             <Ionicons name="chevron-forward" size={18} color="#999" />
           </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.menuItem}
-            onPress={() => navigation.navigate('APIConfig')}
-          >
-            <View style={styles.menuIconContainer}>
-              <Ionicons name="server-outline" size={22} color="#EA5034" />
-            </View>
-            <Text style={styles.menuText}>Cấu hình Server</Text>
-            <Ionicons name="chevron-forward" size={18} color="#999" />
-          </TouchableOpacity>
         </View>
 
         {/* Order History */}
@@ -151,24 +140,29 @@ const ProfileScreen = ({ navigation }: any) => {
               <Text style={styles.emptyText}>Chưa có đơn hàng nào</Text>
             </View>
           ) : (
-            orders.slice(0, 5).map((order: any) => (
-              <TouchableOpacity
-                key={order.id}
-                style={styles.orderCard}
-                onPress={() => navigation.navigate('OrderTracking', { orderId: order.id })}
-              >
-                <View style={styles.orderHeader}>
-                  <Text style={styles.orderId}>{`#${order.id}`}</Text>
-                  <Text style={[styles.orderStatus, getStatusStyle(order.status)]}>
-                    {String(getStatusText(order.status))}
+            orders.slice(0, 5).map((order: any) => {
+              const shortId = order.id?.slice(-8) || order.id;
+              return (
+                <TouchableOpacity
+                  key={order.id}
+                  style={styles.orderCard}
+                  onPress={() => navigation.navigate('OrderTracking', { orderId: order.id })}
+                >
+                  <View style={styles.orderHeader}>
+                    <Text style={styles.orderId} numberOfLines={1}>{`#${shortId}`}</Text>
+                    <View style={[styles.orderStatusBadge, getStatusBadgeStyle(order.status)]}>
+                      <Text style={[styles.orderStatusText, { color: getStatusTextColor(order.status) }]}>
+                        {String(getStatusText(order.status))}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.orderRestaurant}>{String(order.restaurantName)}</Text>
+                  <Text style={styles.orderTotal}>
+                    {`${order.total.toLocaleString('vi-VN')}đ`}
                   </Text>
-                </View>
-                <Text style={styles.orderRestaurant}>{String(order.restaurantName)}</Text>
-                <Text style={styles.orderTotal}>
-                  {`${order.total.toLocaleString('vi-VN')}đ`}
-                </Text>
-              </TouchableOpacity>
-            ))
+                </TouchableOpacity>
+              );
+            })
           )}
         </View>
 
@@ -196,11 +190,18 @@ const getStatusText = (status: string) => {
   return statusMap[status] || status;
 };
 
-const getStatusStyle = (status: string) => {
-  if (status === 'delivered') return { color: '#10B981' };
-  if (status === 'delivering') return { color: '#EA5034' };
-  if (status === 'cancelled') return { color: '#EF4444' };
-  return { color: '#F59E0B' };
+const getStatusBadgeStyle = (status: string) => {
+  if (status === 'delivered') return { backgroundColor: '#D1FAE5' };
+  if (status === 'delivering') return { backgroundColor: '#FEE2E2' };
+  if (status === 'cancelled') return { backgroundColor: '#FEE2E2' };
+  return { backgroundColor: '#FEF3C7' };
+};
+
+const getStatusTextColor = (status: string) => {
+  if (status === 'delivered') return '#10B981';
+  if (status === 'delivering') return '#EA5034';
+  if (status === 'cancelled') return '#EF4444';
+  return '#F59E0B';
 };
 
 const styles = StyleSheet.create({
@@ -321,15 +322,24 @@ const styles = StyleSheet.create({
   orderHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 8,
   },
   orderId: {
     fontSize: 14,
     color: '#666',
+    flex: 1,
+    marginRight: 8,
   },
-  orderStatus: {
-    fontSize: 14,
+  orderStatusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  orderStatusText: {
+    fontSize: 12,
     fontWeight: 'bold',
+    color: '#333',
   },
   orderRestaurant: {
     fontSize: 16,

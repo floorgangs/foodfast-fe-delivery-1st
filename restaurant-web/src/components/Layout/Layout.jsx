@@ -69,7 +69,7 @@ function Layout() {
 
           <div className="nav-group">
             <div className="nav-group-title">Báo cáo</div>
-            <Link to="/statistics" className="nav-item">
+            <Link to="/analytics" className="nav-item">
               <span className="nav-icon">▤</span>
               <span className="nav-text">Báo cáo & Thống kê</span>
             </Link>

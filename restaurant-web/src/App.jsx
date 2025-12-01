@@ -7,7 +7,7 @@ import Login from "./pages/Login/Login";
 import Dashboard from "./pages/Dashboard/Dashboard";
 import MenuManagement from "./pages/MenuManagement/MenuManagement";
 import OrderManagement from "./pages/OrderManagement/OrderManagement";
-import Statistics from "./pages/Statistics/Statistics";
+import Analytics from "./pages/Analytics/Analytics";
 import Promotions from "./pages/Promotions/Promotions";
 import Reviews from "./pages/Reviews/Reviews";
 import AccountSettings from "./pages/AccountSettings/AccountSettings";
@@ -97,7 +97,7 @@ function App() {
         <Route path="reviews" element={<Reviews />} />
         <Route path="drones" element={<Drones />} />
         <Route path="staff" element={<Staff />} />
-        <Route path="statistics" element={<Statistics />} />
+        <Route path="analytics" element={<Analytics />} />
       </Route>
     </Routes>
   );

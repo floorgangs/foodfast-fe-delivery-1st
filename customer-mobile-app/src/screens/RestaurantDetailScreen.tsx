@@ -45,6 +45,10 @@ const RestaurantDetailScreen = ({ route, navigation }: any) => {
   const [latestReviews, setLatestReviews] = useState<any[]>([]);
   const [reviewLoading, setReviewLoading] = useState(true);
   const [showReviews, setShowReviews] = useState(false);
+  
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 5;
 
   useEffect(() => {
     loadProducts();
@@ -154,6 +158,31 @@ const RestaurantDetailScreen = ({ route, navigation }: any) => {
       };
     });
   }, [products]);
+  
+  // Pagination logic
+  const totalPages = Math.ceil(enrichedProducts.length / ITEMS_PER_PAGE);
+  const paginatedProducts = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    return enrichedProducts.slice(startIndex, endIndex);
+  }, [enrichedProducts, currentPage, ITEMS_PER_PAGE]);
+  
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(prev => prev + 1);
+    }
+  };
+  
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(prev => prev - 1);
+    }
+  };
+  
+  const handlePageSelect = (page: number) => {
+    setCurrentPage(page);
+  };
+  
   const restaurantReviewCount = reviewSummary.totalReviews ?? 0;
 
   const handleAddToCart = (product: any) => {
@@ -391,7 +420,15 @@ const RestaurantDetailScreen = ({ route, navigation }: any) => {
 
         {/* Menu */}
         <View style={styles.menuSection}>
-          <Text style={styles.sectionTitle}>Thực đơn</Text>
+          <View style={styles.menuHeader}>
+            <Text style={styles.sectionTitle}>Thực đơn</Text>
+            {enrichedProducts.length > ITEMS_PER_PAGE && (
+              <Text style={styles.menuCount}>
+                {enrichedProducts.length} món ăn
+              </Text>
+            )}
+          </View>
+          
           <View style={[
             isLandscape && numColumns > 1 && { 
               flexDirection: 'row', 
@@ -400,7 +437,7 @@ const RestaurantDetailScreen = ({ route, navigation }: any) => {
               marginHorizontal: -6
             }
           ]}>
-            {enrichedProducts.map((product) => (
+            {paginatedProducts.map((product) => (
               <View 
                 key={product.id || product._id} 
                 style={isLandscape && numColumns > 1 ? { width: '48%', marginHorizontal: '1%' } : undefined}
@@ -409,6 +446,63 @@ const RestaurantDetailScreen = ({ route, navigation }: any) => {
               </View>
             ))}
           </View>
+          
+          {/* Pagination Controls */}
+          {enrichedProducts.length > ITEMS_PER_PAGE && (
+            <View style={styles.paginationContainer}>
+              <TouchableOpacity
+                style={[styles.paginationButton, currentPage === 1 && styles.paginationButtonDisabled]}
+                onPress={handlePrevPage}
+                disabled={currentPage === 1}
+              >
+                <Ionicons 
+                  name="chevron-back" 
+                  size={20} 
+                  color={currentPage === 1 ? '#ccc' : '#EA5034'} 
+                />
+              </TouchableOpacity>
+              
+              <View style={styles.paginationPages}>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <TouchableOpacity
+                    key={page}
+                    style={[
+                      styles.paginationPageButton,
+                      page === currentPage && styles.paginationPageButtonActive
+                    ]}
+                    onPress={() => handlePageSelect(page)}
+                  >
+                    <Text
+                      style={[
+                        styles.paginationPageText,
+                        page === currentPage && styles.paginationPageTextActive
+                      ]}
+                    >
+                      {page}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              
+              <TouchableOpacity
+                style={[styles.paginationButton, currentPage === totalPages && styles.paginationButtonDisabled]}
+                onPress={handleNextPage}
+                disabled={currentPage === totalPages}
+              >
+                <Ionicons 
+                  name="chevron-forward" 
+                  size={20} 
+                  color={currentPage === totalPages ? '#ccc' : '#EA5034'} 
+                />
+              </TouchableOpacity>
+            </View>
+          )}
+          
+          {enrichedProducts.length > ITEMS_PER_PAGE && (
+            <Text style={styles.paginationInfo}>
+              Đang hiển thị {((currentPage - 1) * ITEMS_PER_PAGE) + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, enrichedProducts.length)} trong {enrichedProducts.length} món
+            </Text>
+          )}
         </View>
         </ScrollView>
       )}
@@ -618,11 +712,79 @@ const styles = StyleSheet.create({
   menuSection: {
     padding: 16,
   },
+  menuHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  menuCount: {
+    fontSize: 14,
+    color: '#777',
+    fontWeight: '500',
+  },
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 16,
+  },
+  paginationContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 12,
+    paddingHorizontal: 16,
+  },
+  paginationButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#EA5034',
+    marginHorizontal: 8,
+  },
+  paginationButtonDisabled: {
+    borderColor: '#ddd',
+    backgroundColor: '#f5f5f5',
+  },
+  paginationPages: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 8,
+  },
+  paginationPageButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 4,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  paginationPageButtonActive: {
+    backgroundColor: '#EA5034',
+    borderColor: '#EA5034',
+  },
+  paginationPageText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#666',
+  },
+  paginationPageTextActive: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  paginationInfo: {
+    textAlign: 'center',
+    fontSize: 13,
+    color: '#777',
+    marginTop: 8,
   },
   productCard: {
     flexDirection: 'row',

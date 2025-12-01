@@ -11,9 +11,19 @@ import {
   StatusBar,
   Alert,
 } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { updateProfile } from '../store/slices/authSlice';
+import {
+  VIETNAM_LOCATIONS,
+  getCityByCode,
+  getDistrictByCode,
+  getFullLocationName,
+  City,
+  District,
+  Ward,
+} from '../data/vietnamLocations';
 
 interface AddressItem {
   id: string;
@@ -32,41 +42,6 @@ interface AddressItem {
   isDefault: boolean;
 }
 
-const ADDRESS_SUGGESTIONS = [
-  {
-    id: 'vincom-dongkhoi',
-    label: 'Vincom Đồng Khởi',
-    address: '72 Lê Thánh Tôn, Bến Nghé, Quận 1, TP.HCM',
-  },
-  {
-    id: 'landmark81',
-    label: 'Landmark 81',
-    address: '720A Điện Biên Phủ, Phường 22, Bình Thạnh, TP.HCM',
-  },
-  {
-    id: 'saigoncentre',
-    label: 'Saigon Centre',
-    address: '65 Lê Lợi, Bến Nghé, Quận 1, TP.HCM',
-  },
-  {
-    id: 'cresentmall',
-    label: 'Crescent Mall',
-    address: '101 Tôn Dật Tiên, Tân Phú, Quận 7, TP.HCM',
-  },
-  {
-    id: 'citiho',
-    label: 'Chung cư CitiHome',
-    address: 'Cát Lái, Thành phố Thủ Đức, TP.HCM',
-  },
-  {
-    id: 'vinhomegrandpark',
-    label: 'Vinhomes Grand Park',
-    address: 'Nguyễn Xiển, Long Thạnh Mỹ, TP.Thủ Đức, TP.HCM',
-  },
-];
-
-const QUICK_ADDRESS_TAGS = ['Nhà riêng', 'Văn phòng', 'Chung cư', 'Sảnh bảo vệ'];
-
 const AddressScreen = ({ navigation }: any) => {
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
@@ -79,9 +54,11 @@ const AddressScreen = ({ navigation }: any) => {
   const [formData, setFormData] = useState({
     label: '',
     phone: '',
-    address: '',
+    streetAddress: '', // Changed from 'address' to 'streetAddress'
+    cityCode: '',
+    districtCode: '',
+    wardCode: '',
   });
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const fallbackPhone = user?.phone ?? '';
 
   const mapAddressFromBackend = (entry: any, index: number): AddressItem => ({
@@ -144,22 +121,30 @@ const AddressScreen = ({ navigation }: any) => {
     }
   };
 
-  const filteredSuggestions = useMemo(() => {
-    const keyword = formData.address.trim().toLowerCase();
+  // Get available districts based on selected city
+  const availableDistricts = useMemo(() => {
+    if (!formData.cityCode) return [];
+    const city = getCityByCode(formData.cityCode);
+    return city?.districts || [];
+  }, [formData.cityCode]);
 
-    if (!keyword) {
-      return ADDRESS_SUGGESTIONS.slice(0, 5);
-    }
-
-    return ADDRESS_SUGGESTIONS.filter(item =>
-      `${item.label} ${item.address}`.toLowerCase().includes(keyword),
-    ).slice(0, 6);
-  }, [formData.address]);
+  // Get available wards based on selected city and district
+  const availableWards = useMemo(() => {
+    if (!formData.cityCode || !formData.districtCode) return [];
+    const district = getDistrictByCode(formData.cityCode, formData.districtCode);
+    return district?.wards || [];
+  }, [formData.cityCode, formData.districtCode]);
 
   const handleAdd = () => {
     setEditingAddress(null);
-    setFormData({ label: '', phone: fallbackPhone, address: '' });
-    setShowSuggestions(false);
+    setFormData({
+      label: '',
+      phone: fallbackPhone,
+      streetAddress: '',
+      cityCode: '',
+      districtCode: '',
+      wardCode: '',
+    });
     setModalVisible(true);
   };
 
@@ -168,9 +153,11 @@ const AddressScreen = ({ navigation }: any) => {
     setFormData({
       label: address.label,
       phone: address.phone,
-      address: address.address,
+      streetAddress: address.address,
+      cityCode: address.city || '',
+      districtCode: address.district || '',
+      wardCode: address.ward || '',
     });
-    setShowSuggestions(false);
     setModalVisible(true);
   };
 
@@ -198,22 +185,14 @@ const AddressScreen = ({ navigation }: any) => {
     }
   };
 
-  const handleSelectSuggestion = (suggestion: typeof ADDRESS_SUGGESTIONS[number]) => {
-    setFormData(prev => ({
-      ...prev,
-      address: `${suggestion.label}, ${suggestion.address}`,
-      label: prev.label || suggestion.label,
-    }));
-    setShowSuggestions(false);
-  };
-
   const handleSave = async () => {
     const trimmedLabel = formData.label.trim();
-    const trimmedAddress = formData.address.trim();
+    const trimmedStreetAddress = formData.streetAddress.trim();
     const trimmedPhone = formData.phone.trim() || fallbackPhone;
 
-    if (!trimmedLabel || !trimmedAddress) {
-      const message = 'Vui lòng nhập đầy đủ thông tin địa chỉ.';
+    // Validate all required fields
+    if (!trimmedLabel || !trimmedStreetAddress || !formData.cityCode || !formData.districtCode || !formData.wardCode) {
+      const message = 'Vui lòng nhập đầy đủ thông tin địa chỉ (bao gồm tên đường, phường, quận, thành phố).';
       if (Platform.OS === 'web') {
         window.alert(message);
       } else {
@@ -221,6 +200,10 @@ const AddressScreen = ({ navigation }: any) => {
       }
       return;
     }
+
+    // Construct full address with location hierarchy
+    const locationName = getFullLocationName(formData.cityCode, formData.districtCode, formData.wardCode);
+    const fullAddress = `${trimmedStreetAddress}, ${locationName}`;
 
     let next: AddressItem[];
 
@@ -234,7 +217,10 @@ const AddressScreen = ({ navigation }: any) => {
           label: trimmedLabel,
           contactName: addr.contactName || trimmedLabel,
           phone: trimmedPhone,
-          address: trimmedAddress,
+          address: fullAddress,
+          city: formData.cityCode,
+          district: formData.districtCode,
+          ward: formData.wardCode,
         };
       });
     } else {
@@ -243,7 +229,10 @@ const AddressScreen = ({ navigation }: any) => {
         label: trimmedLabel,
         contactName: trimmedLabel,
         phone: trimmedPhone,
-        address: trimmedAddress,
+        address: fullAddress,
+        city: formData.cityCode,
+        district: formData.districtCode,
+        ward: formData.wardCode,
         isDefault: addresses.length === 0,
       };
       next = [...addresses.map(addr => ({ ...addr })), newAddress];
@@ -256,9 +245,15 @@ const AddressScreen = ({ navigation }: any) => {
     const success = await persistAddresses(next);
     if (success) {
       setModalVisible(false);
-      setShowSuggestions(false);
       setEditingAddress(null);
-      setFormData({ label: '', phone: fallbackPhone, address: '' });
+      setFormData({
+        label: '',
+        phone: fallbackPhone,
+        streetAddress: '',
+        cityCode: '',
+        districtCode: '',
+        wardCode: '',
+      });
       if (Platform.OS !== 'web') {
         Alert.alert('Thành công', 'Đã lưu địa chỉ');
       }
@@ -335,7 +330,6 @@ const AddressScreen = ({ navigation }: any) => {
         transparent={true}
         onRequestClose={() => {
           setModalVisible(false);
-          setShowSuggestions(false);
         }}
       >
         <View style={styles.modalOverlay}>
@@ -354,7 +348,7 @@ const AddressScreen = ({ navigation }: any) => {
                 <Text style={styles.label}>Tên địa chỉ</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="VD: Nhà riêng, Văn phòng"
+                  placeholder="Nhà riêng, Văn phòng"
                   value={formData.label}
                   onChangeText={(text) => setFormData({ ...formData, label: text })}
                 />
@@ -364,72 +358,98 @@ const AddressScreen = ({ navigation }: any) => {
                 <Text style={styles.label}>Số điện thoại</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="Nhập số điện thoại"
+                  placeholder="Số điện thoại"
                   value={formData.phone}
                   onChangeText={(text) => setFormData({ ...formData, phone: text })}
                   keyboardType="phone-pad"
                 />
               </View>
 
+              {/* City Picker */}
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Địa chỉ chi tiết</Text>
+                <Text style={styles.label}>Thành phố <Text style={styles.required}>*</Text></Text>
+                <View style={styles.pickerContainer}>
+                  <Picker
+                    selectedValue={formData.cityCode}
+                    onValueChange={(value) =>
+                      setFormData({
+                        ...formData,
+                        cityCode: value,
+                        districtCode: '', // Reset district when city changes
+                        wardCode: '', // Reset ward when city changes
+                      })
+                    }
+                    style={styles.picker}
+                  >
+                    <Picker.Item label="-- Chọn thành phố --" value="" />
+                    {VIETNAM_LOCATIONS.map((city) => (
+                      <Picker.Item key={city.code} label={city.name} value={city.code} />
+                    ))}
+                  </Picker>
+                </View>
+              </View>
+
+              {/* District Picker */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Quận/Huyện <Text style={styles.required}>*</Text></Text>
+                <View style={styles.pickerContainer}>
+                  <Picker
+                    selectedValue={formData.districtCode}
+                    onValueChange={(value) =>
+                      setFormData({
+                        ...formData,
+                        districtCode: value,
+                        wardCode: '', // Reset ward when district changes
+                      })
+                    }
+                    style={styles.picker}
+                    enabled={!!formData.cityCode}
+                  >
+                    <Picker.Item label="-- Chọn quận/huyện --" value="" />
+                    {availableDistricts.map((district) => (
+                      <Picker.Item key={district.code} label={district.name} value={district.code} />
+                    ))}
+                  </Picker>
+                </View>
+                {!formData.cityCode && (
+                  <Text style={styles.helperText}>Vui lòng chọn thành phố trước</Text>
+                )}
+              </View>
+
+              {/* Ward Picker */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Phường/Xã <Text style={styles.required}>*</Text></Text>
+                <View style={styles.pickerContainer}>
+                  <Picker
+                    selectedValue={formData.wardCode}
+                    onValueChange={(value) => setFormData({ ...formData, wardCode: value })}
+                    style={styles.picker}
+                    enabled={!!formData.districtCode}
+                  >
+                    <Picker.Item label="-- Chọn phường/xã --" value="" />
+                    {availableWards.map((ward) => (
+                      <Picker.Item key={ward.code} label={ward.name} value={ward.code} />
+                    ))}
+                  </Picker>
+                </View>
+                {!formData.districtCode && (
+                  <Text style={styles.helperText}>Vui lòng chọn quận/huyện trước</Text>
+                )}
+              </View>
+
+              {/* Street Address Input */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Số nhà, tên đường <Text style={styles.required}>*</Text></Text>
                 <TextInput
                   style={[styles.input, styles.textArea]}
-                  placeholder="Số nhà, tên đường, phường, quận, thành phố"
-                  value={formData.address}
+                  placeholder=""
+                  value={formData.streetAddress}
                   onChangeText={text => {
-                    setFormData({ ...formData, address: text });
-                    setShowSuggestions(true);
+                    setFormData({ ...formData, streetAddress: text });
                   }}
-                  onFocus={() => setShowSuggestions(true)}
                   multiline
-                  numberOfLines={4}
+                  numberOfLines={3}
                 />
-                <View style={styles.quickTagRow}>
-                  {QUICK_ADDRESS_TAGS.map(tag => (
-                    <TouchableOpacity
-                      key={tag}
-                      style={styles.quickTag}
-                      onPress={() => {
-                        setFormData(prev => ({
-                          ...prev,
-                          address: prev.address ? `${tag} • ${prev.address}` : tag,
-                        }));
-                        setShowSuggestions(true);
-                      }}
-                    >
-                      <Text style={styles.quickTagText}>{tag}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                {showSuggestions && (
-                  <View style={styles.suggestionList}>
-                    {filteredSuggestions.length > 0 ? (
-                      filteredSuggestions.map((item, index) => (
-                        <TouchableOpacity
-                          key={item.id}
-                          style={[
-                            styles.suggestionItem,
-                            index === filteredSuggestions.length - 1 && styles.suggestionItemLast,
-                          ]}
-                          onPress={() => handleSelectSuggestion(item)}
-                        >
-                          <Text style={styles.suggestionTitle}>{item.label}</Text>
-                          <Text style={styles.suggestionSubtitle}>{item.address}</Text>
-                        </TouchableOpacity>
-                      ))
-                    ) : (
-                      <Text style={styles.noSuggestionText}>Không tìm thấy địa chỉ phù hợp, hãy nhập chi tiết hơn.</Text>
-                    )}
-                    <TouchableOpacity
-                      style={styles.hideSuggestionButton}
-                      onPress={() => setShowSuggestions(false)}
-                    >
-                      <Text style={styles.hideSuggestionText}>Ẩn gợi ý</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
               </View>
 
               <TouchableOpacity
@@ -603,6 +623,10 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 8,
   },
+  required: {
+    color: '#EA5034',
+    fontSize: 14,
+  },
   input: {
     borderWidth: 1,
     borderColor: '#ddd',
@@ -610,6 +634,23 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     backgroundColor: '#fff',
+  },
+  pickerContainer: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    overflow: 'hidden',
+  },
+  picker: {
+    height: 56,
+    marginVertical: -4,
+  },
+  helperText: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   textArea: {
     height: 100,
