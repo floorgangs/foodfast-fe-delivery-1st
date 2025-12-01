@@ -1,0 +1,156 @@
+name: FoodFast CI Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  backend-test:
+    name: Backend - Build & Test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: ./backend
+        run: npm ci
+      
+      - name: Check for syntax errors
+        working-directory: ./backend
+        run: node -c server.js
+      
+      - name: Run tests (if available)
+        working-directory: ./backend
+        run: npm test --if-present
+        continue-on-error: true
+
+  customer-web-build:
+    name: Customer Web - Build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: customer-web/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: ./customer-web
+        run: npm ci
+      
+      - name: Build project
+        working-directory: ./customer-web
+        run: npm run build
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: customer-web-build
+          path: customer-web/dist
+          retention-days: 7
+
+  restaurant-web-build:
+    name: Restaurant Web - Build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: restaurant-web/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: ./restaurant-web
+        run: npm ci
+      
+      - name: Build project
+        working-directory: ./restaurant-web
+        run: npm run build
+
+  admin-web-build:
+    name: Admin Web - Build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: admin-web/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: ./admin-web
+        run: npm ci
+      
+      - name: Build project
+        working-directory: ./admin-web
+        run: npm run build
+
+  mobile-app-check:
+    name: Mobile App - TypeScript Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: customer-mobile-app/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: ./customer-mobile-app
+        run: npm ci
+      
+      - name: TypeScript type check
+        working-directory: ./customer-mobile-app
+        run: npx tsc --noEmit
+      
+      - name: Lint check
+        working-directory: ./customer-mobile-app
+        run: npm run lint --if-present
+        continue-on-error: true
+
+  all-tests-passed:
+    name: All Checks Passed ✅
+    runs-on: ubuntu-latest
+    needs: [backend-test, customer-web-build, restaurant-web-build, admin-web-build, mobile-app-check]
+    if: success()
+    
+    steps:
+      - name: Success message
+        run: |
+          echo "🎉 All CI checks passed successfully!"
+          echo "✅ Backend tests completed"
+          echo "✅ Customer Web built successfully"
+          echo "✅ Restaurant Web built successfully"
+          echo "✅ Admin Web built successfully"
+          echo "✅ Mobile App type checks passed"

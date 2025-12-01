@@ -5,7 +5,7 @@ import { Platform } from 'react-native';
 const API_URL_KEY = '@custom_api_url';
 
 // IMPORTANT: Có 3 cách kết nối backend
-// 1. CUSTOM URL (trong app) - Ưu tiên cao nhất
+// 1. CUSTOM URL (trong app) - Ưu tiên cao nhất.
 // 2. NGROK (Khuyên dùng) - Hoạt động mọi máy, mọi mạng
 // 3. LAN IP - Chỉ hoạt động cùng mạng WiFi
 
@@ -21,7 +21,11 @@ const API_URL_KEY = '@custom_api_url';
 const NGROK_URL = ''; // VD: 'https://abc123.ngrok.io'
 
 // ===== CÁCH 3: LAN IP =====
-const DEFAULT_LAN_IP = '172.18.247.98'; // IP máy tính chạy backend (Updated: 2025-12-01)
+const DEFAULT_LAN_IP = '172.18.247.106'; // IP máy tính chạy backend (Updated: 2025-12-01)
+
+// ===== TEST: GitHub Actions CI Pipeline =====
+// This comment is added to test CI workflow
+// Date: 2025-12-01
 
 // ===== BUILD URL =====
 const buildAPIURL = () => {
