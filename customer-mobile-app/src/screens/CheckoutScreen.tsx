@@ -250,7 +250,7 @@ const CheckoutScreen = ({ navigation }: any) => {
       const response = await orderAPI.create(orderData);
       console.log('[Checkout] Order creation response:', response);
 
-      if (!response?.data?._id || !response?.paymentSession?.sessionId) {
+      if (!response?.data?._id || !response?.data?.paymentSession?.sessionId) {
         console.error('[Checkout] Invalid response structure:', response);
         throw new Error('Không thể khởi tạo phiên thanh toán. Vui lòng thử lại.');
       }
@@ -270,11 +270,11 @@ const CheckoutScreen = ({ navigation }: any) => {
         orderId: response.data._id,
         orderNumber: response.data.orderNumber,
         amount: response.data.total,
-        sessionId: response.paymentSession.sessionId,
-        providerName: response.paymentSession.providerName,
+        sessionId: response.data.paymentSession.sessionId,
+        providerName: response.data.paymentSession.providerName,
         paymentMethod: selectedPayment,
-        redirectUrl: response.paymentSession.redirectUrl,
-        expiresAt: response.paymentSession.expiresAt,
+        redirectUrl: response.data.paymentSession.redirectUrl,
+        expiresAt: response.data.paymentSession.expiresAt,
         restaurantName: items[0]?.restaurantName,
       };
       
