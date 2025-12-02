@@ -203,7 +203,7 @@ const RestaurantDetailScreen = ({ route, navigation }: any) => {
 
     const attemptAdd = async () => {
       try {
-        await dispatch(addToCart({
+        await (dispatch(addToCart({
           id: (product._id || product.id || `${Date.now()}`).toString(),
           productId: (product._id || product.id || `${Date.now()}`).toString(),
           name: product.name,
@@ -211,7 +211,7 @@ const RestaurantDetailScreen = ({ route, navigation }: any) => {
           restaurantId,
           restaurantName: restaurant.name,
           image: product.image || restaurantImageUri,
-        }));
+        })) as any);
         Alert.alert('Thành công', 'Đã thêm món ăn vào giỏ hàng!');
       } catch (error: any) {
         Alert.alert('Lỗi', error?.message || 'Không thể lưu giỏ hàng');

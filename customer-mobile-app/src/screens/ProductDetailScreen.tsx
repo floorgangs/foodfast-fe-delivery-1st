@@ -73,7 +73,7 @@ const ProductDetailScreen = ({ route, navigation }: any) => {
 
     // Thêm 1 món vào giỏ (số lượng mặc định 1)
     try {
-      await dispatch(addToCart({
+      await (dispatch(addToCart({
         id: productId || product.id || `${Date.now()}`,
         productId: productId || product.id || `${Date.now()}`,
         name: product.name,
@@ -81,7 +81,7 @@ const ProductDetailScreen = ({ route, navigation }: any) => {
         restaurantId,
         restaurantName: restaurant.name,
         image: images[0] || restaurantImageUri || PLACEHOLDER_IMAGE,
-      }));
+      })) as any);
       Alert.alert('Thành công', 'Đã thêm vào giỏ hàng');
       navigation.goBack();
     } catch (error: any) {

@@ -55,7 +55,6 @@ const PayPalPaymentScreen: React.FC<PayPalPaymentScreenProps> = ({
 
       const response: any = await paypalAPI.createOrder({
         amount: parseFloat(amountUSD),
-        orderId: orderId,
         description: description || `FoodFast Order #${orderId}`,
       });
 
@@ -131,7 +130,7 @@ const PayPalPaymentScreen: React.FC<PayPalPaymentScreenProps> = ({
       if (captureResponse?.success && captureResponse?.data?.status === 'COMPLETED') {
         // Xác nhận thanh toán với backend
         await paymentAPI.confirmThirdParty({
-          orderId: orderId,
+          orderId,
           sessionId: paypalOrderId,
           status: 'success',
         });
@@ -152,7 +151,7 @@ const PayPalPaymentScreen: React.FC<PayPalPaymentScreenProps> = ({
                     { name: 'MainTabs' },
                     {
                       name: 'OrderTracking',
-                      params: { orderId: orderId },
+                      params: { orderId },
                     },
                   ],
                 });
