@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   View,
   Text,
@@ -7,42 +7,40 @@ import {
   TouchableOpacity,
   Platform,
   StatusBar,
-} from 'react-native';
-import { useSelector, useDispatch } from 'react-redux';
-import { RootState } from '../store';
-import { logout } from '../store/slices/authSlice';
-import { Ionicons } from '@expo/vector-icons';
-import useResponsive from '../hooks/useResponsive';
+} from "react-native";
+import { useSelector, useDispatch } from "react-redux";
+import { RootState } from "../store";
+import { logout } from "../store/slices/authSlice";
+import { Ionicons } from "@expo/vector-icons";
+import useResponsive from "../hooks/useResponsive";
 
 const ProfileScreen = ({ navigation }: any) => {
   const { isLandscape, containerPadding } = useResponsive();
-  const { user, isAuthenticated } = useSelector((state: RootState) => state.auth);
+  const { user, isAuthenticated } = useSelector(
+    (state: RootState) => state.auth
+  );
   const { orders } = useSelector((state: RootState) => state.orders);
   const dispatch = useDispatch();
 
   const handleLogout = () => {
-    if (Platform.OS === 'web') {
+    if (Platform.OS === "web") {
       // Trên web dùng confirm
-      if (window.confirm('Bạn có chắc chắn muốn đăng xuất?')) {
-        dispatch(logout());
+      if (window.confirm("Bạn có chắc chắn muốn đăng xuất?")) {
+        dispatch(logout()) as any;
       }
     } else {
       // Trên mobile dùng Alert
-      const Alert = require('react-native').Alert;
-      Alert.alert(
-        'Đăng xuất',
-        'Bạn có chắc chắn muốn đăng xuất?',
-        [
-          { text: 'Hủy', style: 'cancel' },
-          {
-            text: 'Đăng xuất',
-            style: 'destructive',
-            onPress: () => {
-              dispatch(logout());
-            },
+      const Alert = require("react-native").Alert;
+      Alert.alert("Đăng xuất", "Bạn có chắc chắn muốn đăng xuất?", [
+        { text: "Hủy", style: "cancel" },
+        {
+          text: "Đăng xuất",
+          style: "destructive",
+          onPress: () => {
+            dispatch(logout()) as any;
           },
-        ]
-      );
+        },
+      ]);
     }
   };
 
@@ -55,10 +53,12 @@ const ProfileScreen = ({ navigation }: any) => {
         <View style={{ width: 70 }} />
       </View>
 
-      <ScrollView contentContainerStyle={[
-        { paddingHorizontal: containerPadding },
-        isLandscape && { paddingHorizontal: containerPadding * 2 }
-      ]}>
+      <ScrollView
+        contentContainerStyle={[
+          { paddingHorizontal: containerPadding },
+          isLandscape && { paddingHorizontal: containerPadding * 2 },
+        ]}
+      >
         {/* User Info Card */}
         <View style={styles.userCard}>
           <View style={styles.avatar}>
@@ -67,28 +67,34 @@ const ProfileScreen = ({ navigation }: any) => {
           {!isAuthenticated ? (
             <>
               <Text style={styles.userName}>Chào mừng bạn!</Text>
-              <Text style={styles.guestText}>Đăng nhập để trải nghiệm tốt hơn</Text>
+              <Text style={styles.guestText}>
+                Đăng nhập để trải nghiệm tốt hơn
+              </Text>
               <TouchableOpacity
                 style={styles.loginButton}
-                onPress={() => navigation.navigate('Login')}
+                onPress={() => navigation.navigate("Login")}
               >
                 <Text style={styles.loginButtonText}>Đăng nhập / Đăng ký</Text>
               </TouchableOpacity>
             </>
           ) : (
             <>
-              <Text style={styles.userName}>{user?.name || 'Người dùng'}</Text>
-              <Text style={styles.userEmail}>{user?.email || 'user@example.com'}</Text>
-              <Text style={styles.userPhone}>{user?.phone || '0123456789'}</Text>
+              <Text style={styles.userName}>{user?.name || "Người dùng"}</Text>
+              <Text style={styles.userEmail}>
+                {user?.email || "user@example.com"}
+              </Text>
+              <Text style={styles.userPhone}>
+                {user?.phone || "0123456789"}
+              </Text>
             </>
           )}
         </View>
 
         {/* Menu Options */}
         <View style={styles.menuSection}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => navigation.navigate('PersonalInfo')}
+            onPress={() => navigation.navigate("PersonalInfo")}
           >
             <View style={styles.menuIconContainer}>
               <Ionicons name="person-outline" size={22} color="#EA5034" />
@@ -97,9 +103,9 @@ const ProfileScreen = ({ navigation }: any) => {
             <Ionicons name="chevron-forward" size={18} color="#999" />
           </TouchableOpacity>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => navigation.navigate('Address')}
+            onPress={() => navigation.navigate("Address")}
           >
             <View style={styles.menuIconContainer}>
               <Ionicons name="location-outline" size={22} color="#EA5034" />
@@ -108,9 +114,9 @@ const ProfileScreen = ({ navigation }: any) => {
             <Ionicons name="chevron-forward" size={18} color="#999" />
           </TouchableOpacity>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => navigation.navigate('PaymentMethod')}
+            onPress={() => navigation.navigate("PaymentMethod")}
           >
             <View style={styles.menuIconContainer}>
               <Ionicons name="card-outline" size={22} color="#EA5034" />
@@ -119,9 +125,9 @@ const ProfileScreen = ({ navigation }: any) => {
             <Ionicons name="chevron-forward" size={18} color="#999" />
           </TouchableOpacity>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => navigation.navigate('Vouchers')}
+            onPress={() => navigation.navigate("Vouchers")}
           >
             <View style={styles.menuIconContainer}>
               <Ionicons name="gift-outline" size={22} color="#EA5034" />
@@ -136,7 +142,12 @@ const ProfileScreen = ({ navigation }: any) => {
           <Text style={styles.sectionTitle}>Đơn hàng của tôi</Text>
           {orders.length === 0 ? (
             <View style={styles.emptyOrders}>
-              <Ionicons name="cube-outline" size={56} color="#d1d5db" style={styles.emptyIcon} />
+              <Ionicons
+                name="cube-outline"
+                size={56}
+                color="#d1d5db"
+                style={styles.emptyIcon}
+              />
               <Text style={styles.emptyText}>Chưa có đơn hàng nào</Text>
             </View>
           ) : (
@@ -146,19 +157,36 @@ const ProfileScreen = ({ navigation }: any) => {
                 <TouchableOpacity
                   key={order.id}
                   style={styles.orderCard}
-                  onPress={() => navigation.navigate('OrderTracking', { orderId: order.id })}
+                  onPress={() =>
+                    navigation.navigate("OrderTracking", { orderId: order.id })
+                  }
                 >
                   <View style={styles.orderHeader}>
-                    <Text style={styles.orderId} numberOfLines={1}>{`#${shortId}`}</Text>
-                    <View style={[styles.orderStatusBadge, getStatusBadgeStyle(order.status)]}>
-                      <Text style={[styles.orderStatusText, { color: getStatusTextColor(order.status) }]}>
+                    <Text
+                      style={styles.orderId}
+                      numberOfLines={1}
+                    >{`#${shortId}`}</Text>
+                    <View
+                      style={[
+                        styles.orderStatusBadge,
+                        getStatusBadgeStyle(order.status),
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.orderStatusText,
+                          { color: getStatusTextColor(order.status) },
+                        ]}
+                      >
                         {String(getStatusText(order.status))}
                       </Text>
                     </View>
                   </View>
-                  <Text style={styles.orderRestaurant}>{String(order.restaurantName)}</Text>
+                  <Text style={styles.orderRestaurant}>
+                    {String(order.restaurantName)}
+                  </Text>
                   <Text style={styles.orderTotal}>
-                    {`${order.total.toLocaleString('vi-VN')}đ`}
+                    {`${order.total.toLocaleString("vi-VN")}đ`}
                   </Text>
                 </TouchableOpacity>
               );
@@ -179,60 +207,60 @@ const ProfileScreen = ({ navigation }: any) => {
 
 const getStatusText = (status: string) => {
   const statusMap: Record<string, string> = {
-    pending: 'Chờ xác nhận',
-    confirmed: 'Đã xác nhận',
-    preparing: 'Đang chuẩn bị',
-    ready: 'Sẵn sàng giao',
-    delivering: 'Đang giao',
-    delivered: 'Đã giao',
-    cancelled: 'Đã hủy',
+    pending: "Chờ xác nhận",
+    confirmed: "Đã xác nhận",
+    preparing: "Đang chuẩn bị",
+    ready: "Sẵn sàng giao",
+    delivering: "Đang giao",
+    delivered: "Đã giao",
+    cancelled: "Đã hủy",
   };
   return statusMap[status] || status;
 };
 
 const getStatusBadgeStyle = (status: string) => {
-  if (status === 'delivered') return { backgroundColor: '#D1FAE5' };
-  if (status === 'delivering') return { backgroundColor: '#FEE2E2' };
-  if (status === 'cancelled') return { backgroundColor: '#FEE2E2' };
-  return { backgroundColor: '#FEF3C7' };
+  if (status === "delivered") return { backgroundColor: "#D1FAE5" };
+  if (status === "delivering") return { backgroundColor: "#FEE2E2" };
+  if (status === "cancelled") return { backgroundColor: "#FEE2E2" };
+  return { backgroundColor: "#FEF3C7" };
 };
 
 const getStatusTextColor = (status: string) => {
-  if (status === 'delivered') return '#10B981';
-  if (status === 'delivering') return '#EA5034';
-  if (status === 'cancelled') return '#EF4444';
-  return '#F59E0B';
+  if (status === "delivered") return "#10B981";
+  if (status === "delivering") return "#EA5034";
+  if (status === "cancelled") return "#EF4444";
+  return "#F59E0B";
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fafafa',
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+    backgroundColor: "#fafafa",
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#fff',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#fff",
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: "#eee",
   },
   backButton: {
     fontSize: 16,
-    color: '#EA5034',
-    fontWeight: '500',
+    color: "#EA5034",
+    fontWeight: "500",
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "bold",
+    color: "#333",
   },
   userCard: {
-    backgroundColor: '#fff',
-    alignItems: 'center',
+    backgroundColor: "#fff",
+    alignItems: "center",
     padding: 32,
     marginBottom: 16,
   },
@@ -240,94 +268,94 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#f5f5f5',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#f5f5f5",
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 16,
   },
   userName: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "bold",
+    color: "#333",
     marginBottom: 8,
   },
   userEmail: {
     fontSize: 16,
-    color: '#666',
+    color: "#666",
     marginBottom: 4,
   },
   userPhone: {
     fontSize: 16,
-    color: '#666',
+    color: "#666",
   },
   guestText: {
     fontSize: 16,
-    color: '#666',
+    color: "#666",
     marginBottom: 20,
   },
   loginButton: {
-    backgroundColor: '#EA5034',
+    backgroundColor: "#EA5034",
     paddingHorizontal: 32,
     paddingVertical: 12,
     borderRadius: 8,
   },
   loginButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   menuSection: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     marginBottom: 16,
   },
   menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f5f5f5',
+    borderBottomColor: "#f5f5f5",
   },
   menuIconContainer: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#FFF1EB',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#FFF1EB",
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 16,
   },
   menuText: {
     flex: 1,
     fontSize: 16,
-    color: '#333',
+    color: "#333",
   },
   orderSection: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     padding: 16,
     marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "bold",
+    color: "#333",
     marginBottom: 16,
   },
   orderCard: {
     borderWidth: 1,
-    borderColor: '#eee',
+    borderColor: "#eee",
     borderRadius: 8,
     padding: 12,
     marginBottom: 12,
   },
   orderHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 8,
   },
   orderId: {
     fontSize: 14,
-    color: '#666',
+    color: "#666",
     flex: 1,
     marginRight: 8,
   },
@@ -338,22 +366,22 @@ const styles = StyleSheet.create({
   },
   orderStatusText: {
     fontSize: 12,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "bold",
+    color: "#333",
   },
   orderRestaurant: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: "600",
+    color: "#333",
     marginBottom: 4,
   },
   orderTotal: {
     fontSize: 16,
-    color: '#EA5034',
-    fontWeight: 'bold',
+    color: "#EA5034",
+    fontWeight: "bold",
   },
   emptyOrders: {
-    alignItems: 'center',
+    alignItems: "center",
     padding: 32,
   },
   emptyIcon: {
@@ -361,22 +389,22 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#666',
+    color: "#666",
   },
   logoutButton: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     marginHorizontal: 16,
     marginBottom: 32,
     padding: 16,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#EA5034',
-    alignItems: 'center',
+    borderColor: "#EA5034",
+    alignItems: "center",
   },
   logoutButtonText: {
-    color: '#EA5034',
+    color: "#EA5034",
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
 });
 
