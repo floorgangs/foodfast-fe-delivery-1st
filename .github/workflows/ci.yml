@@ -12,54 +12,34 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
       
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v3
         with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: backend/package-lock.json
+          node-version: 18
       
-      - name: Install dependencies
-        working-directory: ./backend
-        run: npm ci
+      - run: cd backend && npm install
       
-      - name: Check for syntax errors
-        working-directory: ./backend
-        run: node -c server.js
+      - run: cd backend && node -c server.js
       
-      - name: Run tests (if available)
-        working-directory: ./backend
-        run: npm test --if-present
-        continue-on-error: true
+      - run: cd backend && npm test --if-present || true
 
   customer-web-build:
     name: Customer Web - Build
     runs-on: ubuntu-latest
     
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
       
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v3
         with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: customer-web/package-lock.json
+          node-version: 18
       
-      - name: Install dependencies
-        working-directory: ./customer-web
-        run: npm ci
+      - run: cd customer-web && npm install
       
-      - name: Build project
-        working-directory: ./customer-web
-        run: npm run build
+      - run: cd customer-web && npm run build
       
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v3
         with:
           name: customer-web-build
           path: customer-web/dist
@@ -70,74 +50,47 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
       
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v3
         with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: restaurant-web/package-lock.json
+          node-version: 18
       
-      - name: Install dependencies
-        working-directory: ./restaurant-web
-        run: npm ci
+      - run: cd restaurant-web && npm install
       
-      - name: Build project
-        working-directory: ./restaurant-web
-        run: npm run build
+      - run: cd restaurant-web && npm run build
 
   admin-web-build:
     name: Admin Web - Build
     runs-on: ubuntu-latest
     
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
       
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v3
         with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: admin-web/package-lock.json
+          node-version: 18
       
-      - name: Install dependencies
-        working-directory: ./admin-web
-        run: npm ci
+      - run: cd admin-web && npm install
       
-      - name: Build project
-        working-directory: ./admin-web
-        run: npm run build
+      - run: cd admin-web && npm run build
 
   mobile-app-check:
     name: Mobile App - TypeScript Check
     runs-on: ubuntu-latest
     
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
       
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v3
         with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: customer-mobile-app/package-lock.json
+          node-version: 18
       
-      - name: Install dependencies
-        working-directory: ./customer-mobile-app
-        run: npm ci
+      - run: cd customer-mobile-app && npm install
       
-      - name: TypeScript type check
-        working-directory: ./customer-mobile-app
-        run: npx tsc --noEmit
+      - run: cd customer-mobile-app && npx tsc --noEmit
       
-      - name: Lint check
-        working-directory: ./customer-mobile-app
-        run: npm run lint --if-present
-        continue-on-error: true
+      - run: cd customer-mobile-app && npm run lint --if-present || true
 
   all-tests-passed:
     name: All Checks Passed ✅
@@ -146,8 +99,7 @@ jobs:
     if: success()
     
     steps:
-      - name: Success message
-        run: |
+      - run: |
           echo "🎉 All CI checks passed successfully!"
           echo "✅ Backend tests completed"
           echo "✅ Customer Web built successfully"
