@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -7,14 +7,14 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
-} from 'react-native';
-import { WebView } from 'react-native-webview';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { useDispatch } from 'react-redux';
-import { clearCart } from '../store/slices/cartSlice';
-import { paypalAPI, paymentAPI } from '../services/api';
-import type { AppDispatch } from '../store';
+} from "react-native";
+import { WebView } from "react-native-webview";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { useDispatch } from "react-redux";
+import { clearCart } from "../store/slices/cartSlice";
+import { paypalAPI, paymentAPI } from "../services/api";
+import type { AppDispatch } from "../store";
 
 interface PayPalPaymentScreenProps {
   route: any;
@@ -46,7 +46,7 @@ const PayPalPaymentScreen: React.FC<PayPalPaymentScreenProps> = ({
       // Chuyển đổi VND sang USD (tỷ giá ước lượng: 1 USD = 25,000 VND)
       const amountUSD = (amount / 25000).toFixed(2);
 
-      console.log('[PayPal] Creating order:', {
+      console.log("[PayPal] Creating order:", {
         orderId,
         amountVND: amount,
         amountUSD,
@@ -55,24 +55,25 @@ const PayPalPaymentScreen: React.FC<PayPalPaymentScreenProps> = ({
 
       const response: any = await paypalAPI.createOrder({
         amount: parseFloat(amountUSD),
+        orderId,
         description: description || `FoodFast Order #${orderId}`,
       });
 
       if (response?.success && response?.data?.approvalUrl) {
         setPaypalUrl(response.data.approvalUrl);
         setPaypalOrderId(response.data.id);
-        console.log('[PayPal] Order created:', response.data);
+        console.log("[PayPal] Order created:", response.data);
       } else {
-        throw new Error('Failed to create PayPal order');
+        throw new Error("Failed to create PayPal order");
       }
     } catch (error: any) {
-      console.error('[PayPal] Init error:', error);
+      console.error("[PayPal] Init error:", error);
       Alert.alert(
-        'Lỗi khởi tạo thanh toán',
-        error.message || 'Không thể kết nối với PayPal',
+        "Lỗi khởi tạo thanh toán",
+        error.message || "Không thể kết nối với PayPal",
         [
           {
-            text: 'Quay lại',
+            text: "Quay lại",
             onPress: () => navigation.goBack(),
           },
         ]
@@ -84,23 +85,23 @@ const PayPalPaymentScreen: React.FC<PayPalPaymentScreenProps> = ({
 
   const handleNavigationStateChange = async (navState: any) => {
     const { url } = navState;
-    console.log('[PayPal] Navigation to:', url);
+    console.log("[PayPal] Navigation to:", url);
 
     // Chỉ detect return URL khi user đã approve thanh toán
     // PayPal redirect về return_url với PayerID param khi thành công
-    if (url.includes('PayerID=')) {
-      console.log('[PayPal] Payment approved - PayerID found in URL:', url);
+    if (url.includes("PayerID=")) {
+      console.log("[PayPal] Payment approved - PayerID found in URL:", url);
       const payerIdMatch = url.match(/PayerID=([^&]+)/);
-      const payerId = payerIdMatch ? payerIdMatch[1] : 'unknown';
-      console.log('[PayPal] Extracted PayerID:', payerId);
-      
+      const payerId = payerIdMatch ? payerIdMatch[1] : "unknown";
+      console.log("[PayPal] Extracted PayerID:", payerId);
+
       await handlePaymentSuccess();
       return;
     }
 
     // Kiểm tra cancel URL (hủy thanh toán)
-    if (url.includes('/payment/paypal-cancel')) {
-      console.log('[PayPal] Payment cancelled');
+    if (url.includes("/payment/paypal-cancel")) {
+      console.log("[PayPal] Payment cancelled");
       handlePaymentCancel();
       return;
     }
@@ -109,7 +110,7 @@ const PayPalPaymentScreen: React.FC<PayPalPaymentScreenProps> = ({
   const handlePaymentSuccess = async () => {
     // Ngăn gọi nhiều lần
     if (processing || !paypalOrderId || captured) {
-      console.log('[PayPal] Skipping duplicate capture call');
+      console.log("[PayPal] Skipping duplicate capture call");
       return;
     }
 
@@ -117,40 +118,43 @@ const PayPalPaymentScreen: React.FC<PayPalPaymentScreenProps> = ({
       setProcessing(true);
       setCaptured(true); // Đánh dấu đã capture
 
-      console.log('[PayPal] Capturing order:', paypalOrderId);
+      console.log("[PayPal] Capturing order:", paypalOrderId);
 
       // Capture PayPal order
       const captureResponse: any = await paypalAPI.captureOrder({
-        paypalOrderId: paypalOrderId,
-        orderId: orderId,
+        paypalOrderId,
+        orderId,
       });
 
-      console.log('[PayPal] Capture response:', captureResponse);
+      console.log("[PayPal] Capture response:", captureResponse);
 
-      if (captureResponse?.success && captureResponse?.data?.status === 'COMPLETED') {
+      if (
+        captureResponse?.success &&
+        captureResponse?.data?.status === "COMPLETED"
+      ) {
         // Xác nhận thanh toán với backend
         await paymentAPI.confirmThirdParty({
           orderId,
           sessionId: paypalOrderId,
-          status: 'success',
+          status: "success",
         });
 
         // Xóa giỏ hàng
         await dispatch(clearCart());
 
         Alert.alert(
-          'Thanh toán thành công!',
-          'Đơn hàng của bạn đã được xác nhận.',
+          "Thanh toán thành công!",
+          "Đơn hàng của bạn đã được xác nhận.",
           [
             {
-              text: 'Xem đơn hàng',
+              text: "Xem đơn hàng",
               onPress: () => {
                 navigation.reset({
                   index: 0,
                   routes: [
-                    { name: 'MainTabs' },
+                    { name: "MainTabs" },
                     {
-                      name: 'OrderTracking',
+                      name: "OrderTracking",
                       params: { orderId },
                     },
                   ],
@@ -160,25 +164,26 @@ const PayPalPaymentScreen: React.FC<PayPalPaymentScreenProps> = ({
           ]
         );
       } else {
-        throw new Error('Payment not completed');
+        throw new Error("Payment not completed");
       }
     } catch (error: any) {
-      console.error('[PayPal] Success handler error:', error);
+      console.error("[PayPal] Success handler error:", error);
       setCaptured(false); // Reset flag nếu lỗi
       Alert.alert(
-        'Lỗi xác nhận thanh toán',
-        error.message || 'Không thể xác nhận thanh toán. Vui lòng liên hệ hỗ trợ.',
+        "Lỗi xác nhận thanh toán",
+        error.message ||
+          "Không thể xác nhận thanh toán. Vui lòng liên hệ hỗ trợ.",
         [
           {
-            text: 'Thử lại',
+            text: "Thử lại",
             onPress: () => {
               // Cho phép thử lại
-            }
+            },
           },
           {
-            text: 'Hủy',
+            text: "Hủy",
             onPress: () => navigation.goBack(),
-            style: 'cancel'
+            style: "cancel",
           },
         ]
       );
@@ -189,11 +194,11 @@ const PayPalPaymentScreen: React.FC<PayPalPaymentScreenProps> = ({
 
   const handlePaymentCancel = () => {
     Alert.alert(
-      'Hủy thanh toán',
-      'Bạn đã hủy thanh toán. Đơn hàng sẽ bị hủy.',
+      "Hủy thanh toán",
+      "Bạn đã hủy thanh toán. Đơn hàng sẽ bị hủy.",
       [
         {
-          text: 'OK',
+          text: "OK",
           onPress: () => navigation.goBack(),
         },
       ]
@@ -201,20 +206,16 @@ const PayPalPaymentScreen: React.FC<PayPalPaymentScreenProps> = ({
   };
 
   const handleClose = () => {
-    Alert.alert(
-      'Xác nhận',
-      'Bạn có chắc muốn hủy thanh toán?',
-      [
-        {
-          text: 'Không',
-          style: 'cancel',
-        },
-        {
-          text: 'Có',
-          onPress: () => navigation.goBack(),
-        },
-      ]
-    );
+    Alert.alert("Xác nhận", "Bạn có chắc muốn hủy thanh toán?", [
+      {
+        text: "Không",
+        style: "cancel",
+      },
+      {
+        text: "Có",
+        onPress: () => navigation.goBack(),
+      },
+    ]);
   };
 
   if (loading) {
@@ -239,7 +240,10 @@ const PayPalPaymentScreen: React.FC<PayPalPaymentScreenProps> = ({
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeButton}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.closeButton}
+          >
             <Ionicons name="close" size={24} color="#333" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Thanh toán PayPal</Text>
@@ -248,7 +252,10 @@ const PayPalPaymentScreen: React.FC<PayPalPaymentScreenProps> = ({
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle" size={64} color="#EA5034" />
           <Text style={styles.errorText}>Không thể tải trang thanh toán</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={initPayPalPayment}>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={initPayPalPayment}
+          >
             <Text style={styles.retryButtonText}>Thử lại</Text>
           </TouchableOpacity>
         </View>
@@ -272,11 +279,13 @@ const PayPalPaymentScreen: React.FC<PayPalPaymentScreenProps> = ({
         onNavigationStateChange={handleNavigationStateChange}
         onError={(syntheticEvent) => {
           const { nativeEvent } = syntheticEvent;
-          console.warn('[PayPal] WebView error:', nativeEvent);
+          console.warn("[PayPal] WebView error:", nativeEvent);
           // Chỉ xử lý như success nếu URL có PayerID (user đã approve)
-          if (nativeEvent.url?.includes('PayerID=')) {
-             console.log('[PayPal] WebView error but PayerID found, treating as success');
-             handlePaymentSuccess();
+          if (nativeEvent.url?.includes("PayerID=")) {
+            console.log(
+              "[PayPal] WebView error but PayerID found, treating as success"
+            );
+            handlePaymentSuccess();
           }
         }}
         startInLoadingState={true}
@@ -307,95 +316,95 @@ const PayPalPaymentScreen: React.FC<PayPalPaymentScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: "#eee",
   },
   closeButton: {
     width: 40,
     height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: "600",
+    color: "#333",
   },
   loadingContainer: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#666',
+    color: "#666",
   },
   errorContainer: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     padding: 24,
   },
   errorText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
+    color: "#666",
+    textAlign: "center",
   },
   retryButton: {
     marginTop: 24,
     paddingHorizontal: 24,
     paddingVertical: 12,
-    backgroundColor: '#0070BA',
+    backgroundColor: "#0070BA",
     borderRadius: 8,
   },
   retryButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   webView: {
     flex: 1,
   },
   webViewLoading: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fff",
   },
   processingOverlay: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   processingBox: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     padding: 24,
     borderRadius: 12,
-    alignItems: 'center',
+    alignItems: "center",
   },
   processingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#333',
+    color: "#333",
   },
 });
 

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -10,85 +10,94 @@ import {
   ScrollView,
   Image,
   ActivityIndicator,
-} from 'react-native';
-import { useDispatch, useSelector } from 'react-redux';
-import { useRoute } from '@react-navigation/native';
-import { addToCart, fetchCart } from '../store/slices/cartSlice';
-import { Alert } from 'react-native';
-import { login, clearError } from '../store/slices/authSlice';
-import type { AppDispatch, RootState } from '../store';
+} from "react-native";
+import { useDispatch, useSelector } from "react-redux";
+import { useRoute } from "@react-navigation/native";
+import { addToCart, fetchCart } from "../store/slices/cartSlice";
+import { Alert } from "react-native";
+import { login, clearError } from "../store/slices/authSlice";
+import type { AppDispatch, RootState } from "../store";
 
 const resolveRestaurantImage = (restaurant: any) =>
-  restaurant?.image || restaurant?.coverImage || restaurant?.avatar || '';
+  restaurant?.image || restaurant?.coverImage || restaurant?.avatar || "";
 
 const LoginScreen = ({ navigation }: any) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const dispatch = useDispatch<AppDispatch>();
   const route = useRoute<any>();
 
   const handleLogin = useCallback(async () => {
     if (!email || !password) {
-      Alert.alert('Lỗi', 'Vui lòng nhập email và mật khẩu');
+      Alert.alert("Lỗi", "Vui lòng nhập email và mật khẩu");
       return;
     }
 
     setIsSubmitting(true);
     try {
-      console.log('🔐 Attempting login with:', { email, password });
+      console.log("🔐 Attempting login with:", { email, password });
       await (dispatch(login({ email, password })) as any).unwrap();
-      console.log('✅ Login successful');
-      
+      console.log("✅ Login successful");
+
       // Đợi một chút để đảm bảo token được lưu vào AsyncStorage
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
       // Load giỏ hàng sau khi đăng nhập thành công
       try {
         await (dispatch(fetchCart()) as any).unwrap();
       } catch (cartError) {
-        console.warn('Failed to fetch cart after login:', cartError);
+        console.warn("Failed to fetch cart after login:", cartError);
       }
-      
+
       // Nếu có pendingAdd từ màn hình trước, thêm món vào giỏ ngay sau khi đăng nhập
       const pending = route?.params?.pendingAdd;
       if (pending && pending.product && pending.restaurant) {
         const restaurantImage = resolveRestaurantImage(pending.restaurant);
         const productImageCandidates = Array.isArray(pending.product.images)
-          ? pending.product.images.filter((item: string) => typeof item === 'string' && item.trim().length > 0)
+          ? pending.product.images.filter(
+              (item: string) =>
+                typeof item === "string" && item.trim().length > 0
+            )
           : [];
-        const fallbackProductImage = productImageCandidates[0]
-          || pending.product.image
-          || restaurantImage;
+        const fallbackProductImage =
+          productImageCandidates[0] || pending.product.image || restaurantImage;
         try {
-          await dispatch(addToCart({
-            id: pending.product.id || pending.product._id || `${Date.now()}`,
-            productId: pending.product.id || pending.product._id || `${Date.now()}`,
-            name: pending.product.name,
-            price: pending.product.price ?? 0,
-            restaurantId: pending.restaurant.id || pending.restaurant._id,
-            restaurantName: pending.restaurant.name,
-            image: fallbackProductImage,
-          }));
-          Alert.alert('Thành công', 'Đã thêm vào giỏ hàng');
-          navigation.replace('MainTabs');
+          await dispatch(
+            addToCart({
+              id: pending.product.id || pending.product._id || `${Date.now()}`,
+              productId:
+                pending.product.id || pending.product._id || `${Date.now()}`,
+              name: pending.product.name,
+              price: pending.product.price ?? 0,
+              restaurantId: pending.restaurant.id || pending.restaurant._id,
+              restaurantName: pending.restaurant.name,
+              image: fallbackProductImage,
+            })
+          );
+          Alert.alert("Thành công", "Đã thêm vào giỏ hàng");
+          navigation.replace("MainTabs");
           return;
         } catch (cartError: any) {
-          console.error('Add to cart failed:', cartError);
+          console.error("Add to cart failed:", cartError);
           // Không hiển thị lỗi, vẫn chuyển về trang chính
-          Alert.alert('Đăng nhập thành công', 'Bạn có thể thêm món vào giỏ hàng ngay bây giờ');
-          navigation.replace('MainTabs');
+          Alert.alert(
+            "Đăng nhập thành công",
+            "Bạn có thể thêm món vào giỏ hàng ngay bây giờ"
+          );
+          navigation.replace("MainTabs");
           return;
         }
       }
 
       // Nếu không có pendingAdd, quay về Home
-      Alert.alert('Thành công', 'Đăng nhập thành công!');
-      navigation.replace('MainTabs');
+      Alert.alert("Thành công", "Đăng nhập thành công!");
+      navigation.replace("MainTabs");
     } catch (err: any) {
-      console.error('❌ Login failed:', err);
-      const errorMessage = err?.message || err?.error || err || 'Vui lòng kiểm tra lại thông tin';
-      Alert.alert('Đăng nhập thất bại', errorMessage);
+      console.error("❌ Login failed:", err);
+      const errorMessage =
+        err?.message || err?.error || err || "Vui lòng kiểm tra lại thông tin";
+      Alert.alert("Đăng nhập thất bại", errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -99,12 +108,12 @@ const LoginScreen = ({ navigation }: any) => {
   }, [navigation]);
 
   const handleRegister = useCallback(() => {
-    navigation.navigate('Register');
+    navigation.navigate("Register");
   }, [navigation]);
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -115,12 +124,14 @@ const LoginScreen = ({ navigation }: any) => {
 
         <View style={styles.header}>
           <Text style={styles.logo}>🚁 FoodFast</Text>
-          <Text style={styles.subtitle}>Giao hàng bằng Drone - Nhanh chóng</Text>
+          <Text style={styles.subtitle}>
+            Giao hàng bằng Drone - Nhanh chóng
+          </Text>
         </View>
 
         <View style={styles.form}>
           <Text style={styles.title}>Đăng nhập</Text>
-          
+
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Email</Text>
             <TextInput
@@ -149,8 +160,8 @@ const LoginScreen = ({ navigation }: any) => {
             />
           </View>
 
-          <TouchableOpacity 
-            style={[styles.loginButton, isSubmitting && styles.buttonDisabled]} 
+          <TouchableOpacity
+            style={[styles.loginButton, isSubmitting && styles.buttonDisabled]}
             onPress={handleLogin}
             disabled={isSubmitting}
           >
@@ -161,9 +172,13 @@ const LoginScreen = ({ navigation }: any) => {
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.registerLink} onPress={handleRegister}>
+          <TouchableOpacity
+            style={styles.registerLink}
+            onPress={handleRegister}
+          >
             <Text style={styles.registerText}>
-              Chưa có tài khoản? <Text style={styles.registerTextBold}>Đăng ký ngay</Text>
+              Chưa có tài khoản?{" "}
+              <Text style={styles.registerTextBold}>Đăng ký ngay</Text>
             </Text>
           </TouchableOpacity>
         </View>
@@ -175,32 +190,32 @@ const LoginScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fafafa',
+    backgroundColor: "#fafafa",
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     padding: 24,
   },
   header: {
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 48,
   },
   logo: {
     fontSize: 40,
-    fontWeight: 'bold',
-    color: '#EA5034',
+    fontWeight: "bold",
+    color: "#EA5034",
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
-    color: '#666',
+    color: "#666",
   },
   form: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 12,
     padding: 24,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -208,66 +223,66 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "bold",
+    color: "#333",
     marginBottom: 24,
-    textAlign: 'center',
+    textAlign: "center",
   },
   inputGroup: {
     marginBottom: 20,
   },
   label: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: "600",
+    color: "#333",
     marginBottom: 8,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: "#ddd",
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
   loginButton: {
-    backgroundColor: '#EA5034',
+    backgroundColor: "#EA5034",
     borderRadius: 8,
     padding: 16,
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 8,
   },
   loginButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   buttonDisabled: {
     opacity: 0.6,
   },
   registerLink: {
     marginTop: 20,
-    alignItems: 'center',
+    alignItems: "center",
   },
   registerText: {
     fontSize: 14,
-    color: '#666',
+    color: "#666",
   },
   registerTextBold: {
-    color: '#EA5034',
-    fontWeight: 'bold',
+    color: "#EA5034",
+    fontWeight: "bold",
   },
   closeButton: {
-    position: 'absolute',
+    position: "absolute",
     top: 40,
     right: 20,
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
+    backgroundColor: "#fff",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -276,8 +291,8 @@ const styles = StyleSheet.create({
   },
   closeButtonText: {
     fontSize: 24,
-    color: '#666',
-    fontWeight: '300',
+    color: "#666",
+    fontWeight: "300",
   },
 });
 

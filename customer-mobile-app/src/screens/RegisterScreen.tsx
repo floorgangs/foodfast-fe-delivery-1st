@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -9,23 +9,23 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
-} from 'react-native';
-import { useDispatch } from 'react-redux';
-import { useRoute } from '@react-navigation/native';
-import { addToCart, fetchCart } from '../store/slices/cartSlice';
-import { Alert } from 'react-native';
-import { register } from '../store/slices/authSlice';
-import type { AppDispatch } from '../store';
+} from "react-native";
+import { useDispatch } from "react-redux";
+import { useRoute } from "@react-navigation/native";
+import { addToCart, fetchCart } from "../store/slices/cartSlice";
+import { Alert } from "react-native";
+import { register } from "../store/slices/authSlice";
+import type { AppDispatch } from "../store";
 
 const resolveRestaurantImage = (restaurant: any) =>
-  restaurant?.image || restaurant?.coverImage || restaurant?.avatar || '';
+  restaurant?.image || restaurant?.coverImage || restaurant?.avatar || "";
 
 const RegisterScreen = ({ navigation }: any) => {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const dispatch = useDispatch<AppDispatch>();
 
@@ -35,60 +35,82 @@ const RegisterScreen = ({ navigation }: any) => {
     if (name && email && phone && password && password === confirmPassword) {
       setIsSubmitting(true);
       try {
-        await (dispatch(register({ name, email, phone, password })) as any).unwrap();
+        await (
+          dispatch(register({ name, email, phone, password })) as any
+        ).unwrap();
         try {
           await (dispatch(fetchCart()) as any).unwrap();
         } catch (cartError) {
-          console.warn('Failed to fetch cart after register:', cartError);
+          console.warn("Failed to fetch cart after register:", cartError);
         }
 
         const pending = route?.params?.pendingAdd;
         if (pending && pending.product && pending.restaurant) {
           const restaurantImage = resolveRestaurantImage(pending.restaurant);
           const productImageCandidates = Array.isArray(pending.product.images)
-            ? pending.product.images.filter((item: string) => typeof item === 'string' && item.trim().length > 0)
+            ? pending.product.images.filter(
+                (item: string) =>
+                  typeof item === "string" && item.trim().length > 0
+              )
             : [];
-          const fallbackProductImage = productImageCandidates[0]
-            || pending.product.image
-            || restaurantImage;
+          const fallbackProductImage =
+            productImageCandidates[0] ||
+            pending.product.image ||
+            restaurantImage;
           try {
-            await dispatch(addToCart({
-              id: pending.product.id || pending.product._id || `${Date.now()}`,
-              productId: pending.product.id || pending.product._id || `${Date.now()}`,
-              name: pending.product.name,
-              price: pending.product.price ?? 0,
-              restaurantId: pending.restaurant.id || pending.restaurant._id,
-              restaurantName: pending.restaurant.name,
-              image: fallbackProductImage,
-            }));
-            Alert.alert('Thành công', 'Đã thêm vào giỏ hàng');
-            navigation.navigate('Cart');
+            await dispatch(
+              addToCart({
+                id:
+                  pending.product.id || pending.product._id || `${Date.now()}`,
+                productId:
+                  pending.product.id || pending.product._id || `${Date.now()}`,
+                name: pending.product.name,
+                price: pending.product.price ?? 0,
+                restaurantId: pending.restaurant.id || pending.restaurant._id,
+                restaurantName: pending.restaurant.name,
+                image: fallbackProductImage,
+              })
+            );
+            Alert.alert("Thành công", "Đã thêm vào giỏ hàng");
+            navigation.navigate("Cart");
           } catch (cartError: any) {
-            Alert.alert('Lỗi', cartError?.message || 'Không thể lưu giỏ hàng');
+            Alert.alert("Lỗi", cartError?.message || "Không thể lưu giỏ hàng");
           }
           return;
         }
 
-        navigation.navigate('MainTabs');
+        navigation.navigate("MainTabs");
       } catch (error: any) {
-        Alert.alert('Đăng ký thất bại', error?.message || 'Vui lòng kiểm tra lại thông tin');
+        Alert.alert(
+          "Đăng ký thất bại",
+          error?.message || "Vui lòng kiểm tra lại thông tin"
+        );
       } finally {
         setIsSubmitting(false);
       }
     }
-  }, [name, email, phone, password, confirmPassword, dispatch, navigation, route]);
+  }, [
+    name,
+    email,
+    phone,
+    password,
+    confirmPassword,
+    dispatch,
+    navigation,
+    route,
+  ]);
 
   const handleClose = useCallback(() => {
     navigation.goBack();
   }, [navigation]);
 
   const handleLogin = useCallback(() => {
-    navigation.navigate('Login');
+    navigation.navigate("Login");
   }, [navigation]);
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -99,12 +121,14 @@ const RegisterScreen = ({ navigation }: any) => {
 
         <View style={styles.header}>
           <Text style={styles.logo}>🚁 FoodFast</Text>
-          <Text style={styles.subtitle}>Giao hàng bằng Drone - Nhanh chóng</Text>
+          <Text style={styles.subtitle}>
+            Giao hàng bằng Drone - Nhanh chóng
+          </Text>
         </View>
 
         <View style={styles.form}>
           <Text style={styles.title}>Đăng ký</Text>
-          
+
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Họ và tên</Text>
             <TextInput
@@ -174,8 +198,11 @@ const RegisterScreen = ({ navigation }: any) => {
             />
           </View>
 
-          <TouchableOpacity 
-            style={[styles.registerButton, isSubmitting && styles.buttonDisabled]} 
+          <TouchableOpacity
+            style={[
+              styles.registerButton,
+              isSubmitting && styles.buttonDisabled,
+            ]}
             onPress={handleRegister}
             disabled={isSubmitting}
           >
@@ -188,7 +215,8 @@ const RegisterScreen = ({ navigation }: any) => {
 
           <TouchableOpacity style={styles.loginLink} onPress={handleLogin}>
             <Text style={styles.loginText}>
-              Đã có tài khoản? <Text style={styles.loginTextBold}>Đăng nhập ngay</Text>
+              Đã có tài khoản?{" "}
+              <Text style={styles.loginTextBold}>Đăng nhập ngay</Text>
             </Text>
           </TouchableOpacity>
         </View>
@@ -200,32 +228,32 @@ const RegisterScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fafafa',
+    backgroundColor: "#fafafa",
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     padding: 24,
   },
   header: {
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 48,
   },
   logo: {
     fontSize: 40,
-    fontWeight: 'bold',
-    color: '#EA5034',
+    fontWeight: "bold",
+    color: "#EA5034",
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
-    color: '#666',
+    color: "#666",
   },
   form: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 12,
     padding: 24,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -233,66 +261,66 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "bold",
+    color: "#333",
     marginBottom: 24,
-    textAlign: 'center',
+    textAlign: "center",
   },
   inputGroup: {
     marginBottom: 16,
   },
   label: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: "600",
+    color: "#333",
     marginBottom: 8,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: "#ddd",
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
   registerButton: {
-    backgroundColor: '#EA5034',
+    backgroundColor: "#EA5034",
     borderRadius: 8,
     padding: 16,
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 8,
   },
   registerButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   buttonDisabled: {
     opacity: 0.6,
   },
   loginLink: {
     marginTop: 20,
-    alignItems: 'center',
+    alignItems: "center",
   },
   loginText: {
     fontSize: 14,
-    color: '#666',
+    color: "#666",
   },
   loginTextBold: {
-    color: '#EA5034',
-    fontWeight: 'bold',
+    color: "#EA5034",
+    fontWeight: "bold",
   },
   closeButton: {
-    position: 'absolute',
+    position: "absolute",
     top: 40,
     right: 20,
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
+    backgroundColor: "#fff",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -301,8 +329,8 @@ const styles = StyleSheet.create({
   },
   closeButtonText: {
     fontSize: 24,
-    color: '#666',
-    fontWeight: '300',
+    color: "#666",
+    fontWeight: "300",
   },
 });
 
