@@ -35,9 +35,9 @@ const RegisterScreen = ({ navigation }: any) => {
     if (name && email && phone && password && password === confirmPassword) {
       setIsSubmitting(true);
       try {
-        await dispatch(register({ name, email, phone, password })).unwrap();
+        await (dispatch(register({ name, email, phone, password })) as any).unwrap();
         try {
-          await dispatch(fetchCart()).unwrap();
+          await (dispatch(fetchCart()) as any).unwrap();
         } catch (cartError) {
           console.warn('Failed to fetch cart after register:', cartError);
         }

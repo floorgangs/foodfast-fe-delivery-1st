@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -11,16 +11,20 @@ import {
   StatusBar,
   ActivityIndicator,
   Image,
-} from 'react-native';
-import { useSelector, useDispatch } from 'react-redux';
-import { RootState } from '../store';
-import type { AppDispatch } from '../store';
-import { orderAPI, voucherAPI } from '../services/api';
-import { PAYMENT_METHODS, DEFAULT_ADDRESS } from '../constants';
+} from "react-native";
+import { useSelector, useDispatch } from "react-redux";
+import { RootState } from "../store";
+import type { AppDispatch } from "../store";
+import { orderAPI, voucherAPI } from "../services/api";
+import { PAYMENT_METHODS, DEFAULT_ADDRESS } from "../constants";
 
 const CheckoutScreen = ({ navigation }: any) => {
-  const { items, total, currentRestaurantId } = useSelector((state: RootState) => state.cart);
-  const { user, isAuthenticated } = useSelector((state: RootState) => state.auth);
+  const { items, total, currentRestaurantId } = useSelector(
+    (state: RootState) => state.cart
+  );
+  const { user, isAuthenticated } = useSelector(
+    (state: RootState) => state.auth
+  );
   const dispatch = useDispatch<AppDispatch>();
 
   // Success Modal State
@@ -35,26 +39,28 @@ const CheckoutScreen = ({ navigation }: any) => {
     // Default address nếu user chưa có
     return [
       {
-        id: 'temp1',
-        name: 'Nhà riêng',
-        address: '123 Đường ABC, Phường XYZ, Quận 1, TP.HCM',
-        phone: user?.phone || '0901234567',
-      }
+        id: "temp1",
+        name: "Nhà riêng",
+        address: "123 Đường ABC, Phường XYZ, Quận 1, TP.HCM",
+        phone: user?.phone || "0901234567",
+      },
     ];
   });
 
   const paymentMethods = PAYMENT_METHODS;
 
-  const [selectedAddress, setSelectedAddress] = useState(addresses[0]?._id || addresses[0]?.id || '');
-  const [selectedPayment, setSelectedPayment] = useState('paypal');
-  const [note, setNote] = useState('');
-  const [voucherCode, setVoucherCode] = useState('');
+  const [selectedAddress, setSelectedAddress] = useState(
+    addresses[0]?._id || addresses[0]?.id || ""
+  );
+  const [selectedPayment, setSelectedPayment] = useState("paypal");
+  const [note, setNote] = useState("");
+  const [voucherCode, setVoucherCode] = useState("");
   const [discount, setDiscount] = useState(0);
   const [guestInfo, setGuestInfo] = useState({
-    name: user?.name || '',
-    phone: user?.phone || '',
-    email: user?.email || '',
-    address: user?.addresses?.[0]?.address || '',
+    name: user?.name || "",
+    phone: user?.phone || "",
+    email: user?.email || "",
+    address: user?.addresses?.[0]?.address || "",
   });
 
   const deliveryFee = 15000; // Fixed drone delivery fee
@@ -66,13 +72,19 @@ const CheckoutScreen = ({ navigation }: any) => {
       setAddresses(user.addresses);
       // If no address is selected or selected address doesn't exist, select the first one
       const addressId = user.addresses[0]._id || user.addresses[0].id;
-      if (!selectedAddress || !user.addresses.find(a => (a._id || a.id) === selectedAddress)) {
+      if (
+        !selectedAddress ||
+        !user.addresses.find((a) => (a._id || a.id) === selectedAddress)
+      ) {
         setSelectedAddress(addressId);
       }
     }
   }, [user?.addresses]);
 
-  const handleGuestInfoChange = (field: keyof typeof guestInfo, value: string) => {
+  const handleGuestInfoChange = (
+    field: keyof typeof guestInfo,
+    value: string
+  ) => {
     setGuestInfo((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -80,7 +92,7 @@ const CheckoutScreen = ({ navigation }: any) => {
 
   const handleApplyVoucher = async () => {
     if (!voucherCode.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập mã voucher');
+      Alert.alert("Lỗi", "Vui lòng nhập mã voucher");
       return;
     }
 
@@ -91,11 +103,14 @@ const CheckoutScreen = ({ navigation }: any) => {
         total + deliveryFee,
         currentRestaurantId
       );
-      
+
       setDiscount(response.data.discount);
-      Alert.alert('Thành công', `Giảm giá ${response.data.discount.toLocaleString()}đ!`);
+      Alert.alert(
+        "Thành công",
+        `Giảm giá ${response.data.discount.toLocaleString()}đ!`
+      );
     } catch (error: any) {
-      Alert.alert('Lỗi', error.message || 'Mã voucher không hợp lệ');
+      Alert.alert("Lỗi", error.message || "Mã voucher không hợp lệ");
       setDiscount(0);
     } finally {
       setApplyingVoucher(false);
@@ -104,38 +119,49 @@ const CheckoutScreen = ({ navigation }: any) => {
 
   const handlePlaceOrder = async () => {
     if (!selectedPayment) {
-      Alert.alert('Thông báo', 'Vui lòng chọn phương thức thanh toán');
+      Alert.alert("Thông báo", "Vui lòng chọn phương thức thanh toán");
       return;
     }
 
     if (!isAuthenticated) {
-      if (!guestInfo.name.trim() || !guestInfo.phone.trim() || !guestInfo.email.trim()) {
-        Alert.alert('Thông báo', 'Vui lòng nhập đầy đủ họ tên, số điện thoại và email.');
+      if (
+        !guestInfo.name.trim() ||
+        !guestInfo.phone.trim() ||
+        !guestInfo.email.trim()
+      ) {
+        Alert.alert(
+          "Thông báo",
+          "Vui lòng nhập đầy đủ họ tên, số điện thoại và email."
+        );
         return;
       }
       if (!guestInfo.address.trim()) {
-        Alert.alert('Thông báo', 'Vui lòng nhập địa chỉ để drone giao hàng.');
+        Alert.alert("Thông báo", "Vui lòng nhập địa chỉ để drone giao hàng.");
         return;
       }
     }
 
     // For authenticated users, validate address exists
-    const selectedAddressData = isAuthenticated ? addresses.find(a => (a._id || a.id) === selectedAddress) : null;
+    const selectedAddressData = isAuthenticated
+      ? addresses.find((a) => (a._id || a.id) === selectedAddress)
+      : null;
     if (isAuthenticated && !selectedAddressData) {
-      Alert.alert('Thông báo', 'Vui lòng chọn địa chỉ giao hàng');
+      Alert.alert("Thông báo", "Vui lòng chọn địa chỉ giao hàng");
       return;
     }
 
-    const selectedPaymentData = paymentMethods.find(p => p.id === selectedPayment);
+    const selectedPaymentData = paymentMethods.find(
+      (p) => p.id === selectedPayment
+    );
 
     try {
       setLoading(true);
-      
+
       const normalizeCoordinate = (value: any) => {
-        if (typeof value === 'number') {
+        if (typeof value === "number") {
           return value;
         }
-        if (typeof value === 'string' && value.trim() !== '') {
+        if (typeof value === "string" && value.trim() !== "") {
           const parsed = Number(value);
           return Number.isFinite(parsed) ? parsed : undefined;
         }
@@ -143,29 +169,58 @@ const CheckoutScreen = ({ navigation }: any) => {
       };
 
       const parseAddressComponents = (fullAddress: string) => {
-        const normalized = fullAddress.toLowerCase().replace(/\s+/g, ' ').trim();
-        
+        const normalized = fullAddress
+          .toLowerCase()
+          .replace(/\s+/g, " ")
+          .trim();
+
         const districtPatterns = [
-          { pattern: /quận\s*(\d+|[\w\sàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]+)/i, prefix: 'Quận' },
-          { pattern: /huyện\s*([\w\sàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]+)/i, prefix: 'Huyện' },
-          { pattern: /thành phố\s*([\w\sàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]+)/i, prefix: 'Thành phố' },
-        ];
-        
-        const wardPatterns = [
-          { pattern: /phường\s*(\d+|[\w\sàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]+)/i, prefix: 'Phường' },
-          { pattern: /xã\s*([\w\sàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]+)/i, prefix: 'Xã' },
-          { pattern: /thị trấn\s*([\w\sàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]+)/i, prefix: 'Thị trấn' },
+          {
+            pattern:
+              /quận\s*(\d+|[\w\sàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]+)/i,
+            prefix: "Quận",
+          },
+          {
+            pattern:
+              /huyện\s*([\w\sàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]+)/i,
+            prefix: "Huyện",
+          },
+          {
+            pattern:
+              /thành phố\s*([\w\sàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]+)/i,
+            prefix: "Thành phố",
+          },
         ];
 
-        let district = '';
-        let ward = '';
-        let city = '';
+        const wardPatterns = [
+          {
+            pattern:
+              /phường\s*(\d+|[\w\sàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]+)/i,
+            prefix: "Phường",
+          },
+          {
+            pattern:
+              /xã\s*([\w\sàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]+)/i,
+            prefix: "Xã",
+          },
+          {
+            pattern:
+              /thị trấn\s*([\w\sàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]+)/i,
+            prefix: "Thị trấn",
+          },
+        ];
+
+        let district = "";
+        let ward = "";
+        let city = "";
 
         for (const { pattern, prefix } of districtPatterns) {
           const match = normalized.match(pattern);
           if (match) {
             const value = match[1].trim();
-            district = `${prefix} ${value.charAt(0).toUpperCase() + value.slice(1)}`;
+            district = `${prefix} ${
+              value.charAt(0).toUpperCase() + value.slice(1)
+            }`;
             break;
           }
         }
@@ -174,24 +229,30 @@ const CheckoutScreen = ({ navigation }: any) => {
           const match = normalized.match(pattern);
           if (match) {
             const value = match[1].trim();
-            ward = `${prefix} ${value.charAt(0).toUpperCase() + value.slice(1)}`;
+            ward = `${prefix} ${
+              value.charAt(0).toUpperCase() + value.slice(1)
+            }`;
             break;
           }
         }
 
-        if (/tp\.?\s*hồ chí minh|tp\.?\s*hcm|hồ chí minh|sài gòn|saigon/i.test(normalized)) {
-          city = 'Hồ Chí Minh';
+        if (
+          /tp\.?\s*hồ chí minh|tp\.?\s*hcm|hồ chí minh|sài gòn|saigon/i.test(
+            normalized
+          )
+        ) {
+          city = "Hồ Chí Minh";
         } else if (/hà nội|hanoi/i.test(normalized)) {
-          city = 'Hà Nội';
+          city = "Hà Nội";
         } else if (/đà nẵng|da nang/i.test(normalized)) {
-          city = 'Đà Nẵng';
+          city = "Đà Nẵng";
         } else if (/cần thơ|can tho/i.test(normalized)) {
-          city = 'Cần Thơ';
+          city = "Cần Thơ";
         } else if (/hải phòng|hai phong/i.test(normalized)) {
-          city = 'Hải Phòng';
+          city = "Hải Phòng";
         }
 
-        return { ward, district, city: city || 'Hồ Chí Minh' };
+        return { ward, district, city: city || "Hồ Chí Minh" };
       };
 
       const normalizedCoordinates = selectedAddressData?.coordinates
@@ -201,20 +262,23 @@ const CheckoutScreen = ({ navigation }: any) => {
           }
         : undefined;
 
-      const fullAddressString = selectedAddressData?.address || '';
+      const fullAddressString = selectedAddressData?.address || "";
       const parsedComponents = parseAddressComponents(fullAddressString);
 
       const deliveryAddressPayload = isAuthenticated
         ? {
-            street: selectedAddressData?.street || selectedAddressData?.address || '',
+            street:
+              selectedAddressData?.street || selectedAddressData?.address || "",
             address: fullAddressString,
             city: selectedAddressData?.city || parsedComponents.city,
-            district: selectedAddressData?.district || parsedComponents.district,
+            district:
+              selectedAddressData?.district || parsedComponents.district,
             ward: selectedAddressData?.ward || parsedComponents.ward,
-            phone: selectedAddressData?.phone || user?.phone || '',
+            phone: selectedAddressData?.phone || user?.phone || "",
             label: selectedAddressData?.label,
             coordinates:
-              normalizedCoordinates?.lat != null && normalizedCoordinates?.lng != null
+              normalizedCoordinates?.lat != null &&
+              normalizedCoordinates?.lng != null
                 ? normalizedCoordinates
                 : undefined,
           }
@@ -225,7 +289,7 @@ const CheckoutScreen = ({ navigation }: any) => {
             district: DEFAULT_ADDRESS.district,
             ward: DEFAULT_ADDRESS.ward,
             phone: guestInfo.phone,
-            label: 'Khách lẻ',
+            label: "Khách lẻ",
           };
 
       const orderData = {
@@ -246,19 +310,21 @@ const CheckoutScreen = ({ navigation }: any) => {
         customerInfo: isAuthenticated ? undefined : guestInfo,
       };
 
-      console.log('[Checkout] Creating order with data:', orderData);
+      console.log("[Checkout] Creating order with data:", orderData);
       const response = await orderAPI.create(orderData);
-      console.log('[Checkout] Order creation response:', response);
+      console.log("[Checkout] Order creation response:", response);
 
       if (!response?.data?._id || !response?.data?.paymentSession?.sessionId) {
-        console.error('[Checkout] Invalid response structure:', response);
-        throw new Error('Không thể khởi tạo phiên thanh toán. Vui lòng thử lại.');
+        console.error("[Checkout] Invalid response structure:", response);
+        throw new Error(
+          "Không thể khởi tạo phiên thanh toán. Vui lòng thử lại."
+        );
       }
 
       // Kiểm tra nếu là PayPal thì chuyển sang PayPalPaymentScreen
-      if (selectedPayment === 'paypal') {
-        console.log('[Checkout] Navigating to PayPalPayment');
-        navigation.replace('PayPalPayment', {
+      if (selectedPayment === "paypal") {
+        console.log("[Checkout] Navigating to PayPalPayment");
+        navigation.replace("PayPalPayment", {
           orderId: response.data._id,
           amount: response.data.total,
           description: `Đơn hàng #${response.data.orderNumber} - ${items[0]?.restaurantName}`,
@@ -277,11 +343,17 @@ const CheckoutScreen = ({ navigation }: any) => {
         expiresAt: response.data.paymentSession.expiresAt,
         restaurantName: items[0]?.restaurantName,
       };
-      
-      console.log('[Checkout] Navigating to ThirdPartyPayment with params:', navigationParams);
-      navigation.replace('ThirdPartyPayment', navigationParams);
+
+      console.log(
+        "[Checkout] Navigating to ThirdPartyPayment with params:",
+        navigationParams
+      );
+      navigation.replace("ThirdPartyPayment", navigationParams);
     } catch (error: any) {
-      Alert.alert('Lỗi', error.message || 'Không thể tạo đơn hàng. Vui lòng thử lại!');
+      Alert.alert(
+        "Lỗi",
+        error.message || "Không thể tạo đơn hàng. Vui lòng thử lại!"
+      );
     } finally {
       setLoading(false);
     }
@@ -309,14 +381,17 @@ const CheckoutScreen = ({ navigation }: any) => {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButtonContainer}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButtonContainer}
+        >
           <Text style={styles.backButton}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Thanh toán</Text>
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView 
+      <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={true}
         contentContainerStyle={{ paddingBottom: 16 }}
@@ -329,57 +404,64 @@ const CheckoutScreen = ({ navigation }: any) => {
               <Text style={styles.sectionTitle}>Địa chỉ giao hàng</Text>
             </View>
             {isAuthenticated && (
-              <TouchableOpacity onPress={() => navigation.navigate('Address')}>
+              <TouchableOpacity onPress={() => navigation.navigate("Address")}>
                 <Text style={styles.changeButton}>Thay đổi</Text>
               </TouchableOpacity>
             )}
           </View>
           {isAuthenticated ? (
             addresses.length === 0 ? (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.addAddressButton}
-                onPress={() => navigation.navigate('Address')}
+                onPress={() => navigation.navigate("Address")}
               >
                 <Text style={styles.addAddressText}>+ Thêm địa chỉ mới</Text>
               </TouchableOpacity>
             ) : (
-              addresses.map(address => {
+              addresses.map((address) => {
                 const addressId = address._id || address.id;
                 return (
                   <TouchableOpacity
                     key={addressId}
                     style={[
                       styles.addressCard,
-                      selectedAddress === addressId && styles.addressCardSelected,
+                      selectedAddress === addressId &&
+                        styles.addressCardSelected,
                     ]}
                     onPress={() => setSelectedAddress(addressId)}
                   >
                     <View style={styles.radioButton}>
-                      {selectedAddress === addressId && <View style={styles.radioButtonInner} />}
+                      {selectedAddress === addressId && (
+                        <View style={styles.radioButtonInner} />
+                      )}
                     </View>
-                  <View style={styles.addressInfo}>
-                    <Text style={styles.addressName}>{address.name || address.label}</Text>
-                    <Text style={styles.addressText}>
-                      {address.address}
-                      {address.ward && `, ${address.ward}`}
-                      {address.district && `, ${address.district}`}
-                      {address.city && `, ${address.city}`}
-                    </Text>
-                    <Text style={styles.addressPhone}>{address.phone}</Text>
-                  </View>
-                </TouchableOpacity>
-              );
+                    <View style={styles.addressInfo}>
+                      <Text style={styles.addressName}>
+                        {address.name || address.label}
+                      </Text>
+                      <Text style={styles.addressText}>
+                        {address.address}
+                        {address.ward && `, ${address.ward}`}
+                        {address.district && `, ${address.district}`}
+                        {address.city && `, ${address.city}`}
+                      </Text>
+                      <Text style={styles.addressPhone}>{address.phone}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
               })
             )
           ) : (
             <View style={styles.guestForm}>
-              <Text style={styles.guestHelper}>Bạn chưa đăng nhập – vui lòng cung cấp thông tin để nhận hàng.</Text>
+              <Text style={styles.guestHelper}>
+                Bạn chưa đăng nhập – vui lòng cung cấp thông tin để nhận hàng.
+              </Text>
               <Text style={styles.guestLabel}>Họ và tên</Text>
               <TextInput
                 style={styles.guestInput}
                 placeholder="Ví dụ: Nguyễn Văn A"
                 value={guestInfo.name}
-                onChangeText={(text) => handleGuestInfoChange('name', text)}
+                onChangeText={(text) => handleGuestInfoChange("name", text)}
               />
               <Text style={styles.guestLabel}>Số điện thoại</Text>
               <TextInput
@@ -387,7 +469,7 @@ const CheckoutScreen = ({ navigation }: any) => {
                 placeholder="09xx xxx xxx"
                 keyboardType="phone-pad"
                 value={guestInfo.phone}
-                onChangeText={(text) => handleGuestInfoChange('phone', text)}
+                onChangeText={(text) => handleGuestInfoChange("phone", text)}
               />
               <Text style={styles.guestLabel}>Email nhận hóa đơn</Text>
               <TextInput
@@ -396,7 +478,7 @@ const CheckoutScreen = ({ navigation }: any) => {
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={guestInfo.email}
-                onChangeText={(text) => handleGuestInfoChange('email', text)}
+                onChangeText={(text) => handleGuestInfoChange("email", text)}
               />
               <Text style={styles.guestLabel}>Địa chỉ giao hàng</Text>
               <TextInput
@@ -405,7 +487,7 @@ const CheckoutScreen = ({ navigation }: any) => {
                 multiline
                 numberOfLines={2}
                 value={guestInfo.address}
-                onChangeText={(text) => handleGuestInfoChange('address', text)}
+                onChangeText={(text) => handleGuestInfoChange("address", text)}
               />
             </View>
           )}
@@ -418,14 +500,18 @@ const CheckoutScreen = ({ navigation }: any) => {
             <Text style={styles.sectionTitle}>Đơn hàng</Text>
           </View>
           <View style={styles.restaurantInfo}>
-            <Text style={styles.restaurantName}>{items[0]?.restaurantName}</Text>
+            <Text style={styles.restaurantName}>
+              {items[0]?.restaurantName}
+            </Text>
           </View>
-          {items.map(item => (
+          {items.map((item) => (
             <View key={item.id} style={styles.orderItem}>
-              <Text style={styles.orderItemQuantity}>{`${item.quantity}x`}</Text>
+              <Text
+                style={styles.orderItemQuantity}
+              >{`${item.quantity}x`}</Text>
               <Text style={styles.orderItemName}>{item.name}</Text>
               <Text style={styles.orderItemPrice}>
-                {`${(item.price * item.quantity).toLocaleString('vi-VN')}đ`}
+                {`${(item.price * item.quantity).toLocaleString("vi-VN")}đ`}
               </Text>
             </View>
           ))}
@@ -445,8 +531,11 @@ const CheckoutScreen = ({ navigation }: any) => {
               onChangeText={setVoucherCode}
               autoCapitalize="characters"
             />
-            <TouchableOpacity 
-              style={[styles.applyButton, applyingVoucher && styles.applyButtonDisabled]} 
+            <TouchableOpacity
+              style={[
+                styles.applyButton,
+                applyingVoucher && styles.applyButtonDisabled,
+              ]}
               onPress={handleApplyVoucher}
               disabled={applyingVoucher}
             >
@@ -459,7 +548,7 @@ const CheckoutScreen = ({ navigation }: any) => {
           </View>
           {discount > 0 && (
             <Text style={styles.discountText}>
-              {`✓ Giảm giá: -${discount.toLocaleString('vi-VN')}đ`}
+              {`✓ Giảm giá: -${discount.toLocaleString("vi-VN")}đ`}
             </Text>
           )}
         </View>
@@ -473,7 +562,7 @@ const CheckoutScreen = ({ navigation }: any) => {
           <Text style={styles.paymentNote}>
             * Chỉ hỗ trợ thanh toán online để đảm bảo giao hàng nhanh bằng drone
           </Text>
-          {paymentMethods.map(method => (
+          {paymentMethods.map((method) => (
             <TouchableOpacity
               key={method.id}
               style={[
@@ -483,16 +572,20 @@ const CheckoutScreen = ({ navigation }: any) => {
               onPress={() => setSelectedPayment(method.id)}
             >
               <View style={styles.radioButton}>
-                {selectedPayment === method.id && <View style={styles.radioButtonInner} />}
+                {selectedPayment === method.id && (
+                  <View style={styles.radioButtonInner} />
+                )}
               </View>
-              <Image 
-                source={{ uri: method.icon }} 
+              <Image
+                source={{ uri: method.icon }}
                 style={styles.paymentLogo}
                 resizeMode="contain"
               />
               <View style={{ flex: 1 }}>
                 <Text style={styles.paymentName}>{method.name}</Text>
-                <Text style={styles.paymentDescription}>{method.description || 'Thanh toán an toàn và nhanh chóng'}</Text>
+                <Text style={styles.paymentDescription}>
+                  {method.description || "Thanh toán an toàn và nhanh chóng"}
+                </Text>
               </View>
             </TouchableOpacity>
           ))}
@@ -518,22 +611,30 @@ const CheckoutScreen = ({ navigation }: any) => {
         <View style={styles.section}>
           <View style={styles.priceRow}>
             <Text style={styles.priceLabel}>Tạm tính</Text>
-            <Text style={styles.priceValue}>{`${total.toLocaleString('vi-VN')}đ`}</Text>
+            <Text style={styles.priceValue}>{`${total.toLocaleString(
+              "vi-VN"
+            )}đ`}</Text>
           </View>
           <View style={styles.priceRow}>
             <Text style={styles.priceLabel}>Phí giao hàng (Drone)</Text>
-            <Text style={styles.priceValue}>{`${deliveryFee.toLocaleString('vi-VN')}đ`}</Text>
+            <Text style={styles.priceValue}>{`${deliveryFee.toLocaleString(
+              "vi-VN"
+            )}đ`}</Text>
           </View>
           {discount > 0 && (
             <View style={styles.priceRow}>
               <Text style={styles.priceLabel}>Giảm giá</Text>
-              <Text style={styles.discountValue}>{`-${discount.toLocaleString('vi-VN')}đ`}</Text>
+              <Text style={styles.discountValue}>{`-${discount.toLocaleString(
+                "vi-VN"
+              )}đ`}</Text>
             </View>
           )}
           <View style={styles.divider} />
           <View style={styles.priceRow}>
             <Text style={styles.totalLabel}>Tổng cộng</Text>
-            <Text style={styles.totalValue}>{`${finalTotal.toLocaleString('vi-VN')}đ`}</Text>
+            <Text style={styles.totalValue}>{`${finalTotal.toLocaleString(
+              "vi-VN"
+            )}đ`}</Text>
           </View>
         </View>
       </ScrollView>
@@ -542,10 +643,15 @@ const CheckoutScreen = ({ navigation }: any) => {
       <View style={styles.footer}>
         <View style={styles.footerTotal}>
           <Text style={styles.footerTotalLabel}>Tổng thanh toán</Text>
-          <Text style={styles.footerTotalValue}>{`${finalTotal.toLocaleString('vi-VN')}đ`}</Text>
+          <Text style={styles.footerTotalValue}>{`${finalTotal.toLocaleString(
+            "vi-VN"
+          )}đ`}</Text>
         </View>
-        <TouchableOpacity 
-          style={[styles.checkoutButton, loading && styles.checkoutButtonDisabled]} 
+        <TouchableOpacity
+          style={[
+            styles.checkoutButton,
+            loading && styles.checkoutButtonDisabled,
+          ]}
           onPress={handlePlaceOrder}
           disabled={loading}
         >
@@ -558,7 +664,6 @@ const CheckoutScreen = ({ navigation }: any) => {
       </View>
 
       {/* Success Modal */}
-
     </View>
   );
 };
@@ -566,59 +671,59 @@ const CheckoutScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FB',
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0,
+    backgroundColor: "#F8F9FB",
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: "#f0f0f0",
   },
   backButtonContainer: {
     width: 40,
     height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   backButton: {
     fontSize: 24,
-    color: '#EA5034',
+    color: "#EA5034",
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "bold",
+    color: "#333",
   },
   content: {
     flex: 1,
   },
   section: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     padding: 16,
     marginBottom: 12,
     marginHorizontal: 12,
     marginTop: 12,
     borderRadius: 12,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
   },
   sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 16,
   },
   sectionTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   sectionIcon: {
     fontSize: 20,
@@ -626,47 +731,47 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 17,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "bold",
+    color: "#333",
     marginBottom: 12,
   },
   changeButton: {
-    color: '#EA5034',
+    color: "#EA5034",
     fontSize: 14,
   },
   addAddressButton: {
     borderWidth: 1,
-    borderColor: '#EA5034',
-    borderStyle: 'dashed',
+    borderColor: "#EA5034",
+    borderStyle: "dashed",
     borderRadius: 8,
     padding: 16,
-    alignItems: 'center',
+    alignItems: "center",
   },
   addAddressText: {
-    color: '#EA5034',
+    color: "#EA5034",
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   addressCard: {
-    flexDirection: 'row',
+    flexDirection: "row",
     padding: 12,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: "#e0e0e0",
     borderRadius: 8,
     marginBottom: 8,
   },
   addressCardSelected: {
-    borderColor: '#EA5034',
-    backgroundColor: '#FFF5F3',
+    borderColor: "#EA5034",
+    backgroundColor: "#FFF5F3",
   },
   radioButton: {
     width: 20,
     height: 20,
     borderRadius: 10,
     borderWidth: 2,
-    borderColor: '#EA5034',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderColor: "#EA5034",
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 12,
     marginTop: 2,
   },
@@ -674,94 +779,94 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#EA5034',
+    backgroundColor: "#EA5034",
   },
   addressInfo: {
     flex: 1,
   },
   addressName: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "bold",
+    color: "#333",
     marginBottom: 4,
   },
   addressText: {
     fontSize: 14,
-    color: '#666',
+    color: "#666",
     marginBottom: 4,
   },
   addressPhone: {
     fontSize: 14,
-    color: '#999',
+    color: "#999",
   },
   guestForm: {
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: "#f0f0f0",
     borderRadius: 8,
     padding: 12,
-    backgroundColor: '#FFFDF8',
+    backgroundColor: "#FFFDF8",
   },
   guestHelper: {
     fontSize: 13,
-    color: '#555',
+    color: "#555",
     marginBottom: 12,
   },
   guestLabel: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: "600",
+    color: "#333",
     marginBottom: 6,
   },
   guestInput: {
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: "#e0e0e0",
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
     marginBottom: 12,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
   guestInputMultiline: {
     minHeight: 60,
-    textAlignVertical: 'top',
+    textAlignVertical: "top",
   },
   restaurantInfo: {
     marginBottom: 12,
   },
   restaurantName: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "bold",
+    color: "#333",
   },
   orderItem: {
-    flexDirection: 'row',
+    flexDirection: "row",
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: "#f0f0f0",
   },
   orderItemQuantity: {
     width: 40,
     fontSize: 14,
-    color: '#666',
+    color: "#666",
   },
   orderItemName: {
     flex: 1,
     fontSize: 14,
-    color: '#333',
+    color: "#333",
   },
   orderItemPrice: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#333',
+    fontWeight: "500",
+    color: "#333",
   },
   voucherInput: {
-    flexDirection: 'row',
+    flexDirection: "row",
   },
   voucherTextInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: "#e0e0e0",
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -769,40 +874,40 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   applyButton: {
-    backgroundColor: '#EA5034',
+    backgroundColor: "#EA5034",
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   applyButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   discountText: {
-    color: '#27AE60',
+    color: "#27AE60",
     fontSize: 14,
     marginTop: 8,
   },
   paymentNote: {
     fontSize: 12,
-    color: '#EA5034',
+    color: "#EA5034",
     marginBottom: 12,
-    fontStyle: 'italic',
+    fontStyle: "italic",
   },
   paymentCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: 12,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: "#e0e0e0",
     borderRadius: 8,
     marginBottom: 8,
   },
   paymentCardSelected: {
-    borderColor: '#EA5034',
-    backgroundColor: '#FFF5F3',
+    borderColor: "#EA5034",
+    backgroundColor: "#FFF5F3",
   },
   paymentIcon: {
     fontSize: 24,
@@ -815,85 +920,85 @@ const styles = StyleSheet.create({
   },
   paymentName: {
     fontSize: 14,
-    color: '#333',
+    color: "#333",
     flex: 1,
   },
   paymentDescription: {
     fontSize: 11,
-    color: '#777',
+    color: "#777",
     marginTop: 2,
   },
   noteInput: {
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: "#e0e0e0",
     borderRadius: 8,
     padding: 12,
     fontSize: 14,
     minHeight: 80,
-    textAlignVertical: 'top',
+    textAlignVertical: "top",
   },
   priceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     paddingVertical: 8,
   },
   priceLabel: {
     fontSize: 14,
-    color: '#666',
+    color: "#666",
   },
   priceValue: {
     fontSize: 14,
-    color: '#333',
+    color: "#333",
   },
   discountValue: {
     fontSize: 14,
-    color: '#27AE60',
+    color: "#27AE60",
   },
   divider: {
     height: 1,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: "#e0e0e0",
     marginVertical: 8,
   },
   totalLabel: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "bold",
+    color: "#333",
   },
   totalValue: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#EA5034',
+    fontWeight: "bold",
+    color: "#EA5034",
   },
   footer: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     padding: 16,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    borderTopColor: "#e0e0e0",
   },
   footerTotal: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginBottom: 12,
   },
   footerTotalLabel: {
     fontSize: 14,
-    color: '#666',
+    color: "#666",
   },
   footerTotalValue: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#EA5034',
+    fontWeight: "bold",
+    color: "#EA5034",
   },
   checkoutButton: {
-    backgroundColor: '#EA5034',
+    backgroundColor: "#EA5034",
     paddingVertical: 14,
     borderRadius: 8,
-    alignItems: 'center',
+    alignItems: "center",
   },
   checkoutButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   checkoutButtonDisabled: {
     opacity: 0.6,
@@ -903,8 +1008,8 @@ const styles = StyleSheet.create({
   },
   emptyCart: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   emptyCartIcon: {
     fontSize: 64,
@@ -912,20 +1017,20 @@ const styles = StyleSheet.create({
   },
   emptyCartText: {
     fontSize: 18,
-    color: '#999',
+    color: "#999",
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   successModal: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 20,
     padding: 32,
-    alignItems: 'center',
-    shadowColor: '#000',
+    alignItems: "center",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -937,15 +1042,15 @@ const styles = StyleSheet.create({
   },
   successTitle: {
     fontSize: 22,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "bold",
+    color: "#333",
     marginBottom: 8,
-    textAlign: 'center',
+    textAlign: "center",
   },
   successMessage: {
     fontSize: 15,
-    color: '#666',
-    textAlign: 'center',
+    color: "#666",
+    textAlign: "center",
   },
 });
 

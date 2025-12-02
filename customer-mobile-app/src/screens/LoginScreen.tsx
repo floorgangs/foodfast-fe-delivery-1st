@@ -37,7 +37,7 @@ const LoginScreen = ({ navigation }: any) => {
     setIsSubmitting(true);
     try {
       console.log('🔐 Attempting login with:', { email, password });
-      await dispatch(login({ email, password })).unwrap();
+      await (dispatch(login({ email, password })) as any).unwrap();
       console.log('✅ Login successful');
       
       // Đợi một chút để đảm bảo token được lưu vào AsyncStorage
@@ -45,7 +45,7 @@ const LoginScreen = ({ navigation }: any) => {
       
       // Load giỏ hàng sau khi đăng nhập thành công
       try {
-        await dispatch(fetchCart()).unwrap();
+        await (dispatch(fetchCart()) as any).unwrap();
       } catch (cartError) {
         console.warn('Failed to fetch cart after login:', cartError);
       }

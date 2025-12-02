@@ -436,7 +436,7 @@ const OrdersScreen = ({ navigation }: any) => {
   );
 
   const renderTabContent = () => {
-    if (activeTab !== 'saved' && ordersLoading && orders.length === 0) {
+    if (ordersLoading && orders.length === 0) {
       return (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#EA5034" />

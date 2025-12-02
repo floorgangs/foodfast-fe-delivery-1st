@@ -36,8 +36,8 @@ const VouchersScreen = ({ navigation }: any) => {
 
   const fetchVouchers = async () => {
     try {
-      const data = await voucherAPI.getAll();
-      setVouchers(data);
+      const response = await voucherAPI.getAll();
+      setVouchers(response.data || response);
     } catch (error: any) {
       console.error('Fetch vouchers error:', error);
       Alert.alert('Lỗi', error.response?.data?.message || 'Không thể tải danh sách voucher');
