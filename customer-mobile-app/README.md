@@ -2,6 +2,29 @@
 
 Mobile app khách hàng cho hệ thống giao hàng bằng Drone FoodFast.
 
+## ⚠️ QUAN TRỌNG: Trước khi chạy app
+
+**Xem hướng dẫn setup API tại:** [`API_SETUP.md`](./API_SETUP.md)
+
+Nếu không setup đúng, app sẽ không kết nối được với backend!
+
+### Quick Setup
+
+```bash
+# 1. Copy config file
+cp .env.example .env
+
+# 2. Cập nhật IP hoặc NGROK URL trong .env
+# - Windows: ipconfig → IPv4 Address
+# - Mac/Linux: ifconfig → inet
+
+# 3. Cài dependencies
+npm install
+
+# 4. Chạy app
+npm start
+```
+
 ## 🚀 Công nghệ
 
 - **React Native**: Framework phát triển mobile app
@@ -14,22 +37,26 @@ Mobile app khách hàng cho hệ thống giao hàng bằng Drone FoodFast.
 ## 📱 Tính năng
 
 ### 1. Đăng nhập
+
 - Form đăng nhập với email và mật khẩu
 - Giao diện ShopeeFood style (màu đỏ #EA5034)
 - Tự động lưu thông tin đăng nhập
 
 ### 2. Trang chủ
+
 - Danh sách nhà hàng với hình ảnh, rating, thời gian giao
 - Tìm kiếm nhà hàng
 - Lọc theo danh mục (Việt Nam, Thái Lan, Nhật Bản, Ý, Fastfood)
 - Header với logo và icon profile
 
 ### 3. Chi tiết nhà hàng
+
 - Thông tin nhà hàng đầy đủ
 - Danh sách món ăn với hình ảnh, giá
 - Thêm món vào giỏ hàng
 
 ### 4. Giỏ hàng
+
 - Danh sách món đã chọn
 - Điều chỉnh số lượng (+/-)
 - Xóa món khỏi giỏ
@@ -37,12 +64,14 @@ Mobile app khách hàng cho hệ thống giao hàng bằng Drone FoodFast.
 - Nút đặt hàng
 
 ### 5. Theo dõi đơn hàng
+
 - Timeline trạng thái đơn hàng (Xác nhận → Chuẩn bị → Đang giao → Hoàn thành)
 - Animation drone bay khi đang giao
 - Chi tiết đơn hàng
 - Mã đơn hàng
 
 ### 6. Tài khoản
+
 - Thông tin người dùng
 - Menu tính năng (Thông tin, Địa chỉ, Thanh toán, Ưu đãi)
 - Lịch sử đơn hàng
@@ -112,6 +141,7 @@ customer-mobile-app/
 ## 🔄 State Management
 
 ### Auth State
+
 ```typescript
 {
   user: { id, name, email, phone } | null,
@@ -120,6 +150,7 @@ customer-mobile-app/
 ```
 
 ### Cart State
+
 ```typescript
 {
   items: [{ id, name, price, quantity, restaurantId, restaurantName, image }],
@@ -128,6 +159,7 @@ customer-mobile-app/
 ```
 
 ### Orders State
+
 ```typescript
 {
   orders: [...],
@@ -170,6 +202,7 @@ customer-mobile-app/
 ## 🎯 Đồng bộ với Web App
 
 Mobile app được thiết kế đồng bộ hoàn toàn với web app:
+
 - **Giao diện**: Giống web (màu sắc, layout, typography)
 - **Chức năng**: Các tính năng giống hệt web
 - **State Management**: Redux store structure giống web
