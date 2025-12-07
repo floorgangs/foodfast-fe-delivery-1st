@@ -239,6 +239,26 @@
   transform: translateY(-1px);
 }
 
+.action-btn.delete {
+  background: #ff4d4f;
+  color: white;
+}
+
+.action-btn.delete:hover {
+  background: #cf1322;
+  transform: translateY(-1px);
+}
+
+.action-btn.close {
+  background: #8c8c8c;
+  color: white;
+}
+
+.action-btn.close:hover {
+  background: #595959;
+  transform: translateY(-1px);
+}
+
 /* Modal Styles */
 .modal-overlay {
   position: fixed;
@@ -621,6 +641,12 @@
   font-family: inherit;
 }
 
+.form-group select:disabled {
+  background-color: #f5f5f5;
+  color: #999;
+  cursor: not-allowed;
+}
+
 .form-group input:focus,
 .form-group textarea:focus,
 .form-group select:focus {
@@ -936,8 +962,13 @@
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 /* Loading text */

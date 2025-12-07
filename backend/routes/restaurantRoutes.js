@@ -4,6 +4,7 @@ import {
   getRestaurant,
   createRestaurant,
   updateRestaurant,
+  deleteRestaurant,
   getMyRestaurant,
   restaurantLogin,
   getPendingRestaurants,
@@ -36,12 +37,7 @@ router.get(
   restrictTo("admin"),
   getPendingRestaurants
 );
-router.get(
-  "/admin/all",
-  protect,
-  restrictTo("admin"),
-  getAllRestaurantsAdmin
-);
+router.get("/admin/all", protect, restrictTo("admin"), getAllRestaurantsAdmin);
 router.post(
   "/admin/create-with-owner",
   protect,
@@ -54,12 +50,7 @@ router.put(
   restrictTo("admin"),
   approveRestaurant
 );
-router.put(
-  "/admin/:id/reject",
-  protect,
-  restrictTo("admin"),
-  rejectRestaurant
-);
+router.put("/admin/:id/reject", protect, restrictTo("admin"), rejectRestaurant);
 router.get(
   "/admin/:id/compliance",
   protect,
@@ -75,6 +66,7 @@ router.put(
   restrictTo("restaurant", "admin"),
   updateRestaurant
 );
+router.delete("/:id", protect, restrictTo("admin"), deleteRestaurant);
 
 // Route có param :id phải đặt SAU các route cụ thể
 router.get("/:id", getRestaurant);

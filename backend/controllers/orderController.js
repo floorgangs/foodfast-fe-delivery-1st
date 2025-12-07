@@ -40,14 +40,14 @@ export const createOrder = async (req, res) => {
     }
 
     const supportedPaymentMethods = ["paypal"];
-    
+
     if (!supportedPaymentMethods.includes(paymentMethod)) {
       return res.status(400).json({
         success: false,
         message: "Chỉ hỗ trợ thanh toán qua PayPal",
       });
     }
-    
+
     const normalizedPaymentMethod = paymentMethod;
     const paymentProviderMap = {
       paypal: "PayPal",
@@ -234,7 +234,8 @@ export const createOrder = async (req, res) => {
       Math.random() * 9999
     )}`;
     const paymentSessionExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
-    const paymentProvider = paymentProviderMap[normalizedPaymentMethod] || "PayPal";
+    const paymentProvider =
+      paymentProviderMap[normalizedPaymentMethod] || "PayPal";
 
     // All orders require online payment via PayPal
     const initialPaymentStatus = "pending";
@@ -289,7 +290,7 @@ export const createOrder = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      data: populatedOrder,
+      order: populatedOrder,
       paymentSession: {
         sessionId: paymentSessionId,
         providerName: paymentProvider,
@@ -454,12 +455,15 @@ export const updateOrderStatus = async (req, res) => {
     if (status === "delivering" && !order.drone) {
       const Drone = (await import("../models/Drone.js")).default;
       const Delivery = (await import("../models/Delivery.js")).default;
-      
+
       const availableDrone = await Drone.findOne({ status: "available" }).sort({
         batteryLevel: -1,
       });
 
-      console.log('🔍 Looking for available drone...', availableDrone ? `Found: ${availableDrone._id}` : 'No drone available');
+      console.log(
+        "🔍 Looking for available drone...",
+        availableDrone ? `Found: ${availableDrone._id}` : "No drone available"
+      );
 
       if (availableDrone) {
         availableDrone.status = "delivering";
@@ -472,29 +476,38 @@ export const updateOrderStatus = async (req, res) => {
           launchedAt: new Date(),
         };
 
-        console.log('✅ Drone assigned:', availableDrone._id);
+        console.log("✅ Drone assigned:", availableDrone._id);
       } else {
-        console.log('⚠️ No available drone found, creating Delivery without drone');
+        console.log(
+          "⚠️ No available drone found, creating Delivery without drone"
+        );
       }
 
       // Create Delivery record (with or without drone)
       try {
         const deliveryId = `DEL-${order._id}-${Date.now()}`;
-        
-        // Get restaurant info - need to populate first
-        const populatedOrder = await Order.findById(order._id).populate('restaurant');
-        
-        // Get restaurant location from populated restaurant or use default
-        const restaurantLocation = populatedOrder.restaurant?.location?.coordinates || 
-                                   [106.660172, 10.762622]; // Default HCM
-        
-        // Get delivery address coordinates
-        const deliveryCoords = order.deliveryAddress?.coordinates?.lat && order.deliveryAddress?.coordinates?.lng
-          ? [order.deliveryAddress.coordinates.lng, order.deliveryAddress.coordinates.lat]
-          : [106.660172, 10.762622]; // Default
 
-        console.log('📍 Restaurant location:', restaurantLocation);
-        console.log('📍 Delivery location:', deliveryCoords);
+        // Get restaurant info - need to populate first
+        const populatedOrder = await Order.findById(order._id).populate(
+          "restaurant"
+        );
+
+        // Get restaurant location from populated restaurant or use default
+        const restaurantLocation = populatedOrder.restaurant?.location
+          ?.coordinates || [106.660172, 10.762622]; // Default HCM
+
+        // Get delivery address coordinates
+        const deliveryCoords =
+          order.deliveryAddress?.coordinates?.lat &&
+          order.deliveryAddress?.coordinates?.lng
+            ? [
+                order.deliveryAddress.coordinates.lng,
+                order.deliveryAddress.coordinates.lat,
+              ]
+            : [106.660172, 10.762622]; // Default
+
+        console.log("📍 Restaurant location:", restaurantLocation);
+        console.log("📍 Delivery location:", deliveryCoords);
 
         const newDelivery = await Delivery.create({
           deliveryId,
@@ -502,21 +515,31 @@ export const updateOrderStatus = async (req, res) => {
           droneId: availableDrone?._id || null,
           startLocation: {
             type: "Point",
-            coordinates: Array.isArray(restaurantLocation) ? restaurantLocation : [106.660172, 10.762622],
-            address: populatedOrder.restaurant?.address || '',
+            coordinates: Array.isArray(restaurantLocation)
+              ? restaurantLocation
+              : [106.660172, 10.762622],
+            address: populatedOrder.restaurant?.address || "",
           },
           endLocation: {
             type: "Point",
             coordinates: deliveryCoords,
-            address: order.deliveryAddress?.address || order.deliveryAddress?.street || '',
+            address:
+              order.deliveryAddress?.address ||
+              order.deliveryAddress?.street ||
+              "",
           },
           status: "in_transit",
         });
 
-        console.log('✅ Delivery created:', newDelivery._id, 'deliveryId:', deliveryId);
+        console.log(
+          "✅ Delivery created:",
+          newDelivery._id,
+          "deliveryId:",
+          deliveryId
+        );
       } catch (deliveryError) {
-        console.error('❌ Error creating Delivery:', deliveryError.message);
-        console.error('Delivery validation errors:', deliveryError.errors);
+        console.error("❌ Error creating Delivery:", deliveryError.message);
+        console.error("Delivery validation errors:", deliveryError.errors);
       }
     }
 
@@ -524,7 +547,7 @@ export const updateOrderStatus = async (req, res) => {
     if (status === "delivered" && order.drone) {
       const Drone = (await import("../models/Drone.js")).default;
       const Delivery = (await import("../models/Delivery.js")).default;
-      
+
       const drone = await Drone.findById(order.drone);
       if (drone) {
         drone.status = "available";
@@ -535,13 +558,13 @@ export const updateOrderStatus = async (req, res) => {
       // Update Delivery status
       await Delivery.findOneAndUpdate(
         { orderId: order._id },
-        { 
+        {
           status: "delivered",
           deliveredAt: new Date(),
         }
       );
 
-      console.log('✅ Delivery completed for order:', order._id);
+      console.log("✅ Delivery completed for order:", order._id);
     }
 
     await order.save();
@@ -651,13 +674,15 @@ export const confirmThirdPartyPayment = async (req, res) => {
 
     if (status === "success") {
       // Check if order is already paid
-      if (order.paymentStatus === 'paid') {
-         console.log(`[confirmThirdPartyPayment] Order ${order.orderNumber} already paid, returning success`);
-         return res.json({
-            success: true,
-            message: "Thanh toán thành công (đã ghi nhận trước đó)",
-            data: order,
-         });
+      if (order.paymentStatus === "paid") {
+        console.log(
+          `[confirmThirdPartyPayment] Order ${order.orderNumber} already paid, returning success`
+        );
+        return res.json({
+          success: true,
+          message: "Thanh toán thành công (đã ghi nhận trước đó)",
+          data: order,
+        });
       }
 
       const paidAt = new Date();
@@ -679,7 +704,7 @@ export const confirmThirdPartyPayment = async (req, res) => {
       // Tạo bản ghi Payment riêng cho thống kê/đối soát
       // Check if payment already exists to avoid duplicate key error
       const existingPayment = await Payment.findOne({ paymentId: sessionId });
-      
+
       if (!existingPayment) {
         await Payment.create({
           paymentId: sessionId,
@@ -695,7 +720,9 @@ export const confirmThirdPartyPayment = async (req, res) => {
           rawData: rawData || {},
         });
       } else {
-        console.log(`[confirmThirdPartyPayment] Payment record already exists for session ${sessionId}`);
+        console.log(
+          `[confirmThirdPartyPayment] Payment record already exists for session ${sessionId}`
+        );
       }
 
       // Create notification for customer
@@ -1162,7 +1189,7 @@ export const confirmDelivery = async (req, res) => {
     if (order.drone) {
       const Drone = (await import("../models/Drone.js")).default;
       const Delivery = (await import("../models/Delivery.js")).default;
-      
+
       const drone = await Drone.findById(order.drone);
       if (drone) {
         drone.status = "available";
@@ -1173,7 +1200,7 @@ export const confirmDelivery = async (req, res) => {
       // Update Delivery status
       await Delivery.findOneAndUpdate(
         { orderId: order._id },
-        { 
+        {
           status: "delivered",
           deliveredAt: new Date(),
         }

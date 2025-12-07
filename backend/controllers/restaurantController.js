@@ -33,18 +33,20 @@ const normalizeCompliance = (payload = {}) => {
   }
 
   const relatedDocs = Array.isArray(payload.relatedDocuments)
-    ? payload.relatedDocuments
-        .map(normalizeDocument)
-        .filter(Boolean)
+    ? payload.relatedDocuments.map(normalizeDocument).filter(Boolean)
     : [];
 
   return {
     status: "pending",
-    submittedAt: payload.submittedAt ? parseDate(payload.submittedAt) : new Date(),
+    submittedAt: payload.submittedAt
+      ? parseDate(payload.submittedAt)
+      : new Date(),
     notes: payload.notes,
     idCard: {
       number: payload.idCard?.number || payload.idCardNumber,
-      issueDate: parseDate(payload.idCard?.issueDate || payload.idCardIssueDate),
+      issueDate: parseDate(
+        payload.idCard?.issueDate || payload.idCardIssueDate
+      ),
       issuePlace: payload.idCard?.issuePlace || payload.idCardIssuePlace,
       frontImage: payload.idCard?.frontImage || payload.idCardFront,
       backImage: payload.idCard?.backImage || payload.idCardBack,
@@ -52,13 +54,13 @@ const normalizeCompliance = (payload = {}) => {
     businessLicense: {
       documentImage:
         payload.businessLicense?.documentImage || payload.businessLicenseImage,
-      filename: payload.businessLicense?.filename || payload.businessLicense?.name,
+      filename:
+        payload.businessLicense?.filename || payload.businessLicense?.name,
     },
     tax: {
       code: payload.tax?.code || payload.taxCode,
       rate: payload.tax?.rate || payload.taxRate,
-      certificateImage:
-        payload.tax?.certificateImage || payload.taxCertificate,
+      certificateImage: payload.tax?.certificateImage || payload.taxCertificate,
     },
     relatedDocuments: relatedDocs,
   };
@@ -344,10 +346,7 @@ export const getMyRestaurant = async (req, res) => {
 export const getPendingRestaurants = async (req, res) => {
   try {
     const restaurants = await Restaurant.find({
-      $or: [
-        { isApproved: false },
-        { "compliance.status": "pending" }
-      ]
+      $or: [{ isApproved: false }, { "compliance.status": "pending" }],
     })
       .populate("owner", "name email phone")
       .sort({ createdAt: -1 });
@@ -530,6 +529,51 @@ export const getRestaurantCompliance = async (req, res) => {
   }
 };
 
+// Admin: Delete restaurant (hard delete)
+export const deleteRestaurant = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Check if restaurant exists
+    const restaurant = await Restaurant.findById(id);
+    if (!restaurant) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy nhà hàng",
+      });
+    }
+
+    // Check authorization (only admin can delete)
+    if (req.user.role !== "admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Bạn không có quyền xóa nhà hàng",
+      });
+    }
+
+    // Also delete owner account
+    if (restaurant.owner) {
+      const User = (await import("../models/User.js")).default;
+      await User.findByIdAndDelete(restaurant.owner);
+      console.log(`[Admin] Deleted owner account: ${restaurant.owner}`);
+    }
+
+    // Hard delete restaurant
+    await Restaurant.findByIdAndDelete(id);
+
+    res.json({
+      success: true,
+      message: "Đã xóa nhà hàng và tài khoản chủ nhà hàng thành công",
+      data: { _id: id, name: restaurant.name },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 // Admin: Create restaurant with owner account
 export const createRestaurantWithOwner = async (req, res) => {
   try {
@@ -550,7 +594,10 @@ export const createRestaurantWithOwner = async (req, res) => {
       ownerPassword,
     } = req.body;
 
-    console.log("[Admin] Creating restaurant with owner:", { name, ownerEmail });
+    console.log("[Admin] Creating restaurant with owner:", {
+      name,
+      ownerEmail,
+    });
 
     // Validate required fields
     if (!name || !ownerName || !ownerEmail || !ownerPassword) {
@@ -569,8 +616,10 @@ export const createRestaurantWithOwner = async (req, res) => {
 
     // Check if owner email already exists
     const User = (await import("../models/User.js")).default;
-    const existingUser = await User.findOne({ email: ownerEmail.toLowerCase() });
-    
+    const existingUser = await User.findOne({
+      email: ownerEmail.toLowerCase(),
+    });
+
     if (existingUser) {
       return res.status(400).json({
         success: false,
@@ -579,10 +628,10 @@ export const createRestaurantWithOwner = async (req, res) => {
     }
 
     // Check if restaurant name already exists
-    const existingRestaurant = await Restaurant.findOne({ 
-      name: { $regex: new RegExp(`^${name}$`, 'i') } 
+    const existingRestaurant = await Restaurant.findOne({
+      name: { $regex: new RegExp(`^${name}$`, "i") },
     });
-    
+
     if (existingRestaurant) {
       return res.status(400).json({
         success: false,
@@ -608,7 +657,10 @@ export const createRestaurantWithOwner = async (req, res) => {
       if (Array.isArray(cuisine)) {
         cuisineArray = cuisine.filter(Boolean);
       } else if (typeof cuisine === "string") {
-        cuisineArray = cuisine.split(",").map(c => c.trim()).filter(Boolean);
+        cuisineArray = cuisine
+          .split(",")
+          .map((c) => c.trim())
+          .filter(Boolean);
       }
     }
 
@@ -633,8 +685,14 @@ export const createRestaurantWithOwner = async (req, res) => {
       cuisine: cuisineArray,
       address: restaurantAddress,
       phone: phone?.trim() || ownerPhone.trim(),
-      avatar: req.body.avatar || "https://ui-avatars.com/api/?name=" + encodeURIComponent(name.trim()) + "&background=ff6b35&color=fff&size=300",
-      coverImage: req.body.coverImage || "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&h=400&fit=crop",
+      avatar:
+        req.body.avatar ||
+        "https://ui-avatars.com/api/?name=" +
+          encodeURIComponent(name.trim()) +
+          "&background=ff6b35&color=fff&size=300",
+      coverImage:
+        req.body.coverImage ||
+        "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&h=400&fit=crop",
       owner: owner._id,
       deliveryFee: Number(deliveryFee) || 15000,
       minOrder: Number(minOrder) || 0,
@@ -657,8 +715,9 @@ export const createRestaurantWithOwner = async (req, res) => {
       restaurant: restaurant._id,
     });
 
-    const populatedRestaurant = await Restaurant.findById(restaurant._id)
-      .populate("owner", "name email phone");
+    const populatedRestaurant = await Restaurant.findById(
+      restaurant._id
+    ).populate("owner", "name email phone");
 
     res.status(201).json({
       success: true,

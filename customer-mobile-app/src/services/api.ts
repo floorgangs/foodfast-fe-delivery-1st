@@ -17,15 +17,12 @@ const API_URL_KEY = "@custom_api_url";
 // Bước 2: Chạy backend: cd backend && npm run dev
 // Bước 3: Chạy ngrok: ngrok http 5000
 // Bước 4: Copy URL từ ngrok (VD: https://abc123.ngrok.io)
-// Bước 5: Paste vào NGROK_URL bên dưới HOẶC trong app
-const NGROK_URL = ""; // VD: 'https://abc123.ngrok.io'
+// Bước 5: Set env: EXPO_PUBLIC_NGROK_URL=https://abc123.ngrok.io
+const NGROK_URL = process.env.EXPO_PUBLIC_NGROK_URL || ""; // Hoặc env var
 
 // ===== CÁCH 3: LAN IP =====
-const DEFAULT_LAN_IP = "172.18.247.106"; // IP máy tính chạy backend (Updated: 2025-12-01)
-
-// ===== TEST: GitHub Actions CI Pipeline =====
-// This comment is added to test CI workflow
-// Date: 2025-12-01
+// Set env: EXPO_PUBLIC_LAN_IP=192.168.1.XX (hoặc update dòng dưới)
+const DEFAULT_LAN_IP = process.env.EXPO_PUBLIC_LAN_IP || "192.168.1.16";
 
 // ===== BUILD URL =====
 const buildAPIURL = () => {
@@ -99,7 +96,12 @@ api.interceptors.request.use(
 
 // Response interceptor - xử lý lỗi và token hết hạn
 api.interceptors.response.use(
-  (response) => response?.data || response,
+  (response) => {
+    // Backend trả về { data: {...}, paymentSession: {...}, success: true }
+    // Axios sẽ auto-unwrap thành response.data
+    // Nên ta return response.data để match format
+    return response?.data || response;
+  },
   async (error) => {
     // Log chi tiết để debug
     if (__DEV__) {

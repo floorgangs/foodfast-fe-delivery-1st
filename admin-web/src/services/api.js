@@ -1,17 +1,17 @@
 // Admin API Service - kết nối trực tiếp với backend
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = "http://localhost:5000/api";
 
 // Helper function để lấy auth token
 const getAuthToken = () => {
-  return localStorage.getItem('admin_token');
+  return localStorage.getItem("admin_token");
 };
 
 // Helper function để tạo headers
 const getHeaders = () => {
   const token = getAuthToken();
   return {
-    'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` })
+    "Content-Type": "application/json",
+    ...(token && { Authorization: `Bearer ${token}` }),
   };
 };
 
@@ -20,13 +20,13 @@ const apiCall = async (endpoint, options = {}) => {
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
-      headers: getHeaders()
+      headers: getHeaders(),
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.message || 'Có lỗi xảy ra');
+      throw new Error(data.message || "Có lỗi xảy ra");
     }
 
     return data;
@@ -39,29 +39,29 @@ const apiCall = async (endpoint, options = {}) => {
 // ==================== AUTH API ====================
 export const authAPI = {
   login: async (email, password) => {
-    return apiCall('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password })
+    return apiCall("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
     });
   },
 
   getProfile: async () => {
-    return apiCall('/auth/profile');
+    return apiCall("/auth/profile");
   },
 
   changePassword: async (currentPassword, newPassword) => {
-    return apiCall('/auth/change-password', {
-      method: 'PUT',
-      body: JSON.stringify({ currentPassword, newPassword })
+    return apiCall("/auth/change-password", {
+      method: "PUT",
+      body: JSON.stringify({ currentPassword, newPassword }),
     });
   },
 
   verifyPassword: async (password) => {
-    return apiCall('/auth/verify-password', {
-      method: 'POST',
-      body: JSON.stringify({ password })
+    return apiCall("/auth/verify-password", {
+      method: "POST",
+      body: JSON.stringify({ password }),
     });
-  }
+  },
 };
 
 // ==================== ORDER API ====================
@@ -69,7 +69,7 @@ export const orderAPI = {
   // Lấy tất cả orders (admin có thể lấy tất cả)
   getAllOrders: async (params = {}) => {
     const queryString = new URLSearchParams(params).toString();
-    const endpoint = queryString ? `/orders?${queryString}` : '/orders';
+    const endpoint = queryString ? `/orders?${queryString}` : "/orders";
     return apiCall(endpoint);
   },
 
@@ -86,22 +86,22 @@ export const orderAPI = {
   // Cập nhật status của order
   updateOrderStatus: async (orderId, status) => {
     return apiCall(`/orders/${orderId}/status`, {
-      method: 'PUT',
-      body: JSON.stringify({ status })
+      method: "PUT",
+      body: JSON.stringify({ status }),
     });
   },
 
   // Lấy thống kê đơn hàng
   getOrderStats: async () => {
-    return apiCall('/orders/stats');
-  }
+    return apiCall("/orders/stats");
+  },
 };
 
 // ==================== RESTAURANT API ====================
 export const restaurantAPI = {
   // Lấy tất cả restaurants (public)
   getAllRestaurants: async () => {
-    return apiCall('/restaurants');
+    return apiCall("/restaurants");
   },
 
   // Lấy restaurant theo ID
@@ -112,16 +112,16 @@ export const restaurantAPI = {
   // Cập nhật restaurant
   updateRestaurant: async (restaurantId, data) => {
     return apiCall(`/restaurants/${restaurantId}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
+      method: "PUT",
+      body: JSON.stringify(data),
     });
   },
 
   // Cập nhật trạng thái restaurant
   updateRestaurantStatus: async (restaurantId, status) => {
     return apiCall(`/restaurants/${restaurantId}/status`, {
-      method: 'PUT',
-      body: JSON.stringify({ status })
+      method: "PUT",
+      body: JSON.stringify({ status }),
     });
   },
 
@@ -129,28 +129,30 @@ export const restaurantAPI = {
   // Lấy tất cả restaurants cho admin (bao gồm chưa duyệt)
   getAllRestaurantsAdmin: async (params = {}) => {
     const queryString = new URLSearchParams(params).toString();
-    const endpoint = queryString ? `/restaurants/admin/all?${queryString}` : '/restaurants/admin/all';
+    const endpoint = queryString
+      ? `/restaurants/admin/all?${queryString}`
+      : "/restaurants/admin/all";
     return apiCall(endpoint);
   },
 
   // Lấy danh sách nhà hàng chờ duyệt
   getPendingRestaurants: async () => {
-    return apiCall('/restaurants/admin/pending');
+    return apiCall("/restaurants/admin/pending");
   },
 
   // Duyệt nhà hàng
   approveRestaurant: async (restaurantId, notes) => {
     return apiCall(`/restaurants/admin/${restaurantId}/approve`, {
-      method: 'PUT',
-      body: JSON.stringify({ notes })
+      method: "PUT",
+      body: JSON.stringify({ notes }),
     });
   },
 
   // Từ chối nhà hàng
   rejectRestaurant: async (restaurantId, reason) => {
     return apiCall(`/restaurants/admin/${restaurantId}/reject`, {
-      method: 'PUT',
-      body: JSON.stringify({ reason })
+      method: "PUT",
+      body: JSON.stringify({ reason }),
     });
   },
 
@@ -161,18 +163,25 @@ export const restaurantAPI = {
 
   // Tạo nhà hàng mới kèm tài khoản owner (admin only)
   createRestaurantWithOwner: async (data) => {
-    return apiCall('/restaurants/admin/create-with-owner', {
-      method: 'POST',
-      body: JSON.stringify(data)
+    return apiCall("/restaurants/admin/create-with-owner", {
+      method: "POST",
+      body: JSON.stringify(data),
     });
-  }
+  },
+
+  // Xóa nhà hàng
+  deleteRestaurant: async (restaurantId) => {
+    return apiCall(`/restaurants/${restaurantId}`, {
+      method: "DELETE",
+    });
+  },
 };
 
 // ==================== USER API ====================
 export const userAPI = {
   // Lấy tất cả users
   getAllUsers: async () => {
-    return apiCall('/auth/users');
+    return apiCall("/auth/users");
   },
 
   // Lấy user theo ID
@@ -183,17 +192,17 @@ export const userAPI = {
   // Cập nhật status user (khóa/mở)
   updateUserStatus: async (userId, isActive) => {
     return apiCall(`/auth/users/${userId}/status`, {
-      method: 'PUT',
-      body: JSON.stringify({ isActive })
+      method: "PUT",
+      body: JSON.stringify({ isActive }),
     });
-  }
+  },
 };
 
 // ==================== DRONE API ====================
 export const droneAPI = {
   // Lấy tất cả drones
   getAllDrones: async () => {
-    return apiCall('/drones');
+    return apiCall("/drones");
   },
 
   // Lấy drone theo ID
@@ -203,51 +212,51 @@ export const droneAPI = {
 
   // Tạo drone mới
   createDrone: async (droneData) => {
-    return apiCall('/drones', {
-      method: 'POST',
-      body: JSON.stringify(droneData)
+    return apiCall("/drones", {
+      method: "POST",
+      body: JSON.stringify(droneData),
     });
   },
 
   // Cập nhật drone
   updateDrone: async (droneId, droneData) => {
     return apiCall(`/drones/${droneId}`, {
-      method: 'PUT',
-      body: JSON.stringify(droneData)
+      method: "PUT",
+      body: JSON.stringify(droneData),
     });
   },
 
   // Xóa drone
   deleteDrone: async (droneId) => {
     return apiCall(`/drones/${droneId}`, {
-      method: 'DELETE'
+      method: "DELETE",
     });
-  }
+  },
 };
 
 // ==================== DASHBOARD API ====================
 export const dashboardAPI = {
   // Lấy overview stats
   getOverview: async () => {
-    return apiCall('/dashboard/overview');
+    return apiCall("/dashboard/overview");
   },
 
   // Lấy revenue stats
-  getRevenue: async (period = 'month') => {
+  getRevenue: async (period = "month") => {
     return apiCall(`/dashboard/revenue?period=${period}`);
   },
 
   // Lấy recent orders
   getRecentOrders: async (limit = 10) => {
     return apiCall(`/dashboard/recent-orders?limit=${limit}`);
-  }
+  },
 };
 
 // ==================== TRANSACTION API ====================
 export const transactionAPI = {
   // Lấy tất cả transactions
   getAllTransactions: async () => {
-    return apiCall('/transactions');
+    return apiCall("/transactions");
   },
 
   // Lấy transactions theo restaurant
@@ -257,43 +266,47 @@ export const transactionAPI = {
 
   // Tạo withdrawal request (rút tiền)
   createWithdrawal: async (restaurantId, amount, paypalEmail) => {
-    return apiCall('/transactions/withdraw', {
-      method: 'POST',
-      body: JSON.stringify({ restaurantId, amount, paypalEmail })
+    return apiCall("/transactions/withdraw", {
+      method: "POST",
+      body: JSON.stringify({ restaurantId, amount, paypalEmail }),
     });
   },
 
   // Xử lý withdrawal (approve/reject)
   processWithdrawal: async (transactionId, action, note) => {
     return apiCall(`/transactions/${transactionId}/process`, {
-      method: 'PUT',
-      body: JSON.stringify({ action, note })
+      method: "PUT",
+      body: JSON.stringify({ action, note }),
     });
-  }
+  },
 };
 
 // ==================== ADMIN SETTINGS API ====================
 export const adminSettingsAPI = {
   // Lấy settings
   getSettings: async () => {
-    return apiCall('/admin-settings');
+    return apiCall("/admin-settings");
   },
 
   // Cập nhật PayPal settings
-  updatePayPalSettings: async (paypalEmail, paypalClientId, paypalClientSecret) => {
-    return apiCall('/admin-settings/paypal', {
-      method: 'PUT',
-      body: JSON.stringify({ paypalEmail, paypalClientId, paypalClientSecret })
+  updatePayPalSettings: async (
+    paypalEmail,
+    paypalClientId,
+    paypalClientSecret
+  ) => {
+    return apiCall("/admin-settings/paypal", {
+      method: "PUT",
+      body: JSON.stringify({ paypalEmail, paypalClientId, paypalClientSecret }),
     });
   },
 
   // Cập nhật commission rate
   updateCommissionRate: async (commissionRate, minWithdrawAmount) => {
-    return apiCall('/admin-settings/commission', {
-      method: 'PUT',
-      body: JSON.stringify({ commissionRate, minWithdrawAmount })
+    return apiCall("/admin-settings/commission", {
+      method: "PUT",
+      body: JSON.stringify({ commissionRate, minWithdrawAmount }),
     });
-  }
+  },
 };
 
 export default {
@@ -304,5 +317,5 @@ export default {
   droneAPI,
   dashboardAPI,
   transactionAPI,
-  adminSettingsAPI
+  adminSettingsAPI,
 };

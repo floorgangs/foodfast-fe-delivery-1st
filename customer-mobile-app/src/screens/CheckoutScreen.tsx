@@ -314,7 +314,7 @@ const CheckoutScreen = ({ navigation }: any) => {
       const response = await orderAPI.create(orderData);
       console.log("[Checkout] Order creation response:", response);
 
-      if (!response?.data?._id || !response?.data?.paymentSession?.sessionId) {
+      if (!response?.order?._id || !response?.paymentSession?.sessionId) {
         console.error("[Checkout] Invalid response structure:", response);
         throw new Error(
           "Không thể khởi tạo phiên thanh toán. Vui lòng thử lại."
@@ -325,22 +325,22 @@ const CheckoutScreen = ({ navigation }: any) => {
       if (selectedPayment === "paypal") {
         console.log("[Checkout] Navigating to PayPalPayment");
         navigation.replace("PayPalPayment", {
-          orderId: response.data._id,
-          amount: response.data.total,
-          description: `Đơn hàng #${response.data.orderNumber} - ${items[0]?.restaurantName}`,
+          orderId: response.order._id,
+          amount: response.order.total,
+          description: `Đơn hàng #${response.order.orderNumber} - ${items[0]?.restaurantName}`,
         });
         return;
       }
 
       const navigationParams = {
-        orderId: response.data._id,
-        orderNumber: response.data.orderNumber,
-        amount: response.data.total,
-        sessionId: response.data.paymentSession.sessionId,
-        providerName: response.data.paymentSession.providerName,
+        orderId: response.order._id,
+        orderNumber: response.order.orderNumber,
+        amount: response.order.total,
+        sessionId: response.paymentSession.sessionId,
+        providerName: response.paymentSession.providerName,
         paymentMethod: selectedPayment,
-        redirectUrl: response.data.paymentSession.redirectUrl,
-        expiresAt: response.data.paymentSession.expiresAt,
+        redirectUrl: response.paymentSession.redirectUrl,
+        expiresAt: response.paymentSession.expiresAt,
         restaurantName: items[0]?.restaurantName,
       };
 

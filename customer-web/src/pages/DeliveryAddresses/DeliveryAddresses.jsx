@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { updateProfile, loadUser } from "../../store/slices/authSlice";
+import { vietnamLocations } from "../../data/vietnamLocations";
 import "./DeliveryAddresses.css";
 
 const ADDRESS_SUGGESTIONS = [
@@ -37,7 +38,12 @@ const ADDRESS_SUGGESTIONS = [
   },
 ];
 
-const QUICK_ADDRESS_TAGS = ["Nhà riêng", "Văn phòng", "Chung cư", "Sảnh bảo vệ"];
+const QUICK_ADDRESS_TAGS = [
+  "Nhà riêng",
+  "Văn phòng",
+  "Chung cư",
+  "Sảnh bảo vệ",
+];
 
 function DeliveryAddresses() {
   const navigate = useNavigate();
@@ -51,6 +57,9 @@ function DeliveryAddresses() {
   const [formData, setFormData] = useState({
     label: "",
     phone: "",
+    addressCity: "",
+    addressDistrict: "",
+    addressWard: "",
     address: "",
   });
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -63,8 +72,12 @@ function DeliveryAddresses() {
         id: entry._id || entry.id || `addr-${index}-${Date.now()}`,
         mongoId: entry._id,
         label: entry.label || entry.name || "Địa chỉ",
-        contactName: entry.contactName || entry.recipientName || entry.label || "",
+        contactName:
+          entry.contactName || entry.recipientName || entry.label || "",
         phone: entry.contactPhone || entry.phone || fallbackPhone,
+        addressCity: entry.addressCity || "",
+        addressDistrict: entry.addressDistrict || "",
+        addressWard: entry.addressWard || "",
         address: entry.address || entry.fullAddress || "",
         isDefault: Boolean(entry.isDefault),
       }));
@@ -78,6 +91,9 @@ function DeliveryAddresses() {
       label: item.label,
       contactName: item.contactName ?? item.label,
       contactPhone: item.phone,
+      addressCity: item.addressCity || "",
+      addressDistrict: item.addressDistrict || "",
+      addressWard: item.addressWard || "",
       address: item.address,
       isDefault: item.isDefault,
     }));
@@ -85,7 +101,9 @@ function DeliveryAddresses() {
   const persistAddresses = async (next) => {
     try {
       setSaving(true);
-      await dispatch(updateProfile({ addresses: toBackendPayload(next) })).unwrap();
+      await dispatch(
+        updateProfile({ addresses: toBackendPayload(next) })
+      ).unwrap();
       await dispatch(loadUser()).unwrap();
       return true;
     } catch (error) {
@@ -104,7 +122,14 @@ function DeliveryAddresses() {
 
   const handleAdd = () => {
     setEditingAddress(null);
-    setFormData({ label: "", phone: fallbackPhone, address: "" });
+    setFormData({
+      label: "",
+      phone: fallbackPhone,
+      addressCity: "",
+      addressDistrict: "",
+      addressWard: "",
+      address: "",
+    });
     setShowSuggestions(false);
     setModalVisible(true);
   };
@@ -114,6 +139,9 @@ function DeliveryAddresses() {
     setFormData({
       label: address.label,
       phone: address.phone,
+      addressCity: address.addressCity || "",
+      addressDistrict: address.addressDistrict || "",
+      addressWard: address.addressWard || "",
       address: address.address,
     });
     setShowSuggestions(false);
@@ -153,8 +181,8 @@ function DeliveryAddresses() {
     const trimmedAddress = formData.address.trim();
     const trimmedPhone = formData.phone.trim() || fallbackPhone;
 
-    if (!trimmedLabel || !trimmedAddress) {
-      alert("Vui lòng nhập đầy đủ thông tin địa chỉ.");
+    if (!formData.addressCity || !formData.addressDistrict || !trimmedAddress) {
+      alert("Vui lòng chọn thành phố, quận/huyện và nhập đầy đủ thông tin.");
       return;
     }
 
@@ -170,6 +198,9 @@ function DeliveryAddresses() {
           label: trimmedLabel,
           contactName: addr.contactName || trimmedLabel,
           phone: trimmedPhone,
+          addressCity: formData.addressCity,
+          addressDistrict: formData.addressDistrict,
+          addressWard: formData.addressWard,
           address: trimmedAddress,
         };
       });
@@ -179,6 +210,9 @@ function DeliveryAddresses() {
         label: trimmedLabel,
         contactName: trimmedLabel,
         phone: trimmedPhone,
+        addressCity: formData.addressCity,
+        addressDistrict: formData.addressDistrict,
+        addressWard: formData.addressWard,
         address: trimmedAddress,
         isDefault: addresses.length === 0,
       };
@@ -308,9 +342,82 @@ function DeliveryAddresses() {
                 </div>
 
                 <div className="form-group">
-                  <label>Địa chỉ chi tiết</label>
+                  <label>Thành phố *</label>
+                  <select
+                    value={formData.addressCity}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        addressCity: e.target.value,
+                        addressDistrict: "",
+                        addressWard: "",
+                      })
+                    }
+                    required
+                  >
+                    <option value="">-- Chọn thành phố --</option>
+                    {vietnamLocations.cities.map((city) => (
+                      <option key={city.id} value={city.name}>
+                        {city.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Quận/Huyện *</label>
+                  <select
+                    value={formData.addressDistrict}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        addressDistrict: e.target.value,
+                        addressWard: "",
+                      })
+                    }
+                    disabled={!formData.addressCity}
+                    required
+                  >
+                    <option value="">-- Chọn quận/huyện --</option>
+                    {formData.addressCity &&
+                      vietnamLocations.cities
+                        .find((c) => c.name === formData.addressCity)
+                        ?.districts.map((district) => (
+                          <option key={district.id} value={district.name}>
+                            {district.name}
+                          </option>
+                        ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Phường/Xã</label>
+                  <select
+                    value={formData.addressWard}
+                    onChange={(e) =>
+                      setFormData({ ...formData, addressWard: e.target.value })
+                    }
+                    disabled={!formData.addressDistrict}
+                  >
+                    <option value="">-- Chọn phường/xã --</option>
+                    {formData.addressDistrict &&
+                      vietnamLocations.cities
+                        .find((c) => c.name === formData.addressCity)
+                        ?.districts.find(
+                          (d) => d.name === formData.addressDistrict
+                        )
+                        ?.wards.map((ward) => (
+                          <option key={ward.id} value={ward.name}>
+                            {ward.name}
+                          </option>
+                        ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Số nhà, tên đường (chi tiết)</label>
                   <textarea
-                    placeholder="Số nhà, tên đường, phường, quận, thành phố"
+                    placeholder="Ví dụ: 123 Đường Nguyễn Huệ"
                     value={formData.address}
                     onChange={(e) => {
                       setFormData({ ...formData, address: e.target.value });
@@ -350,7 +457,9 @@ function DeliveryAddresses() {
                             className="suggestion-item"
                             onClick={() => handleSelectSuggestion(item)}
                           >
-                            <span className="suggestion-title">{item.label}</span>
+                            <span className="suggestion-title">
+                              {item.label}
+                            </span>
                             <span className="suggestion-subtitle">
                               {item.address}
                             </span>

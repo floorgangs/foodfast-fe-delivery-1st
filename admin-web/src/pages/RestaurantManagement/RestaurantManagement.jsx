@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { restaurantAPI } from "../../services/api";
+import { vietnamLocations } from "../../data/vietnamLocations";
 import "./RestaurantManagement.css";
 
 function RestaurantManagement() {
-  const [filter, setFilter] = useState("all"); // all, active, pending, suspended, rejected
+  const [filter, setFilter] = useState("all"); // all, active, pending, suspended, rejected, deleted
   const [showViewModal, setShowViewModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedRestaurant, setSelectedRestaurant] = useState(null);
   const [complianceData, setComplianceData] = useState(null);
   const [restaurants, setRestaurants] = useState([]);
@@ -39,11 +41,26 @@ function RestaurantManagement() {
   const [selectedCuisines, setSelectedCuisines] = useState([]);
   const [avatarPreview, setAvatarPreview] = useState("");
   const [coverPreview, setCoverPreview] = useState("");
-  
+
   const cuisineOptions = [
-    "Việt Nam", "Thái Lan", "Nhật Bản", "Hàn Quốc", "Trung Quốc",
-    "Ý", "Pháp", "Mỹ", "Ấn Độ", "Món nướng", "Lẩu", "Hải sản",
-    "Chay", "Buffet", "Fast Food", "Đồ uống", "Tráng miệng", "Khác"
+    "Việt Nam",
+    "Thái Lan",
+    "Nhật Bản",
+    "Hàn Quốc",
+    "Trung Quốc",
+    "Ý",
+    "Pháp",
+    "Mỹ",
+    "Ấn Độ",
+    "Món nướng",
+    "Lẩu",
+    "Hải sản",
+    "Chay",
+    "Buffet",
+    "Fast Food",
+    "Đồ uống",
+    "Tráng miệng",
+    "Khác",
   ];
 
   useEffect(() => {
@@ -72,13 +89,15 @@ function RestaurantManagement() {
               : `${r.address?.street || ""}, ${r.address?.district || ""}, ${
                   r.address?.city || ""
                 }`.trim(),
-          status: r.compliance?.status === "rejected" 
+          status: r.deletedAt
+            ? "deleted"
+            : r.compliance?.status === "rejected"
             ? "rejected"
             : r.isApproved
-              ? r.isActive
-                ? "active"
-                : "suspended"
-              : "pending",
+            ? r.isActive
+              ? "active"
+              : "suspended"
+            : "pending",
           rating: r.rating || 0,
           orders: r.totalOrders || 0,
           revenue: r.totalRevenue || 0,
@@ -88,6 +107,7 @@ function RestaurantManagement() {
           compliance: r.compliance,
           isApproved: r.isApproved,
           isActive: r.isActive,
+          deletedAt: r.deletedAt,
         }));
         setRestaurants(transformed);
       }
@@ -105,6 +125,7 @@ function RestaurantManagement() {
       pending: "Chờ duyệt",
       suspended: "Đã khóa",
       rejected: "Đã từ chối",
+      deleted: "Đã xóa",
     };
     return statusMap[status] || status;
   };
@@ -131,7 +152,9 @@ function RestaurantManagement() {
     // Load compliance data if pending or rejected
     if (restaurant.status === "pending" || restaurant.status === "rejected") {
       try {
-        const response = await restaurantAPI.getRestaurantCompliance(restaurant.id);
+        const response = await restaurantAPI.getRestaurantCompliance(
+          restaurant.id
+        );
         if (response.success) {
           setComplianceData(response.data);
         }
@@ -194,7 +217,9 @@ function RestaurantManagement() {
 
     try {
       setProcessing(true);
-      const response = await restaurantAPI.updateRestaurant(id, { isActive: false });
+      const response = await restaurantAPI.updateRestaurant(id, {
+        isActive: false,
+      });
 
       if (response.success) {
         await loadRestaurants();
@@ -214,7 +239,9 @@ function RestaurantManagement() {
 
     try {
       setProcessing(true);
-      const response = await restaurantAPI.updateRestaurant(id, { isActive: true });
+      const response = await restaurantAPI.updateRestaurant(id, {
+        isActive: true,
+      });
 
       if (response.success) {
         await loadRestaurants();
@@ -229,11 +256,37 @@ function RestaurantManagement() {
     }
   };
 
+  const handleDelete = async () => {
+    try {
+      setProcessing(true);
+      const response = await restaurantAPI.deleteRestaurant(
+        selectedRestaurant.id
+      );
+
+      if (response.success) {
+        await loadRestaurants();
+        setShowDeleteModal(false);
+        setShowViewModal(false);
+        alert("Đã xóa nhà hàng thành công!");
+      }
+    } catch (error) {
+      console.error("Error deleting restaurant:", error);
+      alert(error.message || "Không thể xóa nhà hàng");
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const handleCreateRestaurant = async (e) => {
     e.preventDefault();
-    
+
     // Validate required fields
-    if (!formData.name || !formData.ownerName || !formData.ownerEmail || !formData.ownerPassword) {
+    if (
+      !formData.name ||
+      !formData.ownerName ||
+      !formData.ownerEmail ||
+      !formData.ownerPassword
+    ) {
       alert("Vui lòng nhập đầy đủ thông tin bắt buộc (đánh dấu *)");
       return;
     }
@@ -263,14 +316,17 @@ function RestaurantManagement() {
 
     // Validate phone
     const phoneRegex = /^[0-9]{10,11}$/;
-    if (!phoneRegex.test(formData.ownerPhone) || !phoneRegex.test(formData.phone)) {
+    if (
+      !phoneRegex.test(formData.ownerPhone) ||
+      !phoneRegex.test(formData.phone)
+    ) {
       alert("Số điện thoại không hợp lệ (10-11 số)");
       return;
     }
 
     try {
       setProcessing(true);
-      
+
       const payload = {
         // Restaurant info
         name: formData.name.trim(),
@@ -285,7 +341,8 @@ function RestaurantManagement() {
         phone: formData.phone.trim(),
         deliveryFee: parseFloat(formData.deliveryFee) || 15000,
         minOrder: parseFloat(formData.minOrder) || 0,
-        estimatedDeliveryTime: formData.estimatedDeliveryTime.trim() || "30-45 phút",
+        estimatedDeliveryTime:
+          formData.estimatedDeliveryTime.trim() || "30-45 phút",
         avatar: formData.avatar || undefined,
         coverImage: formData.coverImage || undefined,
         // Owner info
@@ -300,14 +357,19 @@ function RestaurantManagement() {
       const response = await restaurantAPI.createRestaurantWithOwner(payload);
 
       if (response.success) {
-        alert(`✅ Tạo nhà hàng thành công!\n\nThông tin đăng nhập:\nEmail: ${payload.ownerEmail}\nMật khẩu: (đã tạo)\n\nChủ nhà hàng có thể đăng nhập ngay!`);
+        alert(
+          `✅ Tạo nhà hàng thành công!\n\nThông tin đăng nhập:\nEmail: ${payload.ownerEmail}\nMật khẩu: (đã tạo)\n\nChủ nhà hàng có thể đăng nhập ngay!`
+        );
         setShowCreateModal(false);
         resetForm();
         await loadRestaurants();
       }
     } catch (error) {
       console.error("Error creating restaurant:", error);
-      alert(error.message || "Không thể tạo nhà hàng. Vui lòng kiểm tra lại thông tin.");
+      alert(
+        error.message ||
+          "Không thể tạo nhà hàng. Vui lòng kiểm tra lại thông tin."
+      );
     } finally {
       setProcessing(false);
     }
@@ -346,9 +408,9 @@ function RestaurantManagement() {
   };
 
   const toggleCuisine = (cuisine) => {
-    setSelectedCuisines(prev => 
-      prev.includes(cuisine) 
-        ? prev.filter(c => c !== cuisine)
+    setSelectedCuisines((prev) =>
+      prev.includes(cuisine)
+        ? prev.filter((c) => c !== cuisine)
         : [...prev, cuisine]
     );
   };
@@ -357,25 +419,25 @@ function RestaurantManagement() {
     const file = e.target.files[0];
     if (file) {
       // Validate file type
-      if (!file.type.startsWith('image/')) {
-        alert('Vui lòng chọn file ảnh');
+      if (!file.type.startsWith("image/")) {
+        alert("Vui lòng chọn file ảnh");
         return;
       }
-      
+
       // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        alert('Kích thước ảnh không được vượt quá 5MB');
+        alert("Kích thước ảnh không được vượt quá 5MB");
         return;
       }
 
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64String = reader.result;
-        if (type === 'avatar') {
-          setFormData(prev => ({ ...prev, avatar: base64String }));
+        if (type === "avatar") {
+          setFormData((prev) => ({ ...prev, avatar: base64String }));
           setAvatarPreview(base64String);
         } else {
-          setFormData(prev => ({ ...prev, coverImage: base64String }));
+          setFormData((prev) => ({ ...prev, coverImage: base64String }));
           setCoverPreview(base64String);
         }
       };
@@ -486,7 +548,12 @@ function RestaurantManagement() {
               </tr>
             ) : (
               filteredRestaurants.map((restaurant) => (
-                <tr key={restaurant.id} className={restaurant.status === "pending" ? "pending-row" : ""}>
+                <tr
+                  key={restaurant.id}
+                  className={
+                    restaurant.status === "pending" ? "pending-row" : ""
+                  }
+                >
                   <td>
                     <strong>{restaurant.name}</strong>
                   </td>
@@ -554,6 +621,16 @@ function RestaurantManagement() {
                           Kích hoạt
                         </button>
                       )}
+                      <button
+                        className="action-btn delete"
+                        onClick={() => {
+                          setSelectedRestaurant(restaurant);
+                          setShowDeleteModal(true);
+                        }}
+                        disabled={processing}
+                      >
+                        Xóa
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -566,7 +643,10 @@ function RestaurantManagement() {
       {/* View Modal */}
       {showViewModal && selectedRestaurant && (
         <div className="modal-overlay" onClick={() => setShowViewModal(false)}>
-          <div className="modal-content large" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="modal-content large"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-header">
               <h2>Thông tin nhà hàng</h2>
               <button
@@ -592,7 +672,9 @@ function RestaurantManagement() {
                   </div>
                   <div className="info-row">
                     <span className="label">Email:</span>
-                    <span className="value">{selectedRestaurant.ownerEmail}</span>
+                    <span className="value">
+                      {selectedRestaurant.ownerEmail}
+                    </span>
                   </div>
                   <div className="info-row">
                     <span className="label">Số điện thoại:</span>
@@ -605,12 +687,16 @@ function RestaurantManagement() {
                   <div className="info-row">
                     <span className="label">Ngày đăng ký:</span>
                     <span className="value">
-                      {new Date(selectedRestaurant.joined).toLocaleDateString("vi-VN")}
+                      {new Date(selectedRestaurant.joined).toLocaleDateString(
+                        "vi-VN"
+                      )}
                     </span>
                   </div>
                   <div className="info-row">
                     <span className="label">Trạng thái:</span>
-                    <span className={`status-badge ${selectedRestaurant.status}`}>
+                    <span
+                      className={`status-badge ${selectedRestaurant.status}`}
+                    >
                       {getStatusText(selectedRestaurant.status)}
                     </span>
                   </div>
@@ -646,7 +732,8 @@ function RestaurantManagement() {
               )}
 
               {/* Compliance info for pending/rejected restaurants */}
-              {(selectedRestaurant.status === "pending" || selectedRestaurant.status === "rejected") && (
+              {(selectedRestaurant.status === "pending" ||
+                selectedRestaurant.status === "rejected") && (
                 <>
                   {complianceData ? (
                     <>
@@ -656,21 +743,25 @@ function RestaurantManagement() {
                           <div className="info-row">
                             <span className="label">Số CCCD:</span>
                             <span className="value">
-                              {complianceData.compliance?.idCard?.number || "Chưa cung cấp"}
+                              {complianceData.compliance?.idCard?.number ||
+                                "Chưa cung cấp"}
                             </span>
                           </div>
                           <div className="info-row">
                             <span className="label">Ngày cấp:</span>
                             <span className="value">
                               {complianceData.compliance?.idCard?.issueDate
-                                ? new Date(complianceData.compliance.idCard.issueDate).toLocaleDateString("vi-VN")
+                                ? new Date(
+                                    complianceData.compliance.idCard.issueDate
+                                  ).toLocaleDateString("vi-VN")
                                 : "Chưa cung cấp"}
                             </span>
                           </div>
                           <div className="info-row">
                             <span className="label">Nơi cấp:</span>
                             <span className="value">
-                              {complianceData.compliance?.idCard?.issuePlace || "Chưa cung cấp"}
+                              {complianceData.compliance?.idCard?.issuePlace ||
+                                "Chưa cung cấp"}
                             </span>
                           </div>
                         </div>
@@ -678,13 +769,21 @@ function RestaurantManagement() {
                           {complianceData.compliance?.idCard?.frontImage && (
                             <div className="doc-item">
                               <label>CCCD mặt trước</label>
-                              <img src={complianceData.compliance.idCard.frontImage} alt="CCCD mặt trước" />
+                              <img
+                                src={
+                                  complianceData.compliance.idCard.frontImage
+                                }
+                                alt="CCCD mặt trước"
+                              />
                             </div>
                           )}
                           {complianceData.compliance?.idCard?.backImage && (
                             <div className="doc-item">
                               <label>CCCD mặt sau</label>
-                              <img src={complianceData.compliance.idCard.backImage} alt="CCCD mặt sau" />
+                              <img
+                                src={complianceData.compliance.idCard.backImage}
+                                alt="CCCD mặt sau"
+                              />
                             </div>
                           )}
                         </div>
@@ -693,15 +792,21 @@ function RestaurantManagement() {
                       <div className="info-section">
                         <h3>📋 Giấy phép kinh doanh</h3>
                         <div className="document-preview">
-                          {complianceData.compliance?.businessLicense?.documentImage ? (
+                          {complianceData.compliance?.businessLicense
+                            ?.documentImage ? (
                             <div className="doc-item">
                               <img
-                                src={complianceData.compliance.businessLicense.documentImage}
+                                src={
+                                  complianceData.compliance.businessLicense
+                                    .documentImage
+                                }
                                 alt="Giấy phép kinh doanh"
                               />
                             </div>
                           ) : (
-                            <p className="no-doc">Chưa cung cấp giấy phép kinh doanh</p>
+                            <p className="no-doc">
+                              Chưa cung cấp giấy phép kinh doanh
+                            </p>
                           )}
                         </div>
                       </div>
@@ -712,7 +817,8 @@ function RestaurantManagement() {
                           <div className="info-row">
                             <span className="label">Mã số thuế:</span>
                             <span className="value">
-                              {complianceData.compliance?.tax?.code || "Chưa cung cấp"}
+                              {complianceData.compliance?.tax?.code ||
+                                "Chưa cung cấp"}
                             </span>
                           </div>
                         </div>
@@ -720,18 +826,21 @@ function RestaurantManagement() {
                     </>
                   ) : (
                     <div className="info-section">
-                      <p className="loading-text">Đang tải thông tin hồ sơ...</p>
+                      <p className="loading-text">
+                        Đang tải thông tin hồ sơ...
+                      </p>
                     </div>
                   )}
 
-                  {selectedRestaurant.status === "rejected" && selectedRestaurant.compliance?.rejectionReason && (
-                    <div className="info-section rejection-info">
-                      <h3>❌ Lý do từ chối</h3>
-                      <div className="rejection-box">
-                        <p>{selectedRestaurant.compliance.rejectionReason}</p>
+                  {selectedRestaurant.status === "rejected" &&
+                    selectedRestaurant.compliance?.rejectionReason && (
+                      <div className="info-section rejection-info">
+                        <h3>❌ Lý do từ chối</h3>
+                        <div className="rejection-box">
+                          <p>{selectedRestaurant.compliance.rejectionReason}</p>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
                 </>
               )}
             </div>
@@ -773,7 +882,19 @@ function RestaurantManagement() {
                   Kích hoạt lại
                 </button>
               )}
-              <button className="action-btn close" onClick={() => setShowViewModal(false)}>
+              <button
+                className="action-btn delete"
+                onClick={() => {
+                  setShowDeleteModal(true);
+                }}
+                disabled={processing}
+              >
+                Xóa nhà hàng
+              </button>
+              <button
+                className="action-btn close"
+                onClick={() => setShowViewModal(false)}
+              >
                 Đóng
               </button>
             </div>
@@ -783,11 +904,20 @@ function RestaurantManagement() {
 
       {/* Reject Modal */}
       {showRejectModal && (
-        <div className="modal-overlay" onClick={() => setShowRejectModal(false)}>
-          <div className="modal-content small" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="modal-overlay"
+          onClick={() => setShowRejectModal(false)}
+        >
+          <div
+            className="modal-content small"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-header">
               <h2>Từ chối nhà hàng</h2>
-              <button className="close-btn" onClick={() => setShowRejectModal(false)}>
+              <button
+                className="close-btn"
+                onClick={() => setShowRejectModal(false)}
+              >
                 ×
               </button>
             </div>
@@ -802,7 +932,10 @@ function RestaurantManagement() {
               />
             </div>
             <div className="modal-footer">
-              <button className="action-btn close" onClick={() => setShowRejectModal(false)}>
+              <button
+                className="action-btn close"
+                onClick={() => setShowRejectModal(false)}
+              >
                 Hủy
               </button>
               <button
@@ -811,6 +944,59 @@ function RestaurantManagement() {
                 disabled={processing || !rejectReason.trim()}
               >
                 {processing ? "Đang xử lý..." : "Xác nhận từ chối"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Modal */}
+      {showDeleteModal && selectedRestaurant && (
+        <div
+          className="modal-overlay"
+          onClick={() => setShowDeleteModal(false)}
+        >
+          <div
+            className="modal-content small"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h2>Xóa nhà hàng</h2>
+              <button
+                className="close-btn"
+                onClick={() => setShowDeleteModal(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <p>
+                Bạn có chắc muốn xóa nhà hàng{" "}
+                <strong>{selectedRestaurant.name}</strong>?
+              </p>
+              <p
+                style={{
+                  color: "#e74c3c",
+                  marginTop: "10px",
+                  fontSize: "0.9em",
+                }}
+              >
+                ⚠️ Hành động này không thể hoàn tác!
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button
+                className="action-btn close"
+                onClick={() => setShowDeleteModal(false)}
+              >
+                Hủy
+              </button>
+              <button
+                className="action-btn delete"
+                onClick={handleDelete}
+                disabled={processing}
+              >
+                {processing ? "Đang xử lý..." : "Xác nhận xóa"}
               </button>
             </div>
           </div>
@@ -843,7 +1029,7 @@ function RestaurantManagement() {
               <div className="modal-body">
                 <div className="form-section">
                   <h3 className="section-title">Thông tin nhà hàng</h3>
-                  
+
                   <div className="form-group">
                     <label htmlFor="name">Tên nhà hàng *</label>
                     <input
@@ -865,16 +1051,22 @@ function RestaurantManagement() {
                           type="file"
                           id="avatar"
                           accept="image/*"
-                          onChange={(e) => handleImageChange(e, 'avatar')}
-                          style={{ display: 'none' }}
+                          onChange={(e) => handleImageChange(e, "avatar")}
+                          style={{ display: "none" }}
                         />
                         <label htmlFor="avatar" className="image-upload-label">
                           {avatarPreview ? (
-                            <img src={avatarPreview} alt="Avatar preview" className="image-preview" />
+                            <img
+                              src={avatarPreview}
+                              alt="Avatar preview"
+                              className="image-preview"
+                            />
                           ) : (
                             <div className="image-placeholder">
                               <span className="upload-icon">📷</span>
-                              <span className="upload-text">Chọn ảnh đại diện</span>
+                              <span className="upload-text">
+                                Chọn ảnh đại diện
+                              </span>
                               <span className="upload-hint">Tối đa 5MB</span>
                             </div>
                           )}
@@ -889,12 +1081,19 @@ function RestaurantManagement() {
                           type="file"
                           id="coverImage"
                           accept="image/*"
-                          onChange={(e) => handleImageChange(e, 'cover')}
-                          style={{ display: 'none' }}
+                          onChange={(e) => handleImageChange(e, "cover")}
+                          style={{ display: "none" }}
                         />
-                        <label htmlFor="coverImage" className="image-upload-label">
+                        <label
+                          htmlFor="coverImage"
+                          className="image-upload-label"
+                        >
                           {coverPreview ? (
-                            <img src={coverPreview} alt="Cover preview" className="image-preview" />
+                            <img
+                              src={coverPreview}
+                              alt="Cover preview"
+                              className="image-preview"
+                            />
                           ) : (
                             <div className="image-placeholder">
                               <span className="upload-icon">🖼️</span>
@@ -921,7 +1120,9 @@ function RestaurantManagement() {
                   </div>
 
                   <div className="form-group">
-                    <label htmlFor="addressStreet">Địa chỉ (Số nhà, đường) *</label>
+                    <label htmlFor="addressStreet">
+                      Địa chỉ (Số nhà, đường) *
+                    </label>
                     <input
                       type="text"
                       id="addressStreet"
@@ -935,39 +1136,67 @@ function RestaurantManagement() {
 
                   <div className="form-row-3">
                     <div className="form-group">
-                      <label htmlFor="addressWard">Phường/Xã</label>
-                      <input
-                        type="text"
-                        id="addressWard"
-                        name="addressWard"
-                        value={formData.addressWard}
-                        onChange={handleChange}
-                        placeholder="Nhập phường/xã"
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label htmlFor="addressDistrict">Quận/Huyện</label>
-                      <input
-                        type="text"
-                        id="addressDistrict"
-                        name="addressDistrict"
-                        value={formData.addressDistrict}
-                        onChange={handleChange}
-                        placeholder="Nhập quận/huyện"
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label htmlFor="addressCity">Thành phố</label>
-                      <input
-                        type="text"
+                      <label htmlFor="addressCity">Thành phố *</label>
+                      <select
                         id="addressCity"
                         name="addressCity"
                         value={formData.addressCity}
                         onChange={handleChange}
-                        placeholder="Nhập thành phố"
-                      />
+                        required
+                      >
+                        <option value="">-- Chọn thành phố --</option>
+                        {vietnamLocations.cities.map((city) => (
+                          <option key={city.id} value={city.name}>
+                            {city.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label htmlFor="addressDistrict">Quận/Huyện *</label>
+                      <select
+                        id="addressDistrict"
+                        name="addressDistrict"
+                        value={formData.addressDistrict}
+                        onChange={handleChange}
+                        required
+                        disabled={!formData.addressCity}
+                      >
+                        <option value="">-- Chọn quận/huyện --</option>
+                        {formData.addressCity &&
+                          vietnamLocations.cities
+                            .find((c) => c.name === formData.addressCity)
+                            ?.districts.map((district) => (
+                              <option key={district.id} value={district.name}>
+                                {district.name}
+                              </option>
+                            ))}
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label htmlFor="addressWard">Phường/Xã</label>
+                      <select
+                        id="addressWard"
+                        name="addressWard"
+                        value={formData.addressWard}
+                        onChange={handleChange}
+                        disabled={!formData.addressDistrict}
+                      >
+                        <option value="">-- Chọn phường/xã --</option>
+                        {formData.addressDistrict &&
+                          vietnamLocations.cities
+                            .find((c) => c.name === formData.addressCity)
+                            ?.districts.find(
+                              (d) => d.name === formData.addressDistrict
+                            )
+                            ?.wards.map((ward) => (
+                              <option key={ward.id} value={ward.name}>
+                                {ward.name}
+                              </option>
+                            ))}
+                      </select>
                     </div>
                   </div>
 
@@ -978,14 +1207,18 @@ function RestaurantManagement() {
                         <button
                           key={cuisine}
                           type="button"
-                          className={`cuisine-tag ${selectedCuisines.includes(cuisine) ? 'active' : ''}`}
+                          className={`cuisine-tag ${
+                            selectedCuisines.includes(cuisine) ? "active" : ""
+                          }`}
                           onClick={() => toggleCuisine(cuisine)}
                         >
                           {cuisine}
                         </button>
                       ))}
                     </div>
-                    <small className="form-hint">Chọn các loại ẩm thực phù hợp</small>
+                    <small className="form-hint">
+                      Chọn các loại ẩm thực phù hợp
+                    </small>
                   </div>
 
                   <div className="form-group">
@@ -1029,7 +1262,9 @@ function RestaurantManagement() {
                   </div>
 
                   <div className="form-group">
-                    <label htmlFor="estimatedDeliveryTime">Thời gian giao hàng dự kiến</label>
+                    <label htmlFor="estimatedDeliveryTime">
+                      Thời gian giao hàng dự kiến
+                    </label>
                     <input
                       type="text"
                       id="estimatedDeliveryTime"
@@ -1045,7 +1280,7 @@ function RestaurantManagement() {
 
                 <div className="form-section">
                   <h3 className="section-title">Thông tin chủ nhà hàng</h3>
-                  
+
                   <div className="form-group">
                     <label htmlFor="ownerName">Tên chủ nhà hàng *</label>
                     <input
@@ -1071,7 +1306,9 @@ function RestaurantManagement() {
                         required
                         placeholder="Nhập email"
                       />
-                      <small className="form-hint">Email này sẽ dùng để đăng nhập hệ thống</small>
+                      <small className="form-hint">
+                        Email này sẽ dùng để đăng nhập hệ thống
+                      </small>
                     </div>
 
                     <div className="form-group">
@@ -1100,7 +1337,9 @@ function RestaurantManagement() {
                       minLength="6"
                       placeholder="Nhập mật khẩu"
                     />
-                    <small className="form-hint">Mật khẩu tối thiểu 6 ký tự</small>
+                    <small className="form-hint">
+                      Mật khẩu tối thiểu 6 ký tự
+                    </small>
                   </div>
                 </div>
 
@@ -1116,8 +1355,8 @@ function RestaurantManagement() {
                   >
                     Hủy
                   </button>
-                  <button 
-                    type="submit" 
+                  <button
+                    type="submit"
                     className="btn-create"
                     disabled={processing}
                   >
