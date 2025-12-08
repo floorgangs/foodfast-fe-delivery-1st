@@ -159,6 +159,8 @@ const HomeScreen = ({ navigation }: any) => {
   const searchInputRef = useRef<TextInput>(null);
   const user = useSelector((state: RootState) => state.auth.user);
   const [restaurantImageFallbacks, setRestaurantImageFallbacks] = useState<Record<string, number>>({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const RESTAURANTS_PER_PAGE = 4;
 
   // Calculate responsive card width
   const restaurantCardWidth = isLandscape && numColumns > 1 
@@ -316,6 +318,29 @@ const HomeScreen = ({ navigation }: any) => {
   };
 
   const filteredRestaurants = getFilteredRestaurants();
+  
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredRestaurants.length / RESTAURANTS_PER_PAGE);
+  const startIndex = (currentPage - 1) * RESTAURANTS_PER_PAGE;
+  const endIndex = startIndex + RESTAURANTS_PER_PAGE;
+  const paginatedRestaurants = filteredRestaurants.slice(startIndex, endIndex);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedFilter, selectedCategory, searchText]);
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
 
   const banners = useMemo(() => {
     if (!Array.isArray(restaurants) || restaurants.length === 0) {
@@ -603,7 +628,7 @@ const HomeScreen = ({ navigation }: any) => {
           { backgroundColor: '#fff', padding: containerPadding },
           isLandscape && numColumns > 1 && { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }
         ]}>
-        {Array.isArray(filteredRestaurants) && filteredRestaurants.map((restaurant) => {
+        {Array.isArray(paginatedRestaurants) && paginatedRestaurants.map((restaurant) => {
           if (!restaurant || typeof restaurant !== 'object') {
             return null;
           }
@@ -706,7 +731,47 @@ const HomeScreen = ({ navigation }: any) => {
             return null;
           }
         })}
-        <View style={{ height: 20 }} />
+        
+        {/* Pagination Controls - Always visible when there are more restaurants */}
+        {filteredRestaurants.length > RESTAURANTS_PER_PAGE && (
+          <View style={styles.paginationContainer}>
+            <TouchableOpacity 
+              style={[
+                styles.paginationButton, 
+                currentPage === 1 && styles.paginationButtonDisabled
+              ]}
+              onPress={goToPreviousPage}
+              disabled={currentPage === 1}
+            >
+              <Text style={[
+                styles.paginationButtonText,
+                currentPage === 1 && styles.paginationButtonTextDisabled
+              ]}>← Trước</Text>
+            </TouchableOpacity>
+            
+            <View style={styles.paginationInfo}>
+              <Text style={styles.paginationText}>
+                Trang {currentPage} / {totalPages}
+              </Text>
+            </View>
+            
+            <TouchableOpacity 
+              style={[
+                styles.paginationButton,
+                currentPage === totalPages && styles.paginationButtonDisabled
+              ]}
+              onPress={goToNextPage}
+              disabled={currentPage === totalPages}
+            >
+              <Text style={[
+                styles.paginationButtonText,
+                currentPage === totalPages && styles.paginationButtonTextDisabled
+              ]}>Sau →</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        
+        <View style={{ height: 80 }} />
         </View>
       </ScrollView>
       )}
@@ -1042,6 +1107,49 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 14,
     color: '#666',
+  },
+  paginationContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    marginTop: 16,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  paginationButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: '#EA5034',
+    borderRadius: 6,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  paginationButtonDisabled: {
+    backgroundColor: '#e0e0e0',
+  },
+  paginationButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  paginationButtonTextDisabled: {
+    color: '#999',
+  },
+  paginationInfo: {
+    alignItems: 'center',
+  },
+  paginationText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  paginationSubtext: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 2,
   },
 });
 
